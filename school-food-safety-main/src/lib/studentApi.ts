@@ -104,3 +104,42 @@ export async function deleteStudent(id: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+export type BulkImportResult = {
+  summary: { total: number; imported: number; faceUploaded: number; skipped: number; failed: number };
+  results: Array<{ code: string; name: string; status: string; message: string }>;
+};
+
+export async function importStudentsZip(file: File): Promise<BulkImportResult> {
+  const token = getAccessToken();
+  if (!token) throw new Error("Bạn chưa đăng nhập hoặc JWT đã hết hạn.");
+  const body = new FormData();
+  body.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/students/bulk-import`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body,
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = Array.isArray(result?.message) ? result.message.join(", ") : result?.message || "Không thể nhập ZIP.";
+    throw new Error(message);
+  }
+  return result as BulkImportResult;
+}
+
+export async function downloadStudentImportTemplate(): Promise<void> {
+  const token = getAccessToken();
+  if (!token) throw new Error("Bạn chưa đăng nhập hoặc JWT đã hết hạn.");
+  const response = await fetch(`${API_BASE_URL}/students/import-template`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Không tải được file Excel mẫu.");
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "CanTinSo_students_template.xlsx";
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

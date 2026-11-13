@@ -108,6 +108,7 @@ model Student {
   updatedAt        DateTime          @updatedAt @map("updated_at")
   classroom        Classroom?        @relation(fields: [classroomId], references: [id], onDelete: SetNull)
   attendanceEvents AttendanceEvent[]
+  hikvisionEnrollments HikvisionStudentEnrollment[]
 
   @@unique([schoolId, code])
   @@index([schoolId, name])
@@ -258,4 +259,24 @@ model TraceEvent {
 
   @@index([lotId, occurredAt])
   @@map("trace_events")
+}
+
+
+model HikvisionStudentEnrollment {
+  id            String   @id @default(uuid()) @db.Uuid
+  schoolId      String   @map("school_id") @db.Uuid
+  studentId     String   @map("student_id") @db.Uuid
+  deviceId      String   @map("device_id")
+  employeeNo    String   @map("employee_no")
+  userCreatedAt DateTime? @map("user_created_at")
+  faceUploadedAt DateTime? @map("face_uploaded_at")
+  lastError     String?  @map("last_error")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, employeeNo])
+  @@unique([deviceId, studentId])
+  @@index([schoolId, lastError])
+  @@map("hikvision_student_enrollments")
 }

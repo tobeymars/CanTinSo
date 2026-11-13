@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowDownToLine,
@@ -28,6 +28,9 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
+  importStudentsZip,
+  downloadStudentImportTemplate,
+  type BulkImportResult,
 } from "./lib/studentApi";
 import { getAttendanceEvents, type AttendanceEvent } from "./lib/attendanceApi";
 type Student = {
@@ -243,6 +246,9 @@ export default function StudentManagement() {
   const [form, setForm] = useState(emptyForm);
   const [modal, setModal] = useState(false);
   const [notice, setNotice] = useState("");
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<BulkImportResult | null>(null);
 
   const classes = useMemo(
     () =>
@@ -307,6 +313,33 @@ export default function StudentManagement() {
       checkinStatus: event ? "Đã điểm danh" : "Chưa điểm danh",
       checkinTime: getStudentCheckinTime(student),
     };
+  };
+
+  const handleZipImport = async (file?: File) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      setNotice("Vui lòng chọn file .zip.");
+      return;
+    }
+    setImporting(true);
+    setImportReport(null);
+    try {
+      const result = await importStudentsZip(file);
+      setImportReport(result);
+      const refreshed = await getStudents();
+      setStudents(refreshed.data);
+      setNotice(`Đã xử lý ${result.summary.total} học sinh: ${result.summary.imported} mới, ${result.summary.faceUploaded} ảnh đã tải, ${result.summary.skipped} bỏ qua, ${result.summary.failed} lỗi.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Nhập dữ liệu thất bại.");
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try { await downloadStudentImportTemplate(); }
+    catch (error) { setNotice(error instanceof Error ? error.message : "Không tải được Excel mẫu."); }
   };
 
   const openCreate = () => {
@@ -609,6 +642,19 @@ export default function StudentManagement() {
         <div className="student-head-actions">
           <button className="student-btn student-btn-light" onClick={exportCsv}>
             <ArrowDownToLine size={16} /> Xuất danh sách
+          </button>
+          <button className="student-btn student-btn-light" onClick={handleDownloadTemplate}>
+            Tải Excel mẫu
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".zip,application/zip"
+            hidden
+            onChange={(event) => void handleZipImport(event.target.files?.[0])}
+          />
+          <button className="student-btn student-btn-light" disabled={importing} onClick={() => importInputRef.current?.click()}>
+            {importing ? "Đang nhập..." : "Nhập Excel + ảnh (ZIP)"}
           </button>
           <button
             className="student-btn student-btn-primary"
@@ -1057,6 +1103,33 @@ export default function StudentManagement() {
             </div>
           </section>
         </>
+      )}
+
+      {importReport && (
+        <section className="student-list-card student-import-report">
+          <div className="student-list-title">
+            <div>
+              <h2>Kết quả nhập học sinh và đồng bộ Hikvision</h2>
+              <p>
+                Tổng {importReport.summary.total} · Mới {importReport.summary.imported} ·
+                Ảnh tải lên {importReport.summary.faceUploaded} · Bỏ qua {importReport.summary.skipped} ·
+                Lỗi {importReport.summary.failed}
+              </p>
+            </div>
+            <button className="student-btn student-btn-light" onClick={() => setImportReport(null)}>Đóng</button>
+          </div>
+          <div className="student-import-results">
+            {importReport.results.map((item) => (
+              <div key={item.code} className="student-import-result">
+                <strong>{item.code} — {item.name}</strong>
+                <span className={item.status === "SUCCESS" ? "is-success" : item.status === "FAILED" ? "is-failed" : "is-skipped"}>
+                  {item.status}
+                </span>
+                <small>{item.message}</small>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {notice && (
