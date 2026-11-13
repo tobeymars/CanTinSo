@@ -161,10 +161,6 @@ export class StudentBulkImportService {
           });
           student = created;
           imported++;
-        } else if (!enrollment && !deviceHasUser) {
-          results.push({ code: row.code, name: row.name, status: "EXISTS_IN_DATABASE", message: "Mã học sinh đã có trong PostgreSQL; bỏ qua để tránh trùng dữ liệu." });
-          skipped++;
-          continue;
         }
 
         const deviceId = process.env.HIK_DEVICE_ID || "hik-main";
