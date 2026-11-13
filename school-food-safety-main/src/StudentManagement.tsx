@@ -245,7 +245,10 @@ export default function StudentManagement() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [modal, setModal] = useState(false);
-  const [notice, setNotice] = useState("");\n  const importInputRef = useRef<HTMLInputElement>(null);\n  const [importing, setImporting] = useState(false);\n  const [importReport, setImportReport] = useState<BulkImportResult | null>(null);
+  const [notice, setNotice] = useState("");
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<BulkImportResult | null>(null);
 
   const classes = useMemo(
     () =>
