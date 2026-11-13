@@ -905,3 +905,16 @@
     align-items: stretch;
   }
 }
+
+
+.student-import-report { margin-top: 18px; }
+.student-import-results { display: grid; gap: 10px; max-height: 420px; overflow: auto; }
+.student-import-result { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 4px 12px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; }
+.student-import-result small { grid-column: 1 / -1; color: #64748b; overflow-wrap: anywhere; }
+.student-import-result .is-success { color: #15803d; font-weight: 700; }
+.student-import-result .is-failed { color: #b91c1c; font-weight: 700; }
+.student-import-result .is-skipped { color: #a16207; font-weight: 700; }
+@media (max-width: 720px) {
+  .student-import-result { grid-template-columns: 1fr; }
+  .student-import-result small { grid-column: auto; }
+}
