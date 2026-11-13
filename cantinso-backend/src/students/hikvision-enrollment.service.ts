@@ -73,7 +73,6 @@ export class HikvisionEnrollmentService {
         Valid: { enable: true, beginTime, endTime, timeType: "UTC" },
         gender: input.gender === "MALE" ? "male" : input.gender === "FEMALE" ? "female" : "unknown",
         userVerifyMode: "face",
-        checkUser: true,
       },
     });
   }
