@@ -75,7 +75,7 @@ export class StudentBulkImportService {
       const line = index + 2;
       if (!code || !name || !className) throw new BadRequestException(`Dòng ${line}: bắt buộc có Mã học sinh, Họ và tên, Lớp.`);
       if (code.length > 30 || !/^[A-Za-z0-9_-]+$/.test(code)) {
-        throw new BadRequestException(`Dòng ${line}: mã học sinh chỉ gồm chữ/số/_/-, tối đa 30 ký tự và không bắt đầu bằng 0 để tương thích thiết bị.`);
+        throw new BadRequestException(`Dòng ${line}: mã học sinh chỉ gồm chữ/số/_/-, tối đa 30 ký tự để tương thích thiết bị.`);
       }
       const key = code.toLocaleLowerCase("vi");
       if (seen.has(key)) throw new BadRequestException(`Excel có mã học sinh bị lặp: ${code}.`);
