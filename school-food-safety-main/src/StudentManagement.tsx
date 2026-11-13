@@ -29,7 +29,7 @@ import {
   updateStudent,
   deleteStudent,
 } from "./lib/studentApi";
-
+import { getAttendanceEvents, type AttendanceEvent } from "./lib/attendanceApi";
 type Student = {
   id: string;
   code: string;
@@ -190,6 +190,50 @@ export default function StudentManagement() {
     };
   }, []);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [attendanceEvents, setAttendanceEvents] = useState<AttendanceEvent[]>(
+    [],
+  );
+  useEffect(() => {
+    if (activeTab !== "face") return;
+
+    let cancelled = false;
+
+    const loadAttendance = async () => {
+      try {
+        setAttendanceLoading(true);
+
+        const events = await getAttendanceEvents(200);
+
+        if (!cancelled) {
+          setAttendanceEvents(events);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setNotice(
+            error instanceof Error
+              ? error.message
+              : "Không thể tải dữ liệu điểm danh.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setAttendanceLoading(false);
+        }
+      }
+    };
+
+    void loadAttendance();
+
+    const timer = window.setInterval(() => {
+      void loadAttendance();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeTab]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [classFilter, setClassFilter] = useState("all");
   const [statusFilter] = useState("all");
@@ -218,6 +262,27 @@ export default function StudentManagement() {
       (selectedClass === "all" || s.className === selectedClass),
   );
 
+  function getStudentAttendance(student: Student) {
+    const today = new Date().toDateString();
+
+    return attendanceEvents.find(
+      (event) =>
+        event.employeeNoString === student.code &&
+        new Date(event.occurredAt).toDateString() === today,
+    );
+  }
+
+  function getStudentCheckinTime(student: Student) {
+    const event = getStudentAttendance(student);
+
+    if (!event) return "";
+
+    return new Date(event.occurredAt).toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   const active = students.filter((s) => s.status === "Đang học").length;
   const paused = students.length - active;
 
@@ -225,8 +290,8 @@ export default function StudentManagement() {
     (s) => faceRecords[s.id]?.faceStatus === "Đã đăng ký",
   ).length;
 
-  const checkedIn = students.filter(
-    (s) => faceRecords[s.id]?.checkinStatus === "Đã điểm danh",
+  const checkedIn = students.filter((student) =>
+    Boolean(getStudentAttendance(student)),
   ).length;
 
   const saveFaceRecords = (next: Record<string, FaceRecord>) => {
@@ -234,12 +299,15 @@ export default function StudentManagement() {
     localStorage.setItem(FACE_STORAGE_KEY, JSON.stringify(next));
   };
 
-  const getFaceRecord = (student: Student): FaceRecord =>
-    faceRecords[student.id] || {
-      faceStatus: "Chưa đăng ký",
-      checkinStatus: "Chưa điểm danh",
-      checkinTime: "",
+  const getFaceRecord = (student: Student): FaceRecord => {
+    const event = getStudentAttendance(student);
+
+    return {
+      faceStatus: faceRecords[student.id]?.faceStatus || "Chưa đăng ký",
+      checkinStatus: event ? "Đã điểm danh" : "Chưa điểm danh",
+      checkinTime: getStudentCheckinTime(student),
     };
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -551,14 +619,6 @@ export default function StudentManagement() {
         </div>
       </header>
 
-      <div className="student-demo-note">
-        <span className="student-demo-dot" /> DỮ LIỆU DEMO
-        <span>
-          Thông tin được lưu trên trình duyệt hiện tại, chưa kết nối máy chủ
-          hoặc camera thật.
-        </span>
-      </div>
-
       <nav className="student-tabs">
         <button
           className={activeTab === "overview" ? "active" : ""}
@@ -684,14 +744,10 @@ export default function StudentManagement() {
               </div>
 
               <div className="student-face-summary">
-                <div>
-                  <strong>{registeredFaces}</strong>
-                  <span>Đã đăng ký</span>
-                </div>
-                <div>
-                  <strong>{students.length - registeredFaces}</strong>
-                  <span>Chưa đăng ký</span>
-                </div>
+                <span className="student-face-status is-unregistered">
+                  <ShieldCheck size={14} />
+                  Tự động từ máy
+                </span>
                 <div>
                   <strong>{checkedIn}</strong>
                   <span>Đã điểm danh hôm nay</span>
@@ -891,12 +947,6 @@ export default function StudentManagement() {
                   Đăng ký khuôn mặt hoặc mô phỏng điểm danh cho từng học sinh.
                 </p>
               </div>
-              <button
-                className="student-btn student-btn-light"
-                onClick={resetCheckins}
-              >
-                <RefreshCw size={15} /> Đặt lại điểm danh
-              </button>
             </div>
 
             <div className="student-filters">
@@ -935,7 +985,6 @@ export default function StudentManagement() {
                     <th>FACE ID</th>
                     <th>ĐIỂM DANH</th>
                     <th>THỜI GIAN</th>
-                    <th>THAO TÁC</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -986,28 +1035,6 @@ export default function StudentManagement() {
                         </td>
 
                         <td>{face.checkinTime || "--:--"}</td>
-
-                        <td>
-                          <div className="student-face-actions">
-                            <button
-                              className="student-face-action"
-                              onClick={() => registerFace(s)}
-                              title="Mô phỏng đăng ký Face ID"
-                            >
-                              <Camera size={14} />
-                              Đăng ký
-                            </button>
-
-                            <button
-                              className="student-face-action primary"
-                              onClick={() => simulateCheckin(s)}
-                              title="Mô phỏng điểm danh"
-                            >
-                              <ScanFace size={14} />
-                              Điểm danh
-                            </button>
-                          </div>
-                        </td>
                       </tr>
                     );
                   })}
@@ -1025,8 +1052,8 @@ export default function StudentManagement() {
 
             <div className="student-table-foot">
               <CalendarDays size={14} />
-              Ngày demo: {getToday()}. Dữ liệu điểm danh được lưu trên trình
-              duyệt hiện tại.
+              Ngày: {getToday()}. Dữ liệu đồng bộ .
+              {attendanceLoading && " Đang cập nhật..."}
             </div>
           </section>
         </>
