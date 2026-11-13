@@ -74,7 +74,7 @@ export class StudentBulkImportService {
       const className = String(mapped.className ?? "").trim();
       const line = index + 2;
       if (!code || !name || !className) throw new BadRequestException(`Dòng ${line}: bắt buộc có Mã học sinh, Họ và tên, Lớp.`);
-      if (code.length > 30 || !/^[A-Za-z0-9_-]+$/.test(code) || code.startsWith("0")) {
+      if (code.length > 30 || !/^[A-Za-z0-9_-]+$/.test(code)) {
         throw new BadRequestException(`Dòng ${line}: mã học sinh chỉ gồm chữ/số/_/-, tối đa 30 ký tự và không bắt đầu bằng 0 để tương thích thiết bị.`);
       }
       const key = code.toLocaleLowerCase("vi");
@@ -139,7 +139,7 @@ export class StudentBulkImportService {
           where: { deviceId_employeeNo: { deviceId: process.env.HIK_DEVICE_ID || "hik-main", employeeNo: row.code } },
         }) : null;
 
-        if (deviceHasUser && !enrollment) {
+        if (deviceHasUser && (!enrollment || !enrollment.userCreatedAt)) {
           results.push({ code: row.code, name: row.name, status: "EXISTS_ON_DEVICE", message: "Mã đã tồn tại trên máy; không ghi đè thông tin hoặc ảnh." });
           skipped++;
           continue;
