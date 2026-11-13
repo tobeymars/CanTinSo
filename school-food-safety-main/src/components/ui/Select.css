@@ -1,0 +1,88 @@
+﻿/* Select dùng chung · phỏng theo React Bits Glide Select (xem Select.tsx). Màu lấy từ token của ứng dụng nên tự theo sáng/tối. */
+.glide-select{--glide-ease:cubic-bezier(.23,1,.32,1);--glide-pop:180ms;--glide-pop-out:120ms;--glide-glide:220ms;position:relative;min-width:0;max-width:100%;width:100%}
+label>.glide-select{margin-top:8px}
+
+/* Nút mở */
+.apple-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:46px;padding:9px 9px 9px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);text-align:left;font:inherit;font-size:13px;font-weight:650;line-height:1.4;cursor:pointer;box-shadow:0 1px 2px #1737690a;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:border-color .16s ease,box-shadow .16s ease,background-color .12s ease,transform .16s var(--glide-ease)}
+@media(hover:hover) and (pointer:fine){.apple-select-trigger:not(:disabled):hover{border-color:color-mix(in srgb,var(--primary) 32%,var(--border));background:color-mix(in srgb,var(--primary) 3%,var(--surface))}}
+.apple-select-trigger:not(:disabled):active{transform:scale(.985)}
+.apple-select-trigger:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.apple-select-trigger[aria-expanded=true]{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}
+.apple-select-trigger:disabled{cursor:default;opacity:.55;box-shadow:none}
+.glide-select-label{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.glide-select-label[data-empty]{color:var(--muted);font-weight:600}
+.glide-select-label.is-swapping{animation:glide-swap 160ms ease}
+@keyframes glide-swap{from{opacity:.5;filter:blur(2px)}}
+.glide-select-chevron{flex:none;box-sizing:content-box;width:16px;height:16px;padding:4px;border-radius:8px;background:var(--surface-alt);color:var(--muted);transition:transform .2s var(--glide-ease),background-color .16s ease,color .16s ease}
+.apple-select-trigger[aria-expanded=true] .glide-select-chevron{transform:rotate(180deg);background:var(--primary-soft);color:var(--primary)}
+.glide-select[data-invalid] .apple-select-trigger{border-color:var(--danger);box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 12%,transparent)}
+.glide-select-error{display:block;margin-top:6px;color:var(--danger);font-size:11px;font-weight:700}
+.glide-select.size-sm .apple-select-trigger{min-height:40px;padding:6px 6px 6px 11px;border-radius:10px;font-size:12px}
+.glide-select.size-sm .glide-select-chevron{width:15px;height:15px;padding:3px;border-radius:7px}
+
+/* Menu bật ra từ góc của nút */
+.apple-select-menu{position:fixed;inset:auto;margin:0;padding:5px;border:1px solid color-mix(in srgb,var(--border) 85%,transparent);border-radius:14px;background:var(--surface);color:var(--text);box-shadow:0 16px 40px #14204c24,0 2px 6px #14204c0f;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;z-index:100;opacity:0;transform:scale(.95);transition:opacity var(--glide-pop) var(--glide-ease),transform var(--glide-pop) var(--glide-ease)}
+.apple-select-menu[data-state=open]{opacity:1;transform:none}
+.apple-select-menu[data-state=closed]{transition-duration:var(--glide-pop-out);pointer-events:none}
+.glide-select-search{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:8px;margin:0 0 5px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);box-shadow:0 3px 10px color-mix(in srgb,var(--text) 5%,transparent)}
+.glide-select-search:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 12%,transparent)}
+.glide-select-search input{width:100%;min-width:0;padding:0;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:13px;font-weight:600}
+.glide-select-search input::placeholder{color:var(--muted)}
+.glide-select-list{position:relative;display:grid;gap:2px}
+.glide-select-pill{position:absolute;top:0;right:0;left:0;height:40px;border-radius:9px;background:var(--primary-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 14%,transparent);opacity:0;pointer-events:none;transition:transform var(--glide-glide) var(--glide-ease),height var(--glide-glide) var(--glide-ease),opacity 150ms ease}
+.apple-select-option{position:relative;z-index:1;display:flex;align-items:center;gap:10px;min-height:40px;padding:8px 9px 8px 12px;border-radius:9px;font-size:13px;line-height:1.4;cursor:pointer;user-select:none;-webkit-user-select:none;transition:color .12s ease,background-color .15s ease}
+.apple-select-option.is-active{color:var(--primary)}
+.apple-select-option[aria-selected=true]{background:color-mix(in srgb,var(--primary-soft) 70%,transparent)}
+.glide-select-list[data-live] .apple-select-option[aria-selected=true]{background:transparent}
+.apple-select-option.is-disabled{opacity:.42;cursor:not-allowed}
+.glide-select-text{flex:1 1 auto;min-width:0}
+.glide-select-text strong{display:block;overflow:hidden;font-weight:650;text-overflow:ellipsis;white-space:nowrap}
+.glide-select-text small{display:block;margin-top:2px;color:var(--muted);font-size:11px;font-weight:600;white-space:normal}
+.glide-select-tag{flex:none;color:var(--muted);font-size:11px;font-weight:650;white-space:nowrap}
+.select-check{display:inline-flex;flex:none;width:18px;color:var(--primary);visibility:hidden}
+.select-check[data-on]{visibility:visible}
+.glide-select-empty{margin:0;padding:18px 10px;color:var(--muted);font-size:12px;font-weight:600;text-align:center}
+.glide-select.size-sm .apple-select-option{min-height:36px;padding:7px 8px 7px 10px;font-size:12px}
+
+/* <select> gốc ẩn: chỉ để FormData, required và tự điền của trình duyệt */
+.glide-native{position:absolute;bottom:0;left:0;width:1px;height:1px;margin:0;padding:0;border:0;opacity:0;pointer-events:none}
+
+/* Biến thể hero: bộ chọn trường trên nền xanh */
+.apple-select.hero .apple-select-trigger{min-height:49px;margin-left:-10px;padding:5px 8px 5px 10px;border-color:transparent;border-radius:11px;background:transparent;box-shadow:none;color:white;font-size:29px;font-weight:700;letter-spacing:-.6px;gap:14px}
+.apple-select.hero .glide-select-chevron{background:#ffffff14;color:#dfe6ff}
+.apple-select.hero .apple-select-trigger:hover,.apple-select.hero .apple-select-trigger[aria-expanded=true]{border-color:#ffffff35;background:#ffffff0d;box-shadow:none}
+.apple-select.hero .apple-select-trigger[aria-expanded=true] .glide-select-chevron{background:#ffffff26;color:white}
+
+/* Trình duyệt không có Popover API: dùng <select> gốc cùng kiểu dáng */
+.apple-select.native-fallback{display:flex;align-items:center}
+.apple-select.native-fallback select{width:100%;padding:12px 40px 12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);font:inherit;appearance:none}
+.native-fallback>svg{position:absolute;right:13px;pointer-events:none}
+.apple-select.hero.native-fallback select{border:0;background:transparent;color:white}
+.apple-select.hero.native-fallback option{background:var(--surface);color:var(--text)}
+
+/* Vị trí trong bố cục sẵn có */
+.school-picker,.school-picker .apple-select{width:100%}
+.apple-select.hero .apple-select-trigger{max-width:none}
+.school-hero .hero-content{width:min(100%,460px)}
+.table-filters>.apple-select{width:210px;flex-shrink:0}
+.select-field{display:flex;flex-direction:column;gap:8px;margin:19px 0;font-size:12px;font-weight:700}
+.select-field>.glide-select{margin-top:0}
+
+@media(max-width:760px){
+ .apple-select-trigger{min-height:48px;border-radius:13px;font-size:16px}
+ .glide-select.size-sm .apple-select-trigger{min-height:44px;font-size:15px}
+ .apple-select.hero .apple-select-trigger{max-width:285px;min-height:44px;font-size:28px;letter-spacing:-.7px}
+ .apple-select-menu{max-width:calc(100vw - 24px);padding:6px;border-radius:16px}
+ .apple-select-option,.glide-select.size-sm .apple-select-option{min-height:46px;padding:11px 10px 11px 12px;font-size:16px;border-radius:11px}
+ .glide-select-text small{font-size:13px}
+ .table-filters>.apple-select{width:100%}
+ .select-field{font-size:16px}
+ .school-hero .hero-content{width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+ .apple-select-menu{transform:none!important;transition:opacity var(--glide-pop) ease}
+ .glide-select-pill{transition:opacity 150ms ease}
+ .glide-select-chevron,.apple-select-trigger,.apple-select-option{transition:none}
+ .apple-select-trigger:not(:disabled):active{transform:none}
+ .glide-select-label.is-swapping{animation:none}
+}

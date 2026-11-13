@@ -1,0 +1,42 @@
+.nutrition-ai-dialog{border:0;padding:0;max-width:min(920px,96vw);width:100%;max-height:94vh;background:transparent;border-radius:22px;box-shadow:0 30px 90px #13253c55;color:#193247}
+.nutrition-ai-dialog::backdrop{background:#111f35b8;backdrop-filter:blur(5px)}
+.nutrition-ai-panel{display:flex;flex-direction:column;max-height:94vh;background:#f9fbff;border:1px solid #dae5f1;border-radius:22px;overflow:hidden;font-size:14px}
+.nutrition-ai-header{display:flex;align-items:center;gap:17px;padding:23px 25px;background:linear-gradient(115deg,#eaf8f6,#eef3ff);border-bottom:1px solid #d7e7ef}
+.nutrition-ai-icon{width:49px;height:49px;border-radius:15px;display:grid;place-items:center;background:#127969;color:white;flex-shrink:0}
+.nutrition-ai-header>div:nth-child(2){flex:1;min-width:0}
+.nutrition-ai-header span{font-size:11px;font-weight:800;letter-spacing:.07em;color:#217e74}
+.nutrition-ai-header h2{font-size:25px;margin:5px 0;color:#143c52}
+.nutrition-ai-header p{margin:0;color:#557082}
+.nutrition-ai-header>button{border:0;background:#fff;border-radius:12px;width:36px;height:36px;display:grid;place-items:center;cursor:pointer}
+.nutrition-ai-scroll{overflow:auto;padding:23px;display:flex;flex-direction:column;gap:18px}
+.nutrition-ai-trust{display:flex;align-items:flex-start;gap:12px;padding:17px 19px;border:1px solid #ecd5a0;background:#fff9eb;border-radius:14px;color:#6e531d}
+.nutrition-ai-trust svg{flex-shrink:0}.nutrition-ai-trust strong{font-size:15px}.nutrition-ai-trust p{margin:6px 0 0;line-height:1.55}
+.nutrition-ai-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.nutrition-ai-metrics>div,.nutrition-ai-grid>div{background:#fff;border:1px solid #e3e9f0;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.nutrition-ai-metrics span,.nutrition-ai-grid span{color:#597187;font-size:12px}
+.nutrition-ai-metrics strong{font-size:22px;color:#134b72}.nutrition-ai-metrics small{font-size:11px;line-height:1.5;color:#62788a}
+.nutrition-ai-section{border:1px solid #e2eaf2;border-radius:16px;background:#fff;padding:19px;display:flex;flex-direction:column;gap:13px}
+.nutrition-ai-section-title{display:flex;align-items:center;gap:10px;color:#18796f}.nutrition-ai-section h3{font-size:17px;margin:0;color:#16394e}.nutrition-ai-section>p{margin:0;line-height:1.6;color:#496173}
+.nutrition-ai-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.nutrition-ai-grid>div{background:#f7fafd;padding:12px}.nutrition-ai-grid strong{font-size:17px}
+.nutrition-ai-ratios{display:grid;gap:9px;margin-top:4px}.nutrition-ai-ratios h4{margin:0 0 2px;font-size:13px}
+.nutrition-ai-ratio-row{display:grid;grid-template-columns:78px minmax(0,1fr) 52px 95px;gap:10px;align-items:center;font-size:12px}
+.nutrition-ai-ratio-row>div{height:9px;border-radius:999px;background:#e5eef6;overflow:hidden}.nutrition-ai-ratio-row>div>div{height:100%;background:#16a28e;border-radius:999px}.nutrition-ai-ratio-row>div>div.outside{background:#d69a27}.nutrition-ai-ratio-row strong{font-size:13px}.nutrition-ai-ratio-row small{color:#6b8292;text-align:right}
+.nutrition-ai-diagnostics{display:grid;gap:8px}.nutrition-ai-diagnostics article{display:flex;gap:10px;border-radius:12px;padding:12px 13px;background:#f3f7fa;border:1px solid #e4ebef;color:#355366}.nutrition-ai-diagnostics article.warning{background:#fff3ef;border-color:#f6d1c3;color:#954331}.nutrition-ai-diagnostics article.attention{background:#fff9eb;border-color:#f2e0ac;color:#856119}.nutrition-ai-diagnostics article.information{background:#f2faf6;border-color:#ceeadb;color:#246e55}.nutrition-ai-diagnostics article svg{flex-shrink:0}.nutrition-ai-diagnostics strong{font-size:13px}.nutrition-ai-diagnostics p{margin:4px 0 0;line-height:1.55}
+.nutrition-ai-section .nutrition-ai-subnote{font-size:12px;color:#657e91}
+.nutrition-ai-source{display:flex;flex-direction:column;gap:6px;border:1px solid #cee4ed;background:#f1f9fd;border-radius:12px;padding:14px}.nutrition-ai-source>span{color:#5a6f7d;font-size:12px}.nutrition-ai-source a{display:inline-flex;gap:6px;align-items:center;width:fit-content;color:#087e82;font-weight:700;text-decoration:underline}
+.nutrition-ai-footer-note{font-size:12px;color:#6a7e8a;line-height:1.5}.nutrition-ai-actions{padding:14px 23px;border-top:1px solid #e1e8ef;display:flex;justify-content:flex-end;background:#fff}.nutrition-ai-actions button{background:#137e74;border:0;color:#fff;font-weight:700;padding:11px 18px;border-radius:10px;cursor:pointer}
+.nutrition-ai-cell-button,.menu-submit-button,.menu-review-actions button{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 9px;border:1px solid #b8d9d4;background:#ecf9f6;color:#137668;border-radius:9px;font-size:11px;font-weight:700;cursor:pointer;max-width:100%;margin:3px}
+.nutrition-ai-cell-button:hover,.menu-submit-button:hover{background:#d8f2ed}.menu-submit-button{background:#e8f0ff;border-color:#bbcef5;color:#2461ac}.menu-submit-button:disabled{opacity:.6;cursor:default}
+.menu-review-actions{display:grid;gap:4px;padding:6px 0}.menu-review-actions span{font-size:11px;font-weight:700;color:#617787}.menu-review-actions button{width:100%;margin:0}.menu-review-actions button:nth-of-type(2){background:#fff7ee;color:#a16b20;border-color:#edddc1}
+.age-public-selector{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 17px;margin:12px 0;background:#edf8f7;border:1px solid #cde9e3;border-radius:12px}.age-public-selector label{display:flex;align-items:center;flex-wrap:wrap;gap:10px;font-weight:700}.age-public-selector select{border:1px solid #b6d3d3;border-radius:8px;padding:8px;background:#fff;color:#123f52}.age-public-selector small{color:#537c78}
+.nutrition-review-form{padding:20px;display:grid;gap:15px}.nutrition-review-form-head{display:flex;gap:12px;align-items:center;color:#126c69}.nutrition-review-form-head h2{margin:0 0 5px;font-size:22px}.nutrition-review-form-head p{margin:0;font-size:13px;color:#657687}.nutrition-review-form>p{color:#556e7c;line-height:1.5}.nutrition-review-form>label:not(.menu-review-ack){font-weight:700;display:grid;gap:8px}.nutrition-review-form textarea{width:100%;border-radius:10px;border:1px solid #d0dce5;padding:11px;font:inherit}.menu-review-ack{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.5;color:#4d6776}.menu-review-ack input{margin-top:3px}.nutrition-review-form footer{display:flex;justify-content:flex-end;gap:10px}.nutrition-review-form footer button{padding:11px 15px;border-radius:10px;cursor:pointer}
+@media(max-width:680px){.nutrition-ai-dialog{max-width:100vw;max-height:100dvh;margin:0;border-radius:0}.nutrition-ai-panel{max-height:100dvh;border-radius:0}.nutrition-ai-header{padding:15px}.nutrition-ai-header h2{font-size:19px}.nutrition-ai-scroll{padding:14px}.nutrition-ai-metrics{grid-template-columns:1fr}.nutrition-ai-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.nutrition-ai-ratio-row{grid-template-columns:68px minmax(0,1fr) 44px}.nutrition-ai-ratio-row small{display:none}}
+
+.nutrition-ai-food-table-wrap{overflow-x:auto;border:1px solid #e1e9f0;border-radius:12px}
+.nutrition-ai-food-table{border-collapse:collapse;min-width:710px;width:100%;font-size:12px}
+.nutrition-ai-food-table th{background:#eef6f9;color:#235366;font-weight:800;text-align:left;white-space:nowrap;padding:11px 9px;border-bottom:1px solid #dae6ed}
+.nutrition-ai-food-table td{padding:10px 9px;border-bottom:1px solid #edf2f4;color:#425b6b;vertical-align:top}
+.nutrition-ai-food-table tr:last-child td{border-bottom:0}
+.nutrition-ai-food-table td strong{display:block;white-space:nowrap}
+.nutrition-ai-food-table td small{display:block;color:#708493;margin-top:3px}
+.nutrition-ai-unmatched{border-left:3px solid #ce8c3d;padding:12px;background:#fffaf0;border-radius:6px;color:#805a29!important}
