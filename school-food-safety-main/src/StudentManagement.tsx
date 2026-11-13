@@ -28,6 +28,9 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
+  importStudentsZip,
+  downloadStudentImportTemplate,
+  type BulkImportResult,
 } from "./lib/studentApi";
 import { getAttendanceEvents, type AttendanceEvent } from "./lib/attendanceApi";
 type Student = {
