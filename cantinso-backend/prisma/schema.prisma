@@ -108,6 +108,7 @@ model Student {
   updatedAt        DateTime          @updatedAt @map("updated_at")
   classroom        Classroom?        @relation(fields: [classroomId], references: [id], onDelete: SetNull)
   attendanceEvents AttendanceEvent[]
+  hikvisionEnrollments HikvisionStudentEnrollment[]
 
   @@unique([schoolId, code])
   @@index([schoolId, name])
