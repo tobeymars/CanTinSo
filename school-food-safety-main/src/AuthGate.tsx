@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import LoginPage from "./LoginPage";
 import "./AuthGate.css";
+import { useUI } from "./lib/store";
 import { clearSession, getAccessToken, validateSession, type AuthUser } from "./lib/authApi";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
@@ -9,6 +10,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checking, setChecking] = useState(true);
   const isPublicTrace = location.pathname.startsWith("/truy-xuat-suat/");
+  const setRole = useUI(state => state.setRole);
 
   useEffect(() => {
     let active = true;
@@ -24,7 +26,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
   if (isPublicTrace) return <>{children}</>;
   if (checking) return <div className="login-loading">Đang kiểm tra phiên đăng nhập...</div>;
-  if (!user) return <LoginPage onSuccess={setUser} />;
+  if (!user) return <LoginPage onSuccess={value => { setUser(value); setRole("school_board"); }} />;
   return (
     <>
       <div className="auth-session-bar">
