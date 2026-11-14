@@ -43,7 +43,7 @@ type Student = {
   guardian: string;
   phone: string;
   status: "Đang học" | "Tạm nghỉ" | "Đã chuyển trường";
-  faceRegistered: boolean;
+  faceRegistered?: boolean;
 };
 
 type FaceStatus = "Đã đăng ký" | "Chưa đăng ký";
