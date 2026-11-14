@@ -1,9 +1,26 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
-class LoginDto { @IsEmail() email!: string; @IsString() @MinLength(8) password!: string; }
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { AuthUser, CurrentUser } from '../common/current-user.decorator';
+
+class LoginDto {
+  @IsEmail() email!: string;
+  @IsString() @MinLength(8) password!: string;
+}
+
 @Controller('auth')
 export class AuthController {
- constructor(private auth: AuthService) {}
- @Post('login') login(@Body() dto: LoginDto) { return this.auth.login(dto.email, dto.password); }
+  constructor(private auth: AuthService) {}
+
+  @Post('login')
+  login(@Body() dto: LoginDto) {
+    return this.auth.login(dto.email, dto.password);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  me(@CurrentUser() user: AuthUser) {
+    return user;
+  }
 }
