@@ -1,4 +1,3 @@
-
 const API_BASE_URL = "http://localhost:3000/api/v1";
 const TOKEN_KEY = "cantinso_access_token";
 
@@ -15,7 +14,7 @@ export type Student = {
   status: "Đang học" | "Tạm nghỉ" | "Đã chuyển trường";
 };
 
-export type StudentPayload = Omit<Student, "id">;
+export type StudentPayload = Omit<Student, "id" | "faceRegistered">;
 
 type StudentListResponse = {
   data: Student[];
@@ -43,10 +42,7 @@ export function clearAccessToken() {
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAccessToken();
 
   if (!token) {
@@ -81,9 +77,7 @@ export async function getStudents(): Promise<StudentListResponse> {
   return request<StudentListResponse>("/students");
 }
 
-export async function createStudent(
-  student: StudentPayload,
-): Promise<Student> {
+export async function createStudent(student: StudentPayload): Promise<Student> {
   return request<Student>("/students", {
     method: "POST",
     body: JSON.stringify(student),
@@ -107,8 +101,19 @@ export async function deleteStudent(id: string): Promise<void> {
 }
 
 export type BulkImportResult = {
-  summary: { total: number; imported: number; faceUploaded: number; skipped: number; failed: number };
-  results: Array<{ code: string; name: string; status: string; message: string }>;
+  summary: {
+    total: number;
+    imported: number;
+    faceUploaded: number;
+    skipped: number;
+    failed: number;
+  };
+  results: Array<{
+    code: string;
+    name: string;
+    status: string;
+    message: string;
+  }>;
 };
 
 export async function importStudentsZip(file: File): Promise<BulkImportResult> {
@@ -123,7 +128,9 @@ export async function importStudentsZip(file: File): Promise<BulkImportResult> {
   });
   const result = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = Array.isArray(result?.message) ? result.message.join(", ") : result?.message || "Không thể nhập ZIP.";
+    const message = Array.isArray(result?.message)
+      ? result.message.join(", ")
+      : result?.message || "Không thể nhập ZIP.";
     throw new Error(message);
   }
   return result as BulkImportResult;

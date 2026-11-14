@@ -15,11 +15,9 @@ import {
   LayoutDashboard,
   School,
   ScanFace,
-  Camera,
   CheckCircle2,
   Clock3,
   ShieldCheck,
-  RefreshCw,
   CalendarDays,
 } from "lucide-react";
 import "./StudentManagement.css";
@@ -235,7 +233,9 @@ export default function StudentManagement() {
   const [notice, setNotice] = useState("");
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
-  const [importReport, setImportReport] = useState<BulkImportResult | null>(null);
+  const [importReport, setImportReport] = useState<BulkImportResult | null>(
+    null,
+  );
 
   const classes = useMemo(
     () =>
@@ -308,9 +308,13 @@ export default function StudentManagement() {
       setImportReport(result);
       const refreshed = await getStudents();
       setStudents(refreshed.data);
-      setNotice(`Đã xử lý ${result.summary.total} học sinh: ${result.summary.imported} mới, ${result.summary.faceUploaded} ảnh đã tải, ${result.summary.skipped} bỏ qua, ${result.summary.failed} lỗi.`);
+      setNotice(
+        `Đã xử lý ${result.summary.total} học sinh: ${result.summary.imported} mới, ${result.summary.faceUploaded} ảnh đã tải, ${result.summary.skipped} bỏ qua, ${result.summary.failed} lỗi.`,
+      );
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Nhập dữ liệu thất bại.");
+      setNotice(
+        error instanceof Error ? error.message : "Nhập dữ liệu thất bại.",
+      );
     } finally {
       setImporting(false);
       if (importInputRef.current) importInputRef.current.value = "";
@@ -318,8 +322,13 @@ export default function StudentManagement() {
   };
 
   const handleDownloadTemplate = async () => {
-    try { await downloadStudentImportTemplate(); }
-    catch (error) { setNotice(error instanceof Error ? error.message : "Không tải được Excel mẫu."); }
+    try {
+      await downloadStudentImportTemplate();
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Không tải được Excel mẫu.",
+      );
+    }
   };
 
   const openCreate = () => {
@@ -564,7 +573,10 @@ export default function StudentManagement() {
           <button className="student-btn student-btn-light" onClick={exportCsv}>
             <ArrowDownToLine size={16} /> Xuất danh sách
           </button>
-          <button className="student-btn student-btn-light" onClick={handleDownloadTemplate}>
+          <button
+            className="student-btn student-btn-light"
+            onClick={handleDownloadTemplate}
+          >
             Tải Excel mẫu
           </button>
           <input
@@ -574,7 +586,11 @@ export default function StudentManagement() {
             hidden
             onChange={(event) => void handleZipImport(event.target.files?.[0])}
           />
-          <button className="student-btn student-btn-light" disabled={importing} onClick={() => importInputRef.current?.click()}>
+          <button
+            className="student-btn student-btn-light"
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
             {importing ? "Đang nhập..." : "Nhập Excel + ảnh (ZIP)"}
           </button>
           <button
@@ -841,20 +857,6 @@ export default function StudentManagement() {
 
       {activeTab === "face" && (
         <>
-          <section className="student-face-banner">
-            <div className="student-face-banner-icon">
-              <ScanFace size={34} />
-            </div>
-            <div>
-              <span>FACE RECOGNITION DEMO</span>
-              <h2>Điểm danh học sinh bằng khuôn mặt</h2>
-              <p>
-                Giao diện mô phỏng quy trình đăng ký Face ID và điểm danh. Chưa
-                kết nối camera hoặc hệ thống nhận diện thật.
-              </p>
-            </div>
-          </section>
-
           <section className="student-kpis">
             <article>
               <span className="student-kpi-icon blue">
@@ -863,7 +865,7 @@ export default function StudentManagement() {
               <div>
                 <small>Tổng học sinh</small>
                 <strong>{students.length}</strong>
-                <em>Trong dữ liệu DEMO</em>
+                <em>Trong danh sách hiện tại</em>
               </div>
             </article>
 
@@ -1032,18 +1034,35 @@ export default function StudentManagement() {
             <div>
               <h2>Kết quả nhập học sinh và đồng bộ Hikvision</h2>
               <p>
-                Tổng {importReport.summary.total} · Mới {importReport.summary.imported} ·
-                Ảnh tải lên {importReport.summary.faceUploaded} · Bỏ qua {importReport.summary.skipped} ·
-                Lỗi {importReport.summary.failed}
+                Tổng {importReport.summary.total} · Mới{" "}
+                {importReport.summary.imported} · Ảnh tải lên{" "}
+                {importReport.summary.faceUploaded} · Bỏ qua{" "}
+                {importReport.summary.skipped} · Lỗi{" "}
+                {importReport.summary.failed}
               </p>
             </div>
-            <button className="student-btn student-btn-light" onClick={() => setImportReport(null)}>Đóng</button>
+            <button
+              className="student-btn student-btn-light"
+              onClick={() => setImportReport(null)}
+            >
+              Đóng
+            </button>
           </div>
           <div className="student-import-results">
             {importReport.results.map((item) => (
               <div key={item.code} className="student-import-result">
-                <strong>{item.code} — {item.name}</strong>
-                <span className={item.status === "SUCCESS" ? "is-success" : item.status === "FAILED" ? "is-failed" : "is-skipped"}>
+                <strong>
+                  {item.code} — {item.name}
+                </strong>
+                <span
+                  className={
+                    item.status === "SUCCESS"
+                      ? "is-success"
+                      : item.status === "FAILED"
+                        ? "is-failed"
+                        : "is-skipped"
+                  }
+                >
                   {item.status}
                 </span>
                 <small>{item.message}</small>
