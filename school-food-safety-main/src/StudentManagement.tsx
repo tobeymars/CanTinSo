@@ -43,6 +43,7 @@ type Student = {
   guardian: string;
   phone: string;
   status: "Đang học" | "Tạm nghỉ" | "Đã chuyển trường";
+  faceRegistered: boolean;
 };
 
 type FaceStatus = "Đã đăng ký" | "Chưa đăng ký";
@@ -57,7 +58,6 @@ type FaceRecord = {
 type TabKey = "overview" | "classes" | "face";
 
 const STORAGE_KEY = "school-students-demo-v1";
-const FACE_STORAGE_KEY = "school-students-face-demo-v1";
 
 const seed: Student[] = [
   {
@@ -137,15 +137,6 @@ const loadStudents = (): Student[] => {
   }
 };
 
-const loadFaceRecords = (): Record<string, FaceRecord> => {
-  try {
-    const raw = localStorage.getItem(FACE_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-};
-
 const emptyForm = () => ({
   code: "",
   name: "",
@@ -170,8 +161,6 @@ const getTime = () =>
 
 export default function StudentManagement() {
   const [students, setStudents] = useState<Student[]>(loadStudents);
-  const [faceRecords, setFaceRecords] =
-    useState<Record<string, FaceRecord>>(loadFaceRecords);
   useEffect(() => {
     let cancelled = false;
 
@@ -205,10 +194,14 @@ export default function StudentManagement() {
       try {
         setAttendanceLoading(true);
 
-        const events = await getAttendanceEvents(200);
+        const [events, studentResult] = await Promise.all([
+          getAttendanceEvents(200),
+          getStudents(),
+        ]);
 
         if (!cancelled) {
           setAttendanceEvents(events);
+          setStudents(studentResult.data);
         }
       } catch (error) {
         if (!cancelled) {
@@ -292,24 +285,17 @@ export default function StudentManagement() {
   const active = students.filter((s) => s.status === "Đang học").length;
   const paused = students.length - active;
 
-  const registeredFaces = students.filter(
-    (s) => faceRecords[s.id]?.faceStatus === "Đã đăng ký",
-  ).length;
+  const registeredFaces = students.filter((s) => s.faceRegistered).length;
 
   const checkedIn = students.filter((student) =>
     Boolean(getStudentAttendance(student)),
   ).length;
 
-  const saveFaceRecords = (next: Record<string, FaceRecord>) => {
-    setFaceRecords(next);
-    localStorage.setItem(FACE_STORAGE_KEY, JSON.stringify(next));
-  };
-
   const getFaceRecord = (student: Student): FaceRecord => {
     const event = getStudentAttendance(student);
 
     return {
-      faceStatus: faceRecords[student.id]?.faceStatus || "Chưa đăng ký",
+      faceStatus: student.faceRegistered ? "Đã đăng ký" : "Chưa đăng ký",
       checkinStatus: event ? "Đã điểm danh" : "Chưa điểm danh",
       checkinTime: getStudentCheckinTime(student),
     };
@@ -422,10 +408,6 @@ export default function StudentManagement() {
       await deleteStudent(student.id);
 
       setStudents((current) => current.filter((s) => s.id !== student.id));
-
-      const nextFaces = { ...faceRecords };
-      delete nextFaces[student.id];
-      saveFaceRecords(nextFaces);
 
       setNotice("Đã xóa học sinh khỏi PostgreSQL.");
     } catch (error) {
