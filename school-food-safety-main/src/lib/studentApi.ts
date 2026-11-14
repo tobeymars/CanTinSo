@@ -4,6 +4,7 @@ const TOKEN_KEY = "cantinso_access_token";
 
 export type Student = {
   id: string;
+  faceRegistered: boolean;
   code: string;
   name: string;
   className: string;
