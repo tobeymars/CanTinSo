@@ -61,6 +61,7 @@ import type { DayData, PublicInspection, School } from "./lib/data";
 import { centralKitchenRouteAccess, useUI } from "./lib/store";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
+import AuthGate from "./AuthGate";
 import MobileNavigation from "./MobileNavigation";
 import Select from "./components/ui/Select";
 import CountUp from "./components/react-bits/CountUp";
@@ -2142,7 +2143,7 @@ export default function App() {
   return (
     <QueryClientProvider client={client}>
       <BrowserRouter>
-        <Shell />
+        <AuthGate><Shell /></AuthGate>
       </BrowserRouter>
     </QueryClientProvider>
   );
