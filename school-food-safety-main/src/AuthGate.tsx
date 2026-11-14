@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import LoginPage from "./LoginPage";
+import "./AuthGate.css";
 import { clearSession, getAccessToken, validateSession, type AuthUser } from "./lib/authApi";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
