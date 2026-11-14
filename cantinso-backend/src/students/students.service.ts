@@ -20,14 +20,14 @@ export class StudentsService {
   const schoolId = this.school(user); const code = dto.code.trim();
   if (await this.prisma.student.findFirst({ where: { schoolId, code: { equals: code, mode: 'insensitive' } } })) throw new ConflictException('Mã học sinh đã tồn tại');
   const classroom = await this.prisma.classroom.upsert({ where: { schoolId_name_schoolYear: { schoolId, name: dto.className.trim(), schoolYear: '2026-2027' } }, create: { schoolId, name: dto.className.trim(), schoolYear: '2026-2027' }, update: {} });
-  const row = await this.prisma.student.create({ data: { schoolId, code, name: dto.name.trim(), classroomId: classroom.id, gender: genderMap[dto.gender], birthDate: dto.birthDate ? new Date(dto.birthDate) : null, guardian: dto.guardian?.trim(), phone: dto.phone?.trim(), status: statusMap[dto.status] }, include: { classroom: true } });
+  const row = await this.prisma.student.create({ data: { schoolId, code, name: dto.name.trim(), classroomId: classroom.id, gender: genderMap[dto.gender], birthDate: dto.birthDate ? new Date(dto.birthDate) : null, guardian: dto.guardian?.trim(), phone: dto.phone?.trim(), status: statusMap[dto.status] }, include: { classroom: true, hikvisionEnrollments: { where: { deviceId: process.env.HIK_DEVICE_ID || 'hik-main' }, select: { faceUploadedAt: true } } } });
   return toView(row);
  }
  async update(user: AuthUser, id: string, dto: CreateStudentDto) {
   const schoolId = this.school(user); const existing = await this.prisma.student.findFirst({ where: { id, schoolId } }); if (!existing) throw new NotFoundException('Không tìm thấy học sinh');
   const duplicate = await this.prisma.student.findFirst({ where: { schoolId, code: { equals: dto.code.trim(), mode: 'insensitive' }, NOT: { id } } }); if (duplicate) throw new ConflictException('Mã học sinh đã tồn tại');
   const classroom = await this.prisma.classroom.upsert({ where: { schoolId_name_schoolYear: { schoolId, name: dto.className.trim(), schoolYear: '2026-2027' } }, create: { schoolId, name: dto.className.trim(), schoolYear: '2026-2027' }, update: {} });
-  const row = await this.prisma.student.update({ where: { id }, data: { code: dto.code.trim(), name: dto.name.trim(), classroomId: classroom.id, gender: genderMap[dto.gender], birthDate: dto.birthDate ? new Date(dto.birthDate) : null, guardian: dto.guardian?.trim(), phone: dto.phone?.trim(), status: statusMap[dto.status] }, include: { classroom: true } }); return toView(row);
+  const row = await this.prisma.student.update({ where: { id }, data: { code: dto.code.trim(), name: dto.name.trim(), classroomId: classroom.id, gender: genderMap[dto.gender], birthDate: dto.birthDate ? new Date(dto.birthDate) : null, guardian: dto.guardian?.trim(), phone: dto.phone?.trim(), status: statusMap[dto.status] }, include: { classroom: true, hikvisionEnrollments: { where: { deviceId: process.env.HIK_DEVICE_ID || 'hik-main' }, select: { faceUploadedAt: true } } }); return toView(row);
  }
  async remove(user: AuthUser, id: string) { const schoolId = this.school(user); const result = await this.prisma.student.deleteMany({ where: { id, schoolId } }); if (!result.count) throw new NotFoundException('Không tìm thấy học sinh'); return { success: true }; }
 }
