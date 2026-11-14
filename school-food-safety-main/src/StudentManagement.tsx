@@ -153,12 +153,6 @@ const getInitials = (name: string) =>
 
 const getToday = () => new Date().toLocaleDateString("vi-VN");
 
-const getTime = () =>
-  new Date().toLocaleTimeString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
 export default function StudentManagement() {
   const [students, setStudents] = useState<Student[]>(loadStudents);
   useEffect(() => {
@@ -467,61 +461,6 @@ export default function StudentManagement() {
     a.download = "danh-sach-hoc-sinh-DEMO.csv";
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  // Mô phỏng đăng ký khuôn mặt, chưa kết nối camera thật.
-  const registerFace = (student: Student) => {
-    const next = {
-      ...faceRecords,
-      [student.id]: {
-        ...getFaceRecord(student),
-        faceStatus: "Đã đăng ký" as FaceStatus,
-      },
-    };
-
-    saveFaceRecords(next);
-    setNotice(`Đã mô phỏng đăng ký Face ID cho ${student.name}.`);
-  };
-
-  // Mô phỏng điểm danh bằng Face ID.
-  const simulateCheckin = (student: Student) => {
-    const current = getFaceRecord(student);
-
-    if (current.faceStatus !== "Đã đăng ký") {
-      setNotice("Học sinh cần đăng ký Face ID trước khi điểm danh.");
-      return;
-    }
-
-    const next = {
-      ...faceRecords,
-      [student.id]: {
-        ...current,
-        checkinStatus: "Đã điểm danh" as CheckinStatus,
-        checkinTime: getTime(),
-      },
-    };
-
-    saveFaceRecords(next);
-    setNotice(`Điểm danh thành công: ${student.name}.`);
-  };
-
-  const resetCheckins = () => {
-    if (!window.confirm("Bạn muốn đặt lại trạng thái điểm danh hôm nay?"))
-      return;
-
-    const next = { ...faceRecords };
-
-    students.forEach((student) => {
-      const current = getFaceRecord(student);
-      next[student.id] = {
-        ...current,
-        checkinStatus: "Chưa điểm danh",
-        checkinTime: "",
-      };
-    });
-
-    saveFaceRecords(next);
-    setNotice("Đã đặt lại dữ liệu điểm danh DEMO.");
   };
 
   const renderStudentTable = (list: Student[]) => (
