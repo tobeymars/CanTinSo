@@ -1,0 +1,12 @@
+{
+  "UserInfoSearchCond": {
+    "searchID": "cantinso-check",
+    "searchResultPosition": 0,
+    "maxResults": 10,
+    "EmployeeNoList": [
+      {
+        "employeeNo": "HS011"
+      }
+    ]
+  }
+}

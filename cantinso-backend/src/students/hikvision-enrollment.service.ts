@@ -95,6 +95,7 @@ export class HikvisionEnrollmentService {
         employeeNo: input.employeeNo,
         name: input.name,
         userType: "normal",
+        onlyVerify: true,
         Valid: { enable: true, beginTime, endTime },
         gender:
           input.gender === "MALE"
