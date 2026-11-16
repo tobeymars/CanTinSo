@@ -30,7 +30,7 @@ export default function UserManagement() {
   async function load() {
     setLoading(true);
     setError("");
-    try { setUsers(await getManagedUsers()); }
+    try { setUsers((await getManagedUsers()).filter(user => user.role === "SCHOOL_KITCHEN" || user.role === "SCHOOL_STAFF")); }
     catch (e) { setError(e instanceof Error ? e.message : "Không tải được danh sách tài khoản."); }
     finally { setLoading(false); }
   }
