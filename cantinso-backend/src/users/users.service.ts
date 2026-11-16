@@ -11,6 +11,7 @@ const SCHOOL_SCOPED_ROLES: UserRole[] = [
   UserRole.SCHOOL_ADMIN, UserRole.SCHOOL_STAFF, UserRole.SCHOOL_KITCHEN,
   UserRole.KITCHEN_MANAGER, UserRole.NUTRITIONIST, UserRole.WAREHOUSE_STAFF, UserRole.PARENT,
 ];
+const UNASSIGNED_ORG_ROLES: UserRole[] = [UserRole.CENTRAL_KITCHEN, UserRole.UBND_ADMIN];
 
 @Injectable()
 export class UsersService {
@@ -47,7 +48,7 @@ export class UsersService {
       if (SCHOOL_SCOPED_ROLES.includes(dto.role) && !dto.schoolId) {
         throw new ConflictException('Vai trò này cần được gán schoolId.');
       }
-      if ([UserRole.CENTRAL_KITCHEN, UserRole.UBND_ADMIN].includes(dto.role)) {
+      if (UNASSIGNED_ORG_ROLES.includes(dto.role)) {
         throw new ForbiddenException('Chưa thể tạo tài khoản Bếp trung tâm hoặc UBND khi hệ thống chưa có mô hình gán đơn vị quản lý.');
       }
     }
