@@ -62,6 +62,7 @@ import { centralKitchenRouteAccess, useUI } from "./lib/store";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
 import AuthGate from "./AuthGate";
+import UserManagement from "./UserManagement";
 import MobileNavigation from "./MobileNavigation";
 import Select from "./components/ui/Select";
 import CountUp from "./components/react-bits/CountUp";
@@ -118,6 +119,7 @@ const adminNavigation = [
   { path: "/quan-ly-kho", label: "Quản lý kho", icon: Warehouse },
   { path: "/nha-cung-cap", label: "Nhà cung cấp", icon: Building2 },
   { path: "/quan-ly-hoc-sinh", label: "Quản lý học sinh", icon: Users },
+  { path: "/quan-ly-tai-khoan", label: "Quản lý tài khoản", icon: ShieldCheck },
   { path: "/phan-anh", label: "Phản ánh & góp ý", icon: MessageSquareText },
   { path: "/bao-cao", label: "Báo cáo tổng hợp", icon: CalendarDays },
 ];
@@ -1039,6 +1041,7 @@ function Shell() {
   const parentReadyPhoto = parentReadyEvent?.confirmed ? parentReadyEvent.photos[0] : undefined;
   const adminNav = adminNavigation.filter((item) => {
     if (item.path === "/quan-ly-hoc-sinh" && role !== "school_board") return false;
+    if (item.path === "/quan-ly-tai-khoan" && role !== "school_board") return false;
     if (role !== "central_kitchen") return true;
     const policyPath =
       item.path === "/ho-so-phap-ly" ? "/ho-so" : item.path;
@@ -1390,7 +1393,7 @@ function Shell() {
           )}
           {role !== "parent" ? (
             <>
-              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon"].includes(location.pathname) && (
+              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan"].includes(location.pathname) && (
                 <Suspense
                   fallback={
                     <div className="loading-grid">
@@ -1401,6 +1404,7 @@ function Shell() {
                   <AdminPanel school={school} />
                 </Suspense>
               )}
+              {location.pathname === "/quan-ly-tai-khoan" && role === "school_board" && <UserManagement />}
               {sharedAdminArea && (
                 <div className="section-toolbar shared-admin-toolbar">
                   <div className="segmented">
