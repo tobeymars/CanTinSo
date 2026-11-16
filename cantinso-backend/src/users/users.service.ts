@@ -80,7 +80,7 @@ export class UsersService {
       if (dto.role && !SCHOOL_ADMIN_CREATABLE_ROLES.includes(dto.role)) {
         throw new ForbiddenException('Ban Giám Hiệu không được gán vai trò này.');
       }
-      if (Object.prototype.hasOwnProperty.call(dto, 'schoolId') && dto.schoolId !== actor.schoolId) {
+      if (dto.schoolId !== undefined && dto.schoolId !== actor.schoolId) {
         throw new ForbiddenException('Không được chuyển tài khoản sang trường khác.');
       }
     }
