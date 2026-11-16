@@ -75,6 +75,9 @@ model User {
   role         UserRole @default(SCHOOL_STAFF)
   isActive     Boolean  @default(true) @map("is_active")
   schoolId     String?  @map("school_id") @db.Uuid
+  wardId       String?  @map("ward_id") @db.Uuid
+  school       School?  @relation(fields: [schoolId], references: [id])
+  ward         Ward?    @relation(fields: [wardId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -82,7 +85,42 @@ model User {
   @@map("users")
 }
 
+model Ward {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  code      String?  @unique
+  schools   School[]
+  users     User[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("wards")
+}
+
+model School {
+  id                   String                       @id @default(uuid()) @db.Uuid
+  name                 String
+  code                 String?                      @unique
+  wardId               String?                      @map("ward_id") @db.Uuid
+  ward                 Ward?                        @relation(fields: [wardId], references: [id])
+  users                User[]
+  classrooms           Classroom[]
+  students             Student[]
+  attendanceEvents     AttendanceEvent[]
+  suppliers            Supplier[]
+  inventoryLots        InventoryLot[]
+  mealPlans            MealPlan[]
+  foodSafetyChecks     FoodSafetyCheck[]
+  hikvisionEnrollments HikvisionStudentEnrollment[]
+  createdAt            DateTime                     @default(now()) @map("created_at")
+  updatedAt            DateTime                     @updatedAt @map("updated_at")
+
+  @@index([wardId])
+  @@map("schools")
+}
+
 model Classroom {
+  school     School    @relation(fields: [schoolId], references: [id])
   id         String    @id @default(uuid()) @db.Uuid
   name       String
   grade      Int?
@@ -96,6 +134,7 @@ model Classroom {
 }
 
 model Student {
+  school             School                     @relation(fields: [schoolId], references: [id])
   id               String            @id @default(uuid()) @db.Uuid
   code             String
   name             String
@@ -120,6 +159,7 @@ model Student {
 }
 
 model AttendanceEvent {
+  school            School   @relation(fields: [schoolId], references: [id])
   id                String   @id @default(uuid()) @db.Uuid
   schoolId          String   @map("school_id") @db.Uuid
   studentId         String?  @map("student_id") @db.Uuid
@@ -143,6 +183,7 @@ model AttendanceEvent {
 }
 
 model Supplier {
+  school      School         @relation(fields: [schoolId], references: [id])
   id          String         @id @default(uuid()) @db.Uuid
   code        String
   name        String
@@ -175,6 +216,7 @@ model Ingredient {
 }
 
 model InventoryLot {
+  school          School       @relation(fields: [schoolId], references: [id])
   id              String       @id @default(uuid()) @db.Uuid
   lotCode         String       @map("lot_code")
   ingredientId    String       @map("ingredient_id") @db.Uuid
@@ -209,6 +251,7 @@ model Dish {
 }
 
 model MealPlan {
+  school      School       @relation(fields: [schoolId], references: [id])
   id          String         @id @default(uuid()) @db.Uuid
   schoolId    String         @map("school_id") @db.Uuid
   serviceDate DateTime       @map("service_date") @db.Date
@@ -235,6 +278,7 @@ model MealPlanItem {
 }
 
 model FoodSafetyCheck {
+  school      School          @relation(fields: [schoolId], references: [id])
   id          String          @id @default(uuid()) @db.Uuid
   schoolId    String          @map("school_id") @db.Uuid
   title       String
@@ -266,6 +310,7 @@ model TraceEvent {
 
 
 model HikvisionStudentEnrollment {
+  school        School   @relation(fields: [schoolId], references: [id])
   id            String   @id @default(uuid()) @db.Uuid
   schoolId      String   @map("school_id") @db.Uuid
   studentId     String   @map("student_id") @db.Uuid
