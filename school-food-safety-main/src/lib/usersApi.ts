@@ -1,18 +1,28 @@
+import { getAccessToken } from "./authApi";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
 
 export type ManagedUser = {
   id: string;
   email: string;
   fullName: string;
-  role: "SCHOOL_ADMIN" | "SCHOOL_STAFF" | "SCHOOL_KITCHEN" | string;
+  role: "SUPER_ADMIN" | "UBND_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_STAFF" | "SCHOOL_KITCHEN" | string;
   isActive: boolean;
   schoolId: string | null;
+  wardId: string | null;
   createdAt: string;
   updatedAt?: string;
 };
 
+export type ManagedSchool = {
+  id: string;
+  name: string;
+  wardId: string | null;
+  ward: { id: string; name: string; code: string | null } | null;
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = sessionStorage.getItem("cantinso_access_token");
+  const token = getAccessToken();
   if (!token) throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -31,12 +41,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const getManagedUsers = () => request<ManagedUser[]>("/users");
+export const getManagedSchools = () => request<ManagedSchool[]>("/schools");
 
 export function createManagedUser(payload: {
   email: string;
   fullName: string;
   password: string;
-  role: "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
+  role: "UBND_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
+  wardId?: string;
 }) {
   return request<ManagedUser>("/users", { method: "POST", body: JSON.stringify(payload) });
 }
@@ -44,7 +56,7 @@ export function createManagedUser(payload: {
 export function updateManagedUser(id: string, payload: {
   email?: string;
   fullName?: string;
-  role?: "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
+  role?: "UBND_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
   isActive?: boolean;
 }) {
   return request<ManagedUser>(`/users/${encodeURIComponent(id)}`, {
