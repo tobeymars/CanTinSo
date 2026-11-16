@@ -152,7 +152,8 @@ export class UsersService {
       }
     }
     const nextRole = dto.role ?? target.role;
-    const nextSchoolId = dto.schoolId ?? target.schoolId;
+    const nextSchoolId =
+      dto.schoolId !== undefined ? dto.schoolId : target.schoolId;
 
     if (SCHOOL_SCOPED_ROLES.includes(nextRole) && !nextSchoolId) {
       throw new ConflictException("Vai trò này cần được gán schoolId.");
