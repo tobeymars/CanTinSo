@@ -4,9 +4,12 @@ import { Response } from "express";
 import { memoryStorage } from "multer";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { AuthUser, CurrentUser } from "../common/current-user.decorator";
+import { Roles } from "../common/roles.decorator";
+import { RolesGuard } from "../common/roles.guard";
 import { StudentBulkImportService } from "./student-bulk-import.service";
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles("SCHOOL_ADMIN", "SUPER_ADMIN")
 @Controller("students")
 export class StudentBulkImportController {
   constructor(private readonly importer: StudentBulkImportService) {}
