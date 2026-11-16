@@ -15,6 +15,9 @@ enum UserRole {
   NUTRITIONIST
   WAREHOUSE_STAFF
   PARENT
+  UBND_ADMIN
+  CENTRAL_KITCHEN
+  SCHOOL_KITCHEN
 }
 
 enum StudentStatus {
