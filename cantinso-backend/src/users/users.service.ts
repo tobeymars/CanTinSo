@@ -24,10 +24,7 @@ const SCHOOL_SCOPED_ROLES: UserRole[] = [
   UserRole.WAREHOUSE_STAFF,
   UserRole.PARENT,
 ];
-const UNASSIGNED_ORG_ROLES: UserRole[] = [
-  UserRole.CENTRAL_KITCHEN,
-  UserRole.UBND_ADMIN,
-];
+const UNASSIGNED_ORG_ROLES: UserRole[] = [UserRole.CENTRAL_KITCHEN];
 
 @Injectable()
 export class UsersService {
@@ -35,8 +32,9 @@ export class UsersService {
 
   private scope(user: AuthUser) {
     if (user.role === UserRole.SUPER_ADMIN) return {};
-    if (!user.schoolId)
+    if (!user.schoolId) {
       throw new ForbiddenException("Tài khoản chưa được gán trường.");
+    }
     return { schoolId: user.schoolId };
   }
 
@@ -47,6 +45,7 @@ export class UsersService {
     ) {
       throw new ForbiddenException("Bạn không có quyền quản lý tài khoản.");
     }
+
     return this.prisma.user.findMany({
       where: this.scope(user),
       select: {
@@ -56,6 +55,7 @@ export class UsersService {
         role: true,
         isActive: true,
         schoolId: true,
+        wardId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -70,30 +70,68 @@ export class UsersService {
     ) {
       throw new ForbiddenException("Bạn không có quyền tạo tài khoản.");
     }
+
     if (actor.role === UserRole.SCHOOL_ADMIN) {
       if (!SCHOOL_ADMIN_CREATABLE_ROLES.includes(dto.role)) {
         throw new ForbiddenException(
           "Ban Giám Hiệu chỉ được tạo tài khoản Bếp tại trường hoặc Nhân viên trường.",
         );
       }
-      if (!actor.schoolId)
+      if (!actor.schoolId) {
         throw new ForbiddenException(
           "Tài khoản Ban Giám Hiệu chưa được gán trường.",
         );
+      }
+      if (dto.wardId) {
+        throw new ForbiddenException(
+          "Ban Giám Hiệu không được gán tài khoản vào phường.",
+        );
+      }
       dto.schoolId = actor.schoolId;
     } else {
       if (SCHOOL_SCOPED_ROLES.includes(dto.role) && !dto.schoolId) {
         throw new ConflictException("Vai trò này cần được gán schoolId.");
       }
-      if (UNASSIGNED_ORG_ROLES.includes(dto.role)) {
-        throw new ForbiddenException(
-          "Chưa thể tạo tài khoản Bếp trung tâm hoặc UBND khi hệ thống chưa có mô hình gán đơn vị quản lý.",
-        );
+
+      if (dto.role === UserRole.UBND_ADMIN) {
+        if (!dto.wardId) {
+          throw new ConflictException(
+            "Tài khoản UBND_ADMIN cần được gán wardId.",
+          );
+        }
+        if (dto.schoolId) {
+          throw new ConflictException(
+            "Tài khoản UBND_ADMIN không được gán trực tiếp vào trường.",
+          );
+        }
+
+        const ward = await this.prisma.ward.findUnique({
+          where: { id: dto.wardId },
+          select: { id: true },
+        });
+        if (!ward) {
+          throw new NotFoundException("Không tìm thấy phường được gán.");
+        }
+      } else {
+        if (dto.wardId) {
+          throw new ConflictException(
+            "Chỉ tài khoản UBND_ADMIN mới được gán wardId.",
+          );
+        }
+        if (UNASSIGNED_ORG_ROLES.includes(dto.role)) {
+          throw new ForbiddenException(
+            "Chưa hỗ trợ tạo tài khoản Bếp trung tâm khi chưa có mô hình gán đơn vị quản lý.",
+          );
+        }
       }
     }
+
     const email = dto.email.toLowerCase().trim();
     const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) throw new ConflictException("Email đã được sử dụng.");
+    if (existing) {
+      throw new ConflictException("Email đã được sử dụng.");
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 12);
     return this.prisma.user.create({
       data: {
@@ -101,7 +139,9 @@ export class UsersService {
         passwordHash,
         fullName: dto.fullName.trim(),
         role: dto.role,
-        schoolId: dto.schoolId ?? null,
+        schoolId:
+          dto.role === UserRole.UBND_ADMIN ? null : dto.schoolId ?? null,
+        wardId: dto.role === UserRole.UBND_ADMIN ? dto.wardId! : null,
       },
       select: {
         id: true,
@@ -110,6 +150,7 @@ export class UsersService {
         role: true,
         isActive: true,
         schoolId: true,
+        wardId: true,
         createdAt: true,
       },
     });
@@ -117,7 +158,10 @@ export class UsersService {
 
   private async findManagedUser(actor: AuthUser, id: string) {
     const target = await this.prisma.user.findUnique({ where: { id } });
-    if (!target) throw new NotFoundException("Không tìm thấy tài khoản.");
+    if (!target) {
+      throw new NotFoundException("Không tìm thấy tài khoản.");
+    }
+
     if (
       actor.role !== UserRole.SUPER_ADMIN &&
       (actor.role !== UserRole.SCHOOL_ADMIN ||
@@ -126,6 +170,7 @@ export class UsersService {
     ) {
       throw new ForbiddenException("Bạn không có quyền quản lý tài khoản này.");
     }
+
     if (
       actor.role === UserRole.SCHOOL_ADMIN &&
       !SCHOOL_ADMIN_CREATABLE_ROLES.includes(target.role)
@@ -134,11 +179,13 @@ export class UsersService {
         "Ban Giám Hiệu không được thay đổi tài khoản có vai trò này.",
       );
     }
+
     return target;
   }
 
   async update(actor: AuthUser, id: string, dto: UpdateUserDto) {
     const target = await this.findManagedUser(actor, id);
+
     if (actor.role === UserRole.SCHOOL_ADMIN) {
       if (dto.role && !SCHOOL_ADMIN_CREATABLE_ROLES.includes(dto.role)) {
         throw new ForbiddenException(
@@ -151,6 +198,7 @@ export class UsersService {
         );
       }
     }
+
     const nextRole = dto.role ?? target.role;
     const nextSchoolId =
       dto.schoolId !== undefined ? dto.schoolId : target.schoolId;
@@ -158,16 +206,30 @@ export class UsersService {
     if (SCHOOL_SCOPED_ROLES.includes(nextRole) && !nextSchoolId) {
       throw new ConflictException("Vai trò này cần được gán schoolId.");
     }
+    if (nextRole === UserRole.UBND_ADMIN) {
+      if (!target.wardId || nextSchoolId) {
+        throw new ConflictException(
+          "Tài khoản UBND_ADMIN phải được tạo và gán phường hợp lệ.",
+        );
+      }
+    }
+
     if (dto.email) {
       const email = dto.email.toLowerCase().trim();
       const duplicate = await this.prisma.user.findUnique({ where: { email } });
-      if (duplicate && duplicate.id !== target.id)
+      if (duplicate && duplicate.id !== target.id) {
         throw new ConflictException("Email đã được sử dụng.");
+      }
       dto.email = email;
     }
+
     return this.prisma.user.update({
       where: { id },
-      data: { ...dto, fullName: dto.fullName?.trim() },
+      data: {
+        ...dto,
+        fullName: dto.fullName?.trim(),
+        wardId: nextRole === UserRole.UBND_ADMIN ? target.wardId : null,
+      },
       select: {
         id: true,
         email: true,
@@ -175,6 +237,7 @@ export class UsersService {
         role: true,
         isActive: true,
         schoolId: true,
+        wardId: true,
         updatedAt: true,
       },
     });
