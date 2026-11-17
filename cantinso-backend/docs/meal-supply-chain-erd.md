@@ -277,3 +277,86 @@ Frontend hiện có các view legacy `school_receiver` và `meal_service_staff`,
 - SUPER_ADMIN khi thao tác nghiệp vụ có đối tượng trường/bếp phải chỉ định đối tượng hợp lệ; API không được bỏ lọc chỉ vì role toàn cục.
 - Tài khoản không hoạt động bị từ chối; tài khoản bị đổi scope phải có hiệu lực ngay ở request tiếp theo.
 - PARENT chỉ xem học sinh đã được liên kết và được người giám hộ xác minh.
+
+
+## 11. Ma trận phân quyền theo tài nguyên và hành động (đề xuất ngày 17/11/2026)
+
+> Đây là ma trận nghiệp vụ mục tiêu để chốt API/policy. Các module thực đơn, món, kho, sản xuất, giao nhận và kiểm thực chưa được đăng ký trong `AppModule` ở phiên bản backend được rà soát; các quyền bên dưới không có nghĩa API đã tồn tại.
+
+### 11.1. Quy ước
+
+- **Đọc (R):** xem danh sách/chi tiết trong scope.
+- **Tạo (C):** tạo bản nháp hoặc chứng từ mới.
+- **Sửa (U):** sửa bản nháp/chưa ghi sổ; dữ liệu đã gửi duyệt/đã duyệt/đã ghi sổ phải theo quy trình revision hoặc giao dịch đảo.
+- **Gửi (S):** gửi revision thực đơn hoặc hồ sơ sang bước duyệt.
+- **Duyệt/trả (A):** chỉ chủ thể phê duyệt độc lập theo scope trường.
+- **Thực hiện (X):** xác nhận nghiệp vụ thực tế như nhận hàng, xuất kho, sản xuất, giao/nhận.
+- Ký hiệu **Có** luôn có nghĩa là có trong đúng scope và đúng trạng thái nghiệp vụ; không phải quyền toàn hệ thống.
+- SUPER_ADMIN có quyền quản trị nền tảng và giám sát toàn cục. Với mutation nghiệp vụ có schoolId/kitchenId, vẫn phải chỉ định và xác thực đối tượng đích; không dùng truy vấn không lọc scope.
+- Quyền của các vai trò nhân sự bếp (CENTRAL_KITCHEN, KITCHEN_MANAGER, NUTRITIONIST, WAREHOUSE_STAFF) cần gắn với kitchenId. Quyền theo tác vụ có thể tiếp tục được tách nhỏ; không suy ra rằng mọi nhân viên bếp đều được ghi sổ kho hoặc phát hành công thức.
+
+### 11.2. Ma trận quyền mục tiêu theo nghiệp vụ
+
+| Tài nguyên / hành động | SUPER_ADMIN | UBND_ADMIN | SCHOOL_ADMIN / người được ủy quyền | CENTRAL_KITCHEN / KITCHEN_MANAGER | NUTRITIONIST | WAREHOUSE_STAFF | SCHOOL_KITCHEN (tiếp nhận) |
+|---|---|---|---|---|---|---|---|
+| Danh sách trường | Toàn hệ thống | R trong wardId | R trường mình | Chỉ trường được phân công | Chỉ trường được phân công khi cần lập món/thực đơn | Chỉ trường liên quan đến nghiệp vụ kho | R trường mình |
+| Hồ sơ bếp / phân công bếp-trường | C/R/U toàn cục có audit | C/R/U trong wardId | R bếp phục vụ trường mình | R assignment của bếp mình | R assignment của bếp mình | R assignment của bếp mình | R thông tin bếp giao suất cho trường |
+| Quản lý tài khoản | Quản trị toàn cục | Quản lý đầu mối bếp thuộc ward theo chính sách | C/R/U nhân viên trường và tiếp nhận thuộc schoolId | C/R/U nhân sự cùng kitchen nếu được giao quyền quản lý | Không mặc định | Không mặc định | Không |
+| Danh mục Ingredient/Unit/Allergen chuẩn | C/R/U toàn cục | R | R | R | C/R/U đề xuất; phát hành theo quản trị danh mục | R | R thông tin dị ứng cần cho tiếp nhận |
+| Supplier và SupplierKitchen | Quản trị toàn cục | R/giám sát bếp trong ward; không tự xác nhận giao dịch mua | R thông tin nhà cung cấp phục vụ trường nếu cần giám sát | C/R/U nhà cung cấp được phép của kitchen | R | R; tạo hồ sơ mua/nhận theo phân công | Không |
+| Dish / DishVersion / DishIngredient | Quản trị/khôi phục có audit | R giám sát trong ward | R món được đề xuất cho trường | C/R/U bản nháp món thuộc kitchen | C/R/U công thức, định lượng, dinh dưỡng trong kitchen | R hướng dẫn/nguyên liệu cần chuẩn bị | R món đã được duyệt và phục vụ tại trường |
+| Gửi phiên bản món cho trường duyệt | Không thay bên gửi | R giám sát | Không | S cho trường đang được phân công | S nếu được giao quyền | Không mặc định | Không |
+| Duyệt DishVersion theo trường | Chỉ can thiệp quản trị có audit, không thay phê duyệt thường lệ | R trạng thái trong ward | A cho schoolId mình | Không | Không | Không | Không |
+| MealPlan / MealPlanItem | R toàn cục; sửa chỉ qua thao tác quản trị có audit | R giám sát trong ward | R trường mình; không tạo mặc định | C/R/U bản nháp cho trường được phân công | C/R/U nội dung dinh dưỡng nếu được phân công | R nhu cầu chuẩn bị | R thực đơn đã gửi/đã duyệt của trường |
+| Gửi revision thực đơn | Không | Không | Không | S cho trường được phân công | S nếu được giao quyền lập kế hoạch | Không | Không |
+| Duyệt / trả revision thực đơn | Không thay BGH trong quy trình thường lệ | R giám sát | A cho schoolId mình | Không duyệt đề xuất của chính bếp | Không | Không | Không |
+| StockReceipt / nhập kho / InventoryLot | R có audit | R giám sát bếp trong ward | R báo cáo liên quan trường; không ghi sổ kho bếp trung tâm | C/R theo quyền quản lý kho | R | C/R/X trong kitchen | Không |
+| StockMovement / xuất kho / điều chỉnh / kiểm kê | R có audit | R giám sát | R báo cáo tổng hợp liên quan trường | Phê duyệt/điều phối theo phân quyền kitchen | R | C/R/X; giao dịch đã ghi sổ không sửa/xóa | Không |
+| ProductionBatch / xác nhận sản xuất | R có audit | R tiến độ trong ward | R tiến độ suất ăn trường mình | C/R/X trong kitchen | R; xác nhận chất lượng công thức theo phân quyền | X chuẩn bị/xuất nguyên liệu | R thông tin lô/đợt liên quan giao nhận |
+| Delivery / giao hàng | R có audit | R giám sát trong ward | R trường mình | C/R/X phía giao | R khi cần truy xuất | R | R; không xác nhận thay người nhận |
+| DeliveryReceipt / xác nhận nhận tại trường | R có audit | R giám sát | R; xử lý ngoại lệ/giám sát | R kết quả; không xác nhận thay trường | R | R | C/R/X tại schoolId mình |
+| FoodSafetyCheck / kiểm thực tại trường | R toàn cục có audit | R giám sát trong ward | C/R/U trong schoolId theo vai trò được giao | R phần liên quan giao hàng; không ghi thay kiểm tra tại trường | R/chuyên môn theo phân công | R phần liên quan lô/kho | C/R/X kiểm tra tiếp nhận và ghi sự cố theo biểu mẫu |
+| TraceEvent / truy xuất | R toàn cục có audit | R trong ward | R trường mình | C/R trong kitchen và lô/đợt liên quan | R | C/R sự kiện kho | C/R sự kiện tiếp nhận của trường |
+| Student / Attendance | Theo school scope được chọn và xác thực | Không mặc định | C/R/U trong schoolId | Không | Không | Không | Không mặc định; chỉ khi có nhiệm vụ được cấp riêng |
+| Parent/student private data | Chỉ quản trị có căn cứ và audit | Không | Trong phạm vi trách nhiệm trường, theo chính sách dữ liệu | Không | Không | Không | Không |
+
+**Lưu ý về vai trò bếp:** CENTRAL_KITCHEN là tài khoản đầu mối bếp trung tâm hiện tại. KITCHEN_MANAGER, NUTRITIONIST và WAREHOUSE_STAFF không nên có cùng một bộ quyền ghi/sửa; bảng trên là mức quyền nghiệp vụ tối đa dự kiến, còn quyền cụ thể phải được cấp theo tác vụ. Nếu một người kiêm nhiệm, việc kiêm nhiệm phải được cấp rõ ràng và audit.
+
+### 11.3. Ma trận API đang tồn tại trong backend được rà soát
+
+| API | Role tại Controller | Kiểm tra trong Service | Kết luận |
+|---|---|---|---|
+| `GET /api/v1/schools` | SUPER_ADMIN, UBND_ADMIN | SUPER_ADMIN toàn hệ thống; UBND lọc wardId | Scope rõ ở service |
+| `GET /api/v1/schools/me/overview` | SCHOOL_ADMIN | Bắt buộc schoolId và truy vấn theo schoolId | Scope rõ |
+| `GET /api/v1/users` | SUPER_ADMIN, SCHOOL_ADMIN, UBND_ADMIN ở class; service chỉ cho SUPER_ADMIN/SCHOOL_ADMIN | SCHOOL_ADMIN lọc schoolId; SUPER_ADMIN toàn cục | Decorator rộng hơn service; cần thống nhất |
+| `POST /api/v1/users` | SUPER_ADMIN, SCHOOL_ADMIN, UBND_ADMIN ở class; service chỉ cho SUPER_ADMIN/SCHOOL_ADMIN | BGH chỉ tạo SCHOOL_KITCHEN/SCHOOL_STAFF trong schoolId; SUPER_ADMIN tạo theo DTO và quy tắc role | Decorator rộng hơn service; UBND không tạo user qua endpoint này |
+| `PATCH /api/v1/users/:id` | Như trên | SUPER_ADMIN; BGH trong schoolId và role được phép; UBND quản lý CENTRAL_KITCHEN cùng ward | Cần test scope và trường được phép cập nhật |
+| `PATCH /api/v1/users/:id/password` | Như trên | Dùng findManagedUser để kiểm tra target | Có scope theo target |
+| `GET /api/v1/users/my-kitchen` | SCHOOL_ADMIN | Dùng schoolId tìm assignment hoặc bếp tại trường | Đúng mục tiêu hiển thị bếp phục vụ trường |
+| `GET /api/v1/users/central-kitchens` | SUPER_ADMIN, UBND_ADMIN | UBND lọc Kitchen.wardId | Scope ward có |
+| `POST /api/v1/users/central-kitchens` | SUPER_ADMIN, UBND_ADMIN | UBND chỉ tạo trong ward; xác minh trường cùng ward, chưa có bếp khác đang phục vụ | Có kiểm tra scope và xung đột phân công |
+| `GET /api/v1/students` | SCHOOL_ADMIN, SCHOOL_STAFF, SUPER_ADMIN | Service bắt buộc user.schoolId và lọc schoolId | SUPER_ADMIN được khai báo ở Controller nhưng không dùng được nếu không có schoolId |
+| `POST/PUT/DELETE /api/v1/students` | SCHOOL_ADMIN, SUPER_ADMIN | Service bắt buộc schoolId và thao tác theo schoolId | Cùng mismatch với SUPER_ADMIN |
+| `GET /api/v1/attendance` | SCHOOL_ADMIN, SCHOOL_STAFF, SCHOOL_KITCHEN, SUPER_ADMIN | Controller bắt buộc schoolId; service lọc schoolId | SCHOOL_KITCHEN hiện có thể đọc attendance trường mình; cần xem lại tính cần thiết theo nhiệm vụ tiếp nhận |
+
+### 11.4. Policy backend bắt buộc cho từng request
+
+1. **Resolve actor:** JWT strategy đọc user đang hoạt động từ DB; role và scope lấy từ bản ghi DB, không tin claim scope do client tự gửi.
+2. **Resolve resource:** trước khi đọc/sửa một resource theo id, tìm resource kèm điều kiện scope ngay trong truy vấn (ví dụ `where: { id, kitchenId: actor.kitchenId }`), tránh tải theo id trước rồi quên kiểm tra.
+3. **Resolve relationship:** với bếp trung tâm → trường, xác thực KitchenSchoolAssignment có hiệu lực tại serviceDate; với bếp trường, xác thực Kitchen.type=SCHOOL và Kitchen.schoolId trùng trường.
+4. **Resolve action + state:** ngoài role/scope, kiểm tra trạng thái bản ghi. Ví dụ chỉ bản nháp được sửa; chỉ revision đã gửi mới được duyệt/trả; chỉ giao dịch chưa ghi sổ mới được xác nhận; giao dịch đã ghi sổ chỉ được đảo.
+5. **Separate proposer and approver:** người/bếp lập revision không được tự duyệt revision đó; SCHOOL_ADMIN hoặc người được trường ủy quyền mới được duyệt trong schoolId của mình.
+6. **Audit:** lưu actorId, action, resourceId, scope, thời điểm, lý do và dữ liệu trước/sau hoặc snapshot phù hợp đối với duyệt, trả lại, ghi sổ, điều chỉnh, đảo và xác nhận giao nhận.
+7. **No implicit global bypass:** SUPER_ADMIN phải cung cấp target scope hợp lệ cho nghiệp vụ theo trường/bếp; không được bỏ lọc truy vấn do thiếu schoolId/kitchenId.
+8. **No role-name inference:** SCHOOL_KITCHEN hiện tại là nhân viên tiếp nhận trường. Nhân sự vận hành bếp trường phải có kitchenId hợp lệ; không thể chỉ dựa vào role name hoặc schoolId để cấp quyền bếp.
+9. **Deny by default:** role không có trong policy hoặc scope null/không hợp lệ thì từ chối; không tự mở quyền chỉ vì frontend hiển thị route.
+10. **Cross-scope tests:** mỗi endpoint phải có test actor cùng scope, khác scope, inactive user, missing scope, resource không tồn tại và sai trạng thái.
+
+### 11.5. Các quyết định cần giữ trước khi triển khai
+
+- Giữ nguyên enum và tài khoản hiện hữu trong giai đoạn này; chưa đổi SCHOOL_KITCHEN, chưa thêm role mới.
+- Không tạo quyền tự duyệt cho bếp; không để UBND phê duyệt thay trường trong luồng thường lệ.
+- Không cho BGH ghi sổ kho của bếp trung tâm; BGH giám sát nhu cầu, thực đơn, giao nhận và kiểm thực thuộc trường.
+- Không cho nhân viên tiếp nhận tại trường thao tác kho/sản xuất của bếp.
+- Chưa triển khai API nghiệp vụ thực đơn/kho/giao nhận trong bước này. Trước khi code cần chốt API contract, DTO, trạng thái, audit và test matrix.
+- Không sửa source code, Prisma schema hoặc migration trong lần cập nhật tài liệu này.
