@@ -1024,7 +1024,7 @@ function Shell() {
     queryKey: ["day", school.id, date, role === "parent" ? "parent" : role === "culture_social_office" ? "supervisor" : "shared"],
     queryFn: () => demoData.day(school, date,
       role === "parent" || role === "culture_social_office" ? demoMealViewer(role, school) : undefined),
-    enabled: !!school.id && !!schoolQuery.data,
+    enabled: !!school.id && !!schoolQuery.data && !isRealSchoolAdmin,
   });
   const parentMealQuery = useQuery({
     queryKey: ["parent-meal-day", school.id, date, parentMealType],
