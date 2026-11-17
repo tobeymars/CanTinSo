@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { AlertCircle, ArrowDownToLine, Building2, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Eye, FileCheck2, FileText, Paperclip, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, Upload, WalletCards, X } from 'lucide-react'
 import type { ViewRole } from './lib/store'
+import { getMyAssignedCentralKitchen, type AssignedCentralKitchen } from './lib/usersApi'
+import { getStoredUser } from './lib/authApi'
 import { canManageSupplyChain, canViewSupplyChain } from './lib/managementPermissions'
 import { defaultCoreRecords, emptySupplierLegal, normalizeSupplier, readSuppliers, saveSuppliers, supplierDocumentTypes, supplierSeeds } from './lib/suppliers'
 import type { Supplier, SupplierAttachment, SupplierDocumentType, SupplierLegal } from './lib/suppliers'
@@ -98,6 +100,10 @@ function fileToDataUrl(file:File):Promise<string> {
 
 export default function SupplierManagement({role}:{role:ViewRole}) {
   const [suppliers,setSuppliers]=useState(readSuppliers)
+  const [assignedKitchen,setAssignedKitchen]=useState<AssignedCentralKitchen|null>(null)
+  const [assignedKitchenLoading,setAssignedKitchenLoading]=useState(false)
+  const [assignedKitchenError,setAssignedKitchenError]=useState('')
+  const isSchoolAdminAccount=getStoredUser()?.role==='SCHOOL_ADMIN'
   const [code,setCode]=useState('')
   const [name,setName]=useState('')
   const [phone,setPhone]=useState('')
@@ -118,6 +124,17 @@ export default function SupplierManagement({role}:{role:ViewRole}) {
   const pages=Math.max(1,Math.ceil(filtered.length/pageSize))
   const visible=filtered.slice((Math.min(page,pages)-1)*pageSize,Math.min(page,pages)*pageSize)
   const viewing=suppliers.find(item=>item.id===viewingId)
+  useEffect(()=>{
+    if(role!=='school_board'||!isSchoolAdminAccount)return
+    let active=true
+    setAssignedKitchenLoading(true)
+    setAssignedKitchenError('')
+    getMyAssignedCentralKitchen()
+      .then(value=>{if(active)setAssignedKitchen(value)})
+      .catch(error=>{if(active)setAssignedKitchenError(error instanceof Error?error.message:'Không tải được bếp được phân công.')})
+      .finally(()=>{if(active)setAssignedKitchenLoading(false)})
+    return()=>{active=false}
+  },[role,isSchoolAdminAccount])
   useEffect(()=>{
     const update=(event:StorageEvent)=>{if(event.key==='demo-suppliers-v1')setSuppliers(readSuppliers())}
     window.addEventListener('storage',update)
@@ -177,6 +194,20 @@ export default function SupplierManagement({role}:{role:ViewRole}) {
   if(!canRead)return <div className="management-page"><section className="card management-access-denied"><AlertCircle/><h2>Không có quyền truy cập</h2><p>Vai trò hiện tại không được phân công quản lý nhà cung cấp.</p></section></div>
   return <div className="management-page supplier-management">
     <header className="management-page-header"><div><div className="section-kicker">DỮ LIỆU MINH HỌA · QUẢN LÝ MUA HÀNG</div><h2>{canEdit?'Quản lý nhà cung cấp':'Giám sát nhà cung cấp'}</h2><p>Theo dõi nhà cung cấp, phạm vi áp dụng, hồ sơ pháp lý và các giấy phép, chứng từ liên quan tại bếp trung tâm và bếp tại trường.</p></div>{canEdit&&<div className="management-header-actions"><button className="primary" onClick={()=>openEditor(null)}><Plus size={17}/>Thêm nhà cung cấp</button></div>}</header>
+    {role==='school_board'&&isSchoolAdminAccount&&<section className="card" style={{marginBottom:20}}>
+      <div className="card-header"><div><div className="section-kicker">DỮ LIỆU ĐỒNG BỘ TỪ UBND PHƯỜNG</div><h2>Bếp đang phục vụ trường</h2><p>Thông tin phân công chính thức được tải từ hệ thống CanTinSo.</p></div><span className="supplier-status declared">Dữ liệu hệ thống</span></div>
+      {assignedKitchenLoading?<p>Đang tải thông tin bếp được phân công…</p>
+        :assignedKitchenError?<p className="error" role="alert">{assignedKitchenError}</p>
+        :assignedKitchen?<div className="supplier-document-grid">
+          <div><span>Tên bếp trung tâm</span><strong>{assignedKitchen.kitchen.name}</strong></div>
+          <div><span>Mã bếp</span><strong>{assignedKitchen.kitchen.code}</strong></div>
+          <div><span>Phường quản lý</span><strong>{assignedKitchen.kitchen.ward.name}</strong></div>
+          <div><span>Người liên hệ</span><strong>{assignedKitchen.kitchen.contactName||'Chưa cập nhật'}</strong></div>
+          <div><span>Điện thoại</span><strong>{assignedKitchen.kitchen.phone||'Chưa cập nhật'}</strong></div>
+          <div><span>Địa chỉ</span><strong>{assignedKitchen.kitchen.address||'Chưa cập nhật'}</strong></div>
+        </div>
+        :<div className="empty-state"><Building2 size={32}/><h3>Chưa có bếp trung tâm được phân công</h3><p>UBND phường chưa ghi nhận phân công bếp trung tâm đang hoạt động cho trường này.</p></div>}
+    </section>}
     {!canEdit&&<div className="management-readonly"><AlertCircle size={17}/><span>Chế độ chỉ xem hồ sơ và tra cứu chứng từ nhà cung cấp; không được thêm, sửa, xóa, nhập hoặc xuất danh sách.</span></div>}
     {notice&&<div className="local-toast" role="status"><Check size={16}/>{notice}<button aria-label="Đóng thông báo" onClick={()=>setNotice('')}><X size={15}/></button></div>}{error&&editing===undefined&&<p className="error" role="alert">{error}</p>}
     <div className="management-kpis two"><article className="card"><Building2/><span>Tổng số nhà cung cấp</span><strong>{suppliers.length}</strong><small>{suppliers.filter(item=>item.status==='active').length} đang hoạt động</small></article><article className="card warning"><WalletCards/><span>Tổng nợ cần trả</span><strong>{money.format(suppliers.reduce((sum,item)=>sum+item.debt,0))}</strong><small>Dữ liệu DEMO · Không phải chứng từ kế toán</small></article></div>
