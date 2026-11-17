@@ -1477,3 +1477,213 @@ Profiling trả về 10 FK trong nhóm bảng mục tiêu:
 5. Do các bảng nghiệp vụ đang rỗng, chưa có dữ liệu thực tế để quyết định backfill mapping. Không tự suy luận chủ sở hữu lịch sử từ assignment hiện tại.
 6. Chưa tạo migration, chưa sửa schema.prisma, chưa thay đổi database hoặc dữ liệu. Bước tiếp theo là chốt physical schema: FK composite để bảo vệ cùng Kitchen, delete policy, enum, precision/nullability, unique/partial unique và transaction invariants.
 
+
+
+## 18. Physical Schema v1 — đặc tả vật lý được chốt ở mức thiết kế (17/11/2026)
+
+> Trạng thái: đặc tả thiết kế để làm cơ sở đối chiếu Prisma; chưa triển khai. Các tên model/cột dưới đây là tên logic mục tiêu, tên vật lý dùng snake_case. Những chỗ Prisma không biểu diễn đủ ràng buộc PostgreSQL phải được bổ sung bằng SQL migration có review. Không xem tài liệu này là lệnh tạo migration.
+
+### 18.1. Nguyên tắc sở hữu và ranh giới Kitchen
+
+1. `Kitchen` là tenant nghiệp vụ của miền bếp. Mọi dữ liệu vận hành bếp phải có `kitchenId` trực tiếp hoặc đi qua quan hệ có khóa ngoại bảo đảm về đúng Kitchen.
+2. `Supplier` và `Ingredient` là danh mục dùng chung, không sở hữu bởi School hoặc Kitchen. Quyền sử dụng nhà cung cấp của từng bếp được biểu diễn bằng `SupplierKitchen`.
+3. `InventoryLocation`, `InventoryLot`, `StockReceipt`, `StockMovement`, `Dish` và `ProductionBatch` thuộc đúng một Kitchen. Không suy ra quyền sở hữu từ assignment hiện tại của trường.
+4. `MealPlan` thuộc một School và ghi rõ Kitchen đề xuất/chịu trách nhiệm. `Delivery` thuộc Kitchen giao và School nhận. Mỗi ProductionBatch chỉ phục vụ một School.
+5. Không tạo tồn kho riêng cho từng trường được bếp trung tâm phục vụ. Xuất dùng/đợt sản xuất mới gắn school đích; số lượng tồn vẫn thuộc kho vật lý của Kitchen.
+6. Dữ liệu lịch sử tham chiếu Kitchen/School đã phát sinh phải được giữ nguyên. Thay đổi assignment chỉ ảnh hưởng nghiệp vụ tương lai, không đổi chủ sở hữu các chứng từ cũ.
+
+### 18.2. Danh sách model và khóa định danh
+
+| Model | Khóa chính/duy nhất trọng yếu | Scope |
+|---|---|---|
+| Supplier | `id`; `code` unique toàn hệ thống khi có mã chuẩn | Global |
+| SupplierKitchen | `id`; unique `(supplierId, kitchenId)` | Kitchen |
+| Unit | `id`; `code` unique | Global |
+| Ingredient | `id`; `code` unique | Global |
+| IngredientUnitConversion | unique `(ingredientId, fromUnitId, toUnitId)` | Global |
+| Allergen | `id`; `code` unique | Global |
+| InventoryLocation | `id`; unique `(id, kitchenId)`; unique `(kitchenId, code)` | Kitchen |
+| StockReceipt | `id`; unique `(id, kitchenId)`; unique `(kitchenId, receiptCode)` | Kitchen |
+| StockReceiptItem | `id`; FK kép đến receipt cùng Kitchen | Kitchen |
+| InventoryLot | `id`; unique `(id, kitchenId, ingredientId)`; unique `(kitchenId, ingredientId, lotCode)` | Kitchen |
+| StockMovement | `id`; unique `(id, kitchenId)`; unique `(kitchenId, movementCode)` | Kitchen |
+| StockMovementItem | `id`; FK kép đến movement và lot cùng Kitchen, cùng Ingredient | Kitchen |
+| Dish | `id`; unique `(id, kitchenId)`; unique `(kitchenId, code)` | Kitchen |
+| DishVersion | `id`; unique `(id, dishId)`; unique `(dishId, versionNo)` | Theo Dish/Kitchen |
+| DishIngredient | unique `(dishVersionId, ingredientId)` nếu không cho trùng nguyên liệu; nếu cho nhiều công đoạn thì thêm sequence vào khóa | Theo DishVersion |
+| DishApproval | unique `(schoolId, dishVersionId)` cho trạng thái hiện hành; lịch sử quyết định tách thành ApprovalEvent | School + version |
+| MealPlan | unique `(schoolId, serviceDate, mealType)`; unique `(id, schoolId, kitchenId)` | School + Kitchen |
+| MealPlanRevision | unique `(mealPlanId, revisionNo)`; unique `(id, mealPlanId)` | Theo MealPlan |
+| MealPlanItem | FK đến revision và DishVersion; unique theo revision + version + ageGroup | Theo revision |
+| MealPlanApprovalEvent | `id`; index `(mealPlanRevisionId, occurredAt)` | School |
+| ProductionBatch | unique `(id, kitchenId, schoolId)`; unique `(kitchenId, batchCode)` | Một Kitchen + một School |
+| Delivery | unique `(id, kitchenId, schoolId)`; unique `(kitchenId, deliveryCode)` | Một Kitchen + một School |
+| DeliveryItem / DeliveryReceipt | FK cùng Delivery; một Delivery có đúng một receipt cuối cùng | Kitchen + School |
+| TraceEvent | `id`; FK lot RESTRICT; FK tùy chọn đến movement/batch/delivery | Theo sự kiện |
+
+Ghi chú:
+- Các unique có `id` đứng đầu không thay thế PK; chúng tạo candidate key để PostgreSQL cho phép FK composite bảo đảm cùng scope.
+- `DishApproval` nên tách trạng thái hiện hành (một dòng cho school + version) khỏi `DishApprovalEvent` bất biến để lưu mọi lần gửi, duyệt, trả hoặc thu hồi. Không ghi đè mất quyết định cũ.
+- Nếu cần cho phép cùng Ingredient xuất hiện nhiều lần trong công thức do các công đoạn khác nhau, dùng unique `(dishVersionId, sequenceNo)`, không ép unique ingredient.
+- Với `MealPlanItem`, khóa tự nhiên cần tính cả ageGroup; một món/version có thể có định lượng riêng cho nhiều nhóm tuổi trong cùng revision.
+
+### 18.3. Khóa ngoại composite chống trộn Kitchen
+
+Đây là yêu cầu toàn vẹn dữ liệu cấp DB, không chỉ là kiểm tra trong service.
+
+1. `InventoryLocation`: unique `(id, kitchenId)`.
+2. `InventoryLot`: có `kitchenId`, `locationId`, `ingredientId`; FK `(locationId, kitchenId)` → `InventoryLocation(id, kitchenId)`. FK `(supplierId, kitchenId)` → `SupplierKitchen(supplierId, kitchenId)` để lô chỉ dùng nhà cung cấp đã được liên kết với đúng bếp. Unique `(id, kitchenId, ingredientId)`.
+3. `StockReceipt` và `StockMovement`: unique `(id, kitchenId)`. Các dòng chi tiết tham chiếu header bằng `(receiptId, kitchenId)` hoặc `(movementId, kitchenId)`.
+4. `StockMovementItem`: lưu `kitchenId` và `ingredientId` có kiểm soát; FK `(lotId, kitchenId, ingredientId)` → `InventoryLot(id, kitchenId, ingredientId)`, đồng thời FK `(movementId, kitchenId)` → `StockMovement(id, kitchenId)`. Nhờ vậy không thể ghi một lô của bếp A vào phiếu xuất của bếp B hoặc ghi sai nguyên liệu.
+5. `Dish`: unique `(id, kitchenId)`; `DishVersion` tham chiếu Dish qua cặp `(dishId, kitchenId)` hoặc mang kitchenId để bảo đảm không gắn version vào món khác bếp.
+6. `MealPlan`: lưu `schoolId` và `kitchenId`; FK đến cặp School/Kitchen không tự chứng minh assignment có hiệu lực tại serviceDate. Điều kiện thời gian phải được xác thực bằng service transaction và DB trigger/constraint trigger phù hợp.
+7. `ProductionBatch`: mang `kitchenId`, `schoolId`, `mealPlanRevisionId`; FK composite đến MealPlan/Revision bảo đảm batch thuộc đúng cặp bếp-trường của thực đơn. Không cho một batch phục vụ nhiều trường.
+8. `Delivery`: mang `kitchenId`, `schoolId`, `productionBatchId`; composite FK bảo đảm cùng Kitchen/School với batch. Nếu giao nhiều đợt, tạo nhiều Delivery cho cùng batch và trường.
+9. `TraceEvent`: các FK optional đến movement/batch/delivery phải kèm kitchenId nếu quan hệ có scope Kitchen; lotId dùng RESTRICT và không được xóa dây chuyền lịch sử.
+
+Prisma có thể khai báo nhiều quan hệ composite nếu các cột/unique tương ứng được mô hình hóa. Các điều kiện phụ thuộc thời gian, điều kiện một bản ghi hiện hành và một số CHECK/partial index có thể cần SQL migration thủ công. Phải kiểm tra SQL sinh ra trước khi deploy; không giả định `prisma validate` chứng minh mọi invariant ở DB.
+
+### 18.4. Delete policy, archival và audit
+
+| Quan hệ | ON DELETE mục tiêu | Lý do |
+|---|---|---|
+| Kitchen → assignment | RESTRICT | Giữ lịch sử phân công; ngừng dùng bằng isActive/endsAt |
+| School → assignment | RESTRICT | Giữ lịch sử trường được phục vụ |
+| Kitchen → location/receipt/movement/dish | RESTRICT | Kitchen đã có nghiệp vụ thì không xóa cứng |
+| Location → lot | RESTRICT | Không xóa vị trí làm mất ngữ cảnh lô |
+| Supplier → SupplierKitchen/receipt | RESTRICT hoặc khóa inactive | Không xóa nhà cung cấp đã phát sinh giao dịch |
+| Ingredient → lot/dish ingredient | RESTRICT | Danh mục đã sử dụng phải được lưu |
+| InventoryLot → TraceEvent | RESTRICT | Tuyệt đối không cascade xóa lịch sử truy xuất |
+| MealPlan → revision/item/approval | RESTRICT về mặt lịch sử; child chỉ cascade nếu là draft chưa từng submit và có policy riêng | Không xóa thực đơn đã gửi/duyệt |
+| ProductionBatch → movement/delivery | RESTRICT | Giữ liên kết sản xuất, xuất kho và giao nhận |
+| User → audit/event | RESTRICT hoặc actor snapshot có chủ đích | Không xóa mất danh tính người thao tác |
+
+Quy tắc vận hành:
+- Kitchen, School, Supplier, Ingredient, InventoryLocation và User sau khi được tham chiếu bởi nghiệp vụ phải được deactivate/archive, không hard-delete.
+- Chứng từ đã POSTED/COMPLETED, revision đã SUBMITTED/APPROVED, approval event, stock movement, delivery receipt và trace event là bất biến.
+- Sai sót được sửa bằng reversal/correction record có tham chiếu chứng từ gốc, actor, thời điểm và reason; không sửa số lượng hoặc xóa dòng đã ghi sổ.
+- Với draft chưa phát sinh tham chiếu nghiệp vụ, có thể cho phép xóa theo policy riêng; phải giới hạn ở trạng thái DRAFT và audit hành động.
+- Không dùng `onDelete: Cascade` cho bất kỳ quan hệ nào mà bản ghi con có giá trị kiểm toán/truy xuất.
+
+### 18.5. Enum và state machine mục tiêu
+
+Không thay enum UserRole hiện tại trong bước này. Các enum nghiệp vụ mới đề xuất:
+
+| Enum | Giá trị mục tiêu |
+|---|---|
+| SupplierKitchenStatus | ACTIVE, INACTIVE, SUSPENDED |
+| InventoryLocationStatus | ACTIVE, INACTIVE |
+| StockReceiptStatus | DRAFT, POSTED, VOIDED |
+| StockMovementType | RECEIPT, ISSUE, TRANSFER, ADJUSTMENT_IN, ADJUSTMENT_OUT, RETURN, REVERSAL |
+| StockMovementStatus | DRAFT, POSTED, REVERSED |
+| DishStatus | DRAFT, ACTIVE, ARCHIVED |
+| DishVersionStatus | DRAFT, SUBMITTED, PUBLISHED, WITHDRAWN |
+| DishApprovalStatus | PENDING, APPROVED, RETURNED, REJECTED, WITHDRAWN |
+| MealPlanStatus | DRAFT, IN_REVIEW, RETURNED, APPROVED, CANCELLED |
+| MealPlanRevisionStatus | DRAFT, SUBMITTED, APPROVED, RETURNED, REJECTED, SUPERSEDED |
+| ProductionBatchStatus | PLANNED, IN_PROGRESS, COMPLETED, CANCELLED |
+| DeliveryStatus | PREPARING, DISPATCHED, DELIVERED, PARTIALLY_RECEIVED, RECEIVED, EXCEPTION, CANCELLED |
+
+State invariants:
+- Chỉ DRAFT được chỉnh sửa trực tiếp.
+- SUBMITTED/IN_REVIEW không được sửa nội dung; trả về thì tạo revision mới.
+- APPROVED revision là snapshot bất biến và là nguồn duy nhất cho sản xuất; khi revision mới được duyệt, revision hiệu lực trước chuyển SUPERSEDED trong cùng transaction.
+- Không cho bếp là proposer tự duyệt revision của chính mình.
+- StockMovement chỉ ảnh hưởng tồn khi chuyển POSTED; POSTED không quay về DRAFT, chỉ được đảo bằng movement mới.
+- Delivery chỉ được xác nhận nhận bởi actor thuộc schoolId nhận; phía giao không tự xác nhận receipt thay trường.
+
+Các enum trên là danh sách mục tiêu, cần rà soát tên và mapping trạng thái cũ trước migration; không tự động đổi chuỗi status đang có.
+
+### 18.6. Precision, đơn vị và nullability
+
+1. ID dùng UUID nhất quán với schema hiện tại.
+2. Thời điểm nghiệp vụ dùng `timestamptz(3)`; ngày phục vụ/hạn dùng/ngày sản xuất chỉ là ngày lịch dùng `date`. Không lưu ngày phục vụ dưới timestamp có giờ tùy ý.
+3. Số lượng tồn, nhập, xuất và định lượng nguyên liệu dùng `numeric(14,3)` theo đơn vị cơ sở của Ingredient. Nếu một ngành hàng cần độ chính xác cao hơn, phải có quyết định riêng và test làm tròn.
+4. Hệ số quy đổi đơn vị dùng `numeric(18,8)`; giá tiền dùng `numeric(14,2)` cùng currency code (mặc định VND nếu hệ thống chỉ triển khai Việt Nam); dinh dưỡng dùng `numeric(14,4)`.
+5. Không lưu số lượng cùng một lot bằng nhiều đơn vị tự do. Lot và ledger lưu đơn vị cơ sở; đơn vị nhập từ nhà cung cấp được lưu thêm trên receipt item và quy đổi có snapshot factor tại thời điểm ghi sổ.
+6. Mọi quantity phải CHECK lớn hơn 0 trên dòng giao dịch; số dư cache phải CHECK không âm, trừ khi có nghiệp vụ cho phép âm được phê duyệt riêng. Điều chỉnh âm dùng movement có lý do.
+7. Các cột scope bắt buộc như kitchenId, schoolId, ingredientId, locationId, serviceDate, mealType và actor của thao tác phê duyệt/ghi sổ không nullable. Actor system/import có thể null chỉ khi có `actorType` và `actorLabel`/source rõ ràng.
+8. `endsAt` chỉ null khi assignment còn mở; nếu có giá trị phải lớn hơn startsAt. `expiryDate` có thể null nếu nhà cung cấp không công bố hạn dùng nhưng phải có lý do/ngoại lệ theo policy thực phẩm.
+9. Không dùng float/double cho quantity, price, nutrition hoặc conversion.
+
+### 18.7. Unique, check và index
+
+- Supplier: unique code toàn cục nếu code do hệ thống cấp; nếu mã nhà cung cấp không chuẩn hóa, dùng taxCode unique có điều kiện khi taxCode không null và giữ code nội bộ riêng.
+- SupplierKitchen: unique `(supplierId, kitchenId)`; có index `(kitchenId, status)`.
+- InventoryLocation: unique `(kitchenId, code)`; unique partial một location chính đang hoạt động trên mỗi Kitchen. Mỗi Kitchen phải có ít nhất một location chính; quy tắc “ít nhất một” cần transaction/service hoặc deferred constraint trigger vì CHECK không thể kiểm tra bảng khác.
+- InventoryLot: unique `(kitchenId, ingredientId, lotCode)`; index `(kitchenId, status, expiryDate)`, `(locationId, ingredientId)`; CHECK quantity > 0, remainingQty >= 0, remainingQty <= quantity (nếu chưa tính điều chỉnh tăng trực tiếp vào lot).
+- StockMovement: index `(kitchenId, status, occurredAt)`; unique idempotencyKey trong phạm vi Kitchen cho endpoint ghi sổ.
+- Dish: unique `(kitchenId, code)`; index `(kitchenId, status, name)`.
+- DishVersion: unique `(dishId, versionNo)`; index `(dishId, status)`.
+- DishApproval: unique `(schoolId, dishVersionId)`; index `(schoolId, status, updatedAt)`.
+- MealPlan: unique `(schoolId, serviceDate, mealType)`; index `(kitchenId, serviceDate, status)`; index `(schoolId, serviceDate)`.
+- MealPlanRevision: unique `(mealPlanId, revisionNo)`; unique partial một revision APPROVED/current cho mỗi MealPlan.
+- ProductionBatch: unique `(kitchenId, batchCode)`; index `(schoolId, plannedFor)`, `(kitchenId, status, plannedFor)`.
+- Delivery: unique `(kitchenId, deliveryCode)`; index `(schoolId, status, dispatchedAt)`.
+- TraceEvent: index `(lotId, occurredAt)`, `(kitchenId, occurredAt)`, và index theo các FK optional phục vụ truy xuất.
+- Các index unique có điều kiện/partial và CHECK phải được viết trong migration SQL, ghi chú rõ vì Prisma schema không mô tả hết.
+
+### 18.8. Transaction invariants bắt buộc
+
+**A. Nhập kho**
+1. Xác thực actor có quyền trên kitchenId.
+2. Kiểm tra SupplierKitchen đang ACTIVE tại thời điểm nhận.
+3. Tạo StockReceipt + item + InventoryLot + StockMovement RECEIPT trong một transaction.
+4. Kiểm tra composite FK location/supplier/ingredient cùng Kitchen.
+5. POST chứng từ một lần; idempotencyKey chống gửi lặp. Cập nhật balance cache cùng transaction.
+6. Không để receipt POSTED mà lot hoặc ledger chưa được tạo.
+
+**B. Xuất kho/sản xuất**
+1. Chỉ dùng revision thực đơn APPROVED/current.
+2. ProductionBatch có đúng một schoolId và một kitchenId hợp lệ tại ngày phục vụ.
+3. Chọn lot theo FEFO khi phù hợp; ngoại lệ phải có reason và actor.
+4. Tạo ISSUE movement và các dòng lot allocation cùng transaction; khóa hàng/cập nhật có điều kiện để ngăn hai request cùng tiêu vượt số dư.
+5. Tổng quantity xuất không vượt balance khả dụng; không trừ tồn từ kế hoạch dự kiến.
+6. Reversal tạo movement đối ứng và tham chiếu movement gốc.
+
+**C. Gửi và duyệt thực đơn**
+1. Bếp chỉ tạo/sửa plan cho trường có assignment hiệu lực tại serviceDate, hoặc Kitchen.type=SCHOOL có schoolId trùng trường.
+2. Trước submit, xác thực DishVersion đã được school đó APPROVED và các AgeGroup/servings hợp lệ.
+3. Submit tạo snapshot revision bất biến; ghi approval event SUBMITTED trong cùng transaction.
+4. Người duyệt thuộc schoolId, có quyền approve, không phải proposer; không cho duyệt revision không ở trạng thái SUBMITTED.
+5. Approve cập nhật revision hiện tại và SUPERSEDED revision cũ trong một transaction; ghi actor/time/reason.
+6. Mọi thay đổi sau duyệt phải tạo revision mới và được duyệt lại; batch đã tạo tiếp tục tham chiếu revision đã dùng.
+
+**D. Giao nhận**
+1. Delivery phải cùng Kitchen/School với ProductionBatch.
+2. Mỗi Delivery có thể có nhiều DeliveryItem nhưng chỉ một DeliveryReceipt cuối cùng; giao nhiều chuyến là nhiều Delivery.
+3. Chỉ actor school scope của trường nhận được xác nhận receipt; số lượng nhận có thể nhỏ hơn số lượng giao và phải ghi thiếu/thừa/hư hỏng.
+4. Không sửa receipt đã xác nhận; điều chỉnh bằng biên bản/event bổ sung.
+5. TraceEvent ghi nhận liên kết lot/movement/batch/delivery theo nguồn gốc thực tế, không chỉ metadata JSON.
+
+### 18.9. Quy tắc assignment và thời gian hiệu lực
+
+- Điều kiện hiệu lực tại thời điểm nghiệp vụ: `isActive = true AND startsAt <= serviceDateTime AND (endsAt IS NULL OR endsAt > serviceDateTime)`.
+- Dùng khoảng nửa mở `[startsAt, endsAt)` để hai assignment nối tiếp nhau tại cùng thời điểm không bị overlap.
+- Một School không được có hai Kitchen phục vụ chồng thời gian, kể cả một assignment CENTRAL và một Kitchen.type=SCHOOL. Một Kitchen có thể có nhiều School assignment đồng thời.
+- Bảo vệ overlap bằng PostgreSQL exclusion constraint trên range và trigger/constraint trigger để tính cả quan hệ Kitchen.schoolId của bếp tại trường. Nếu extension `btree_gist` không được phép, dùng trigger có khóa advisory/row lock và kiểm thử concurrency.
+- Assignment đã được dùng bởi MealPlan/Batch/Delivery không xóa; đóng bằng endsAt/isActive. Việc sửa ngày hiệu lực lịch sử cần quyền đặc biệt và audit.
+
+### 18.10. Những điểm Prisma không tự bảo đảm và cần SQL migration có kiểm soát
+
+1. Exclusion constraint/trigger chống assignment overlap.
+2. Trigger/constraint logic xác minh assignment có hiệu lực tại serviceDate khi tạo/submission MealPlan và ProductionBatch.
+3. Partial unique index cho một location chính và một revision hiện hành.
+4. CHECK constraint về quantity, range ngày và điều kiện số dư.
+5. Composite FK nếu Prisma model không biểu diễn được đầy đủ hoặc cần tên constraint cụ thể.
+6. Cơ chế idempotency/atomic posting, row lock và cập nhật balance cache.
+7. Bảo vệ append-only cho ledger, approval event, revision snapshot và trace event (service policy + DB trigger nếu cần).
+8. Xóa cascade hiện hữu phải được thay đổi có chủ đích, đặc biệt `trace_events.lot_id ON DELETE CASCADE`.
+
+### 18.11. Thứ tự triển khai và tiêu chí nghiệm thu
+
+1. Thiết kế Prisma models/enums và SQL constraints trên giấy; rà soát quan hệ hai chiều và tên FK.
+2. Viết test PostgreSQL cho composite FK: cố tình gắn lot/location/supplier/movement khác Kitchen phải bị DB từ chối.
+3. Viết test delete policy: không xóa được lot có TraceEvent, Kitchen có chứng từ, MealPlan đã gửi/duyệt hoặc User có audit history.
+4. Viết test assignment overlap và assignment đổi bếp; xác nhận dữ liệu lịch sử không đổi.
+5. Viết test transaction nhập/xuất có hai request đồng thời, idempotency, không âm tồn và reversal.
+6. Viết test state machine cho dish approval, meal plan revision, production và delivery receipt.
+7. Chỉ sau khi review các test và đối chiếu schema hiện tại mới viết migration additive; chạy trên DB backup/staging trước.
+8. Sau migration: Prisma validate/generate, backend build, migration status, integration tests, đối chiếu row counts và ledger balance.
+
+**Trạng thái sau mục 18:** Physical Schema v1 được chốt ở mức đặc tả thiết kế. Chưa sửa `schema.prisma`, chưa tạo migration, chưa chạy DDL/DML và chưa thay đổi database hoặc dữ liệu. Các mục 18.1–18.11 là tiêu chí để bước tiếp theo đối chiếu model hiện hữu và thiết kế migration; không phải xác nhận rằng các invariant đã được triển khai.
