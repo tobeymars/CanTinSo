@@ -6,6 +6,7 @@ CREATE TABLE "kitchens" (
   "code" TEXT NOT NULL,
   "name" TEXT NOT NULL,
   "type" "KitchenType" NOT NULL DEFAULT 'CENTRAL',
+  "school_id" UUID,
   "address" TEXT,
   "contact_name" TEXT,
   "phone" TEXT,
@@ -16,6 +17,9 @@ CREATE TABLE "kitchens" (
   CONSTRAINT "kitchens_pkey" PRIMARY KEY ("id")
 );
 CREATE UNIQUE INDEX "kitchens_code_key" ON "kitchens"("code");
+CREATE UNIQUE INDEX "kitchens_school_id_key" ON "kitchens"("school_id");
+ALTER TABLE "kitchens" ADD CONSTRAINT "kitchens_school_id_fkey" FOREIGN KEY ("school_id") REFERENCES "schools"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "kitchens" ADD CONSTRAINT "kitchens_type_school_id_check" CHECK (("type" = 'SCHOOL' AND "school_id" IS NOT NULL) OR ("type" = 'CENTRAL' AND "school_id" IS NULL));
 
 ALTER TABLE "users" ADD COLUMN "kitchen_id" UUID;
 CREATE INDEX "users_kitchen_id_role_idx" ON "users"("kitchen_id", "role");
