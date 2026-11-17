@@ -878,3 +878,229 @@ Frontend DEMO hiện có các khái niệm món theo ngày, trường, loại b�
 - Không dùng `expectedQuantity` trên Dish làm số suất thực đơn; số suất nằm ở MealPlanAgeGroup.
 - Không đưa `safetyMonitoring`, lotCode, supplier hoặc tồn kho vào MealPlanRevisionItem; các hồ sơ này thuộc food safety, inventory, production và delivery.
 - Không đổi enum, schema, API source, dữ liệu DB hoặc migration trong bước thiết kế này.
+
+
+## 14. Physical ERD blueprint — đối chiếu và chốt cấu trúc mục tiêu (17/11/2026)
+
+> Trạng thái: bản thiết kế vật lý đề xuất để rà soát nghiệp vụ; chưa phải Prisma schema và chưa được phép tạo migration từ riêng tài liệu này. Các tên model/field dưới đây là tên chuẩn hóa đề xuất. Những ràng buộc liên bảng cần service transaction hoặc DB constraint/trigger được ghi rõ.
+
+### 14.1. Nguyên tắc cấu trúc
+
+1. Mỗi dữ liệu có một chủ sở hữu nghiệp vụ rõ ràng: Dish thuộc Kitchen; InventoryLocation/InventoryLot thuộc Kitchen; MealPlan thuộc School và được một Kitchen đề xuất; Delivery có nguồn là Kitchen và đích là School.
+2. Dữ liệu danh mục dùng chung (Ingredient, Unit, AgeGroup, Allergen) không chứa tồn kho hay dữ liệu riêng của trường.
+3. Snapshot và ledger là dữ liệu lịch sử: revision đã submit, review đã ghi, stock movement đã post, delivery receipt đã xác nhận thì không sửa nội dung gốc. Sai sót được xử lý bằng revision/giao dịch điều chỉnh/biên bản bổ sung.
+4. Trạng thái hiện tại là projection để truy vấn; lịch sử sự kiện phải giữ actor, thời điểm, lý do và đối tượng liên quan.
+5. Không dùng JSON làm nơi chứa các quan hệ cần lọc, join, ràng buộc FK hoặc báo cáo. JSON chỉ dành cho metadata mở rộng, chứng cứ hoặc snapshot phụ không cần truy vấn quan hệ.
+6. Dùng UUID nhất quán với schema hiện tại; tiền/số lượng dùng Decimal có precision xác định; ngày phục vụ/hạn dùng dùng DATE; thời điểm thao tác lưu UTC và hiển thị theo múi giờ Asia/Ho_Chi_Minh.
+7. Delete policy mặc định là Restrict đối với dữ liệu đã phát sinh nghiệp vụ. Danh mục chưa sử dụng có thể archive/isActive=false; không cascade xóa lịch sử kho, duyệt, sản xuất hoặc giao nhận.
+
+### 14.2. Tổ chức, bếp và phân công
+
+Giữ các model hiện tại: Ward, School, Kitchen, KitchenSchoolAssignment, User. Không tạo lại các bảng này.
+
+- Kitchen CENTRAL: wardId bắt buộc, schoolId null.
+- Kitchen SCHOOL: schoolId bắt buộc, wardId null; ward được suy ra qua School.wardId để tránh lưu hai nguồn sự thật.
+- User thuộc một scope nghiệp vụ chính theo role: schoolId cho nhân sự trường; kitchenId cho nhân sự bếp; wardId cho UBND. SUPER_ADMIN không cần scope địa phương. Không cho client tự gán scope tùy ý.
+- Một trường chỉ có một bếp phục vụ có hiệu lực tại một thời điểm. Assignment phải được kiểm tra theo khoảng hiệu lực, không chỉ isActive. Quy ước khoảng thời gian: startsAt inclusive, endsAt exclusive; endsAt null là vô hạn.
+- Cần kiểm tra trigger hiện tại có ngăn cả hai assignment active đồng thời và khoảng ngày hiệu lực chồng lấn hay không. Nếu trigger chỉ kiểm tra isActive thì phải bổ sung temporal overlap validation.
+- Không cascade delete Kitchen/School/User khỏi dữ liệu nghiệp vụ đã phát sinh; chuyển trạng thái inactive và giữ lịch sử.
+
+Đối chiếu: cấu trúc tổ chức hiện tại đã có nền tảng phù hợp. Điểm còn thiếu là CHECK constraint cho loại bếp và scope, temporal validation cho assignment, cùng chính sách role/scope nhất quán. Đây là phần cần rà soát service/trigger, không cần tạo lại Ward/School/Kitchen.
+
+### 14.3. Danh mục chuẩn và nhóm tuổi
+
+| Model đề xuất | Trường chính | Khóa/ràng buộc |
+|---|---|---|
+| Ingredient | id, code, name, categoryId?, baseUnitId, isActive | code unique |
+| IngredientCategory | id, code, name | code unique |
+| Unit | id, code, name, dimension, precision | code unique; dimension MASS/VOLUME/COUNT |
+| IngredientUnitConversion | ingredientId, fromUnitId, toUnitId, factor | unique ingredient + from + to; factor > 0 |
+| AgeGroup | id, code, name, minAgeMonths?, maxAgeMonths?, sortOrder, isActive | code unique; min <= max |
+| Allergen | id, code, name | code unique |
+| IngredientAllergen | ingredientId, allergenId, note? | unique ingredient + allergen |
+| IngredientNutrition | ingredientId, nutrientCode, basisQuantity, basisUnitId, value, source, effectiveFrom | unique ingredient + nutrient + effectiveFrom |
+
+- Ingredient.baseUnitId là đơn vị chuẩn để lưu định lượng; Unit.dimension ngăn quy đổi sai chiều (khối lượng sang thể tích).
+- Quy đổi kg↔g có thể là quy đổi đơn vị chung; quy đổi ml↔g hoặc cup↔g phụ thuộc nguyên liệu phải lưu ở IngredientUnitConversion, không dùng một hệ số chung.
+- AgeGroup là danh mục hệ thống có thể cấu hình theo cấp học/địa phương; MealPlan lưu số suất theo AgeGroup. Không gắn cứng nhóm tuổi vào DishVersion.
+- IngredientNutrition phải ghi basis (ví dụ 100 g phần ăn được), nguồn và thời điểm hiệu lực; không ghi đè kết quả dinh dưỡng lịch sử của DishVersion.
+- Nếu cần nhiều bộ chuẩn nhóm tuổi theo chương trình/địa phương, bổ sung AgeGroupScheme; chưa cần nếu toàn hệ thống dùng một danh mục thống nhất.
+
+Đối chiếu: Ingredient hiện có unit String và category String. Đây là dữ liệu chưa chuẩn hóa; cần mapping unit/category trước khi chuyển. Không tự động quy đổi dữ liệu cũ nếu không biết đơn vị thực tế.
+
+### 14.4. Nhà cung cấp, vị trí kho, lô và sổ giao dịch
+
+| Model đề xuất | Trường chính | Khóa/ràng buộc |
+|---|---|---|
+| Supplier | id, code, name, taxCode?, contact, status | code unique toàn hệ thống hoặc theo pháp nhân |
+| SupplierKitchen | supplierId, kitchenId, status, startsAt, endsAt | unique supplier + kitchen + startsAt |
+| InventoryLocation | id, kitchenId, code, name, locationType, isActive | unique kitchen + code |
+| StockReceipt | id, kitchenId, inventoryLocationId, supplierId, receiptNo, receivedAt, status, createdById, postedAt | unique kitchen + receiptNo |
+| StockReceiptItem | id, stockReceiptId, ingredientId, quantity, unitId, unitCost?, lotCode, manufacturedAt?, expiryDate? | quantity > 0 |
+| InventoryLot | id, kitchenId, inventoryLocationId, ingredientId, supplierId?, receiptItemId?, lotCode, receivedQty, remainingQty, unitId, expiryDate?, status | unique theo kitchen + lotCode theo chính sách mã lô |
+| StockMovement | id, kitchenId, movementNo, movementType, status, occurredAt, actorId, reason?, referenceType?, referenceId?, postedAt | unique kitchen + movementNo |
+| StockMovementItem | id, stockMovementId, lotId, quantity, fromLocationId?, toLocationId? | quantity > 0; lot phải thuộc kitchen của movement |
+| StockBalance (cache tùy chọn) | lotId, locationId, onHandQty, updatedAt | unique lot + location; không phải nguồn sự thật |
+
+Quy tắc ledger:
+- Nhập kho tạo StockReceipt/StockReceiptItem; khi post, hệ thống tạo InventoryLot và giao dịch RECEIPT tương ứng. Không tạo lot từ phiếu nháp.
+- ISSUE, TRANSFER, ADJUSTMENT, RETURN, WASTE là các StockMovement có dòng chi tiết. Quantity luôn dương; chiều tăng/giảm được xác định bởi movementType và from/to location, tránh lưu số âm không rõ nghĩa.
+- StockMovement đã POSTED là bất biến. Điều chỉnh sai lệch bằng movement đối ứng có reference đến giao dịch gốc và reason bắt buộc.
+- remainingQty/StockBalance là cache có thể đối soát từ ledger. Nếu vẫn giữ remainingQty trên InventoryLot để tối ưu đọc, mọi cập nhật phải nằm trong cùng transaction post movement.
+- FEFO là chính sách gợi ý phân bổ lô theo hạn dùng; ngoại lệ phải có reason và actor.
+- Một lot thuộc đúng một Kitchen; chuyển giữa hai bếp phải là xuất khỏi bếp nguồn và nhập vào bếp đích có chứng từ chuyển giao, không đổi kitchenId của lot cũ.
+- SupplierKitchen xác định nhà cung cấp được bếp sử dụng; không có nghĩa nhà cung cấp tự động được phép cung cấp mọi nguyên liệu.
+
+Đối chiếu hiện tại: Supplier.schoolId và InventoryLot.schoolId là sai cấp sở hữu đối với kho trung tâm. Supplier cần tách khỏi School và được liên kết qua SupplierKitchen. InventoryLot cần chuyển sang Kitchen/InventoryLocation. Đây là thay đổi cấu trúc lớn nhất và phải backfill có kiểm soát.
+
+### 14.5. Món, phiên bản công thức và duyệt món
+
+| Model đề xuất | Trường chính | Khóa/ràng buộc |
+|---|---|---|
+| Dish | id, kitchenId, code, name, categoryId?, isActive, createdById | unique kitchen + code |
+| DishVersion | id, dishId, versionNo, status, yieldQuantity, yieldUnitId, instructions, effectiveFrom?, createdById, createdAt, releasedAt? | unique dish + versionNo |
+| DishIngredient | id, dishVersionId, ingredientId, quantity, unitId, preparationNote?, edibleRate? | unique version + ingredient + unit; quantity > 0 |
+| DishNutrition | id, dishVersionId, nutrientCode, value, basis, calculationMethod, calculatedAt, sourceSnapshot | unique version + nutrientCode + basis |
+| DishApproval | id, schoolId, dishVersionId, status, submittedAt, reviewedById?, reviewedAt?, comment? | unique school + dishVersion |
+
+- Dish thuộc Kitchen; DishVersion là snapshot bất biến sau khi phát hành/gửi duyệt. Sửa công thức tạo versionNo mới.
+- DishIngredient tham chiếu Ingredient chuẩn và Unit; tuyệt đối không tham chiếu InventoryLot.
+- Một DishVersion có thể có nhiều DishApproval theo các trường được bếp phục vụ. Approval APPROVED của trường A không có hiệu lực tại trường B.
+- Version mới không kế thừa approval của version cũ. Trường vẫn có thể sử dụng version cũ đã duyệt trong khi version mới chờ duyệt, nếu version cũ còn hiệu lực.
+- Không xóa DishVersion đã được tham chiếu bởi MealPlanRevision/ProductionBatch; dùng ARCHIVED/WITHDRAWN và lưu lý do.
+- Tách trạng thái phát hành version khỏi trạng thái duyệt theo trường. Version được bếp phát hành không đồng nghĩa trường đã duyệt.
+
+Đối chiếu hiện tại: Dish.code unique toàn cục và recipe Json không đủ để quản lý nhiều bếp, version, nguyên liệu chuẩn hoặc duyệt riêng theo trường. Cần migration chuyển dish cũ sang một Kitchen owner xác định; không gán tất cả Dish cho bếp trung tâm nếu không có bằng chứng sở hữu.
+
+### 14.6. Thực đơn, revision, phân bổ nhóm tuổi và duyệt
+
+| Model đề xuất | Trường chính | Khóa/ràng buộc |
+|---|---|---|
+| MealPlan | id, schoolId, serviceDate, mealType, status, createdAt, cancelledAt?, cancelReason? | unique school + serviceDate + mealType |
+| MealPlanRevision | id, mealPlanId, revisionNo, kitchenId, status, createdById, submittedById?, submittedAt?, snapshotAt | unique mealPlan + revisionNo |
+| MealPlanRevisionItem | id, revisionId, dishVersionId, sequence, courseType, displayNameSnapshot?, recipeSnapshot? | unique revision + sequence |
+| MealPlanAgeGroup | id, revisionId, ageGroupId, servings | unique revision + ageGroup; servings > 0 |
+| MealPlanItemAgeGroup | id, revisionItemId, ageGroupId, servings?, portionFactor, portionQuantity?, portionUnitId? | unique revisionItem + ageGroup |
+| MealPlanApproval | id, revisionId, action, actorId, actedAt, comment? | append-only; action SUBMITTED/APPROVED/RETURNED/REJECTED/WITHDRAWN |
+
+- MealPlan là root ổn định của một trường/ngày/loại bữa; giữ unique hiện tại.
+- MealPlanRevision chứa snapshot của mỗi lần gửi. Không sửa revision đã SUBMITTED/APPROVED; RETURNED thì tạo revisionNo tiếp theo.
+- Mỗi revision thuộc đúng một kitchen đề xuất; kitchenId lấy từ actor và kiểm tra assignment tại serviceDate.
+- MealPlanRevisionItem tham chiếu DishVersion đã được chính school đó duyệt. Snapshot tên món/công thức cần thiết để lịch sử không đổi nếu danh mục được cập nhật.
+- MealPlanAgeGroup lưu số suất theo nhóm tuổi ở cấp toàn bữa. MealPlanItemAgeGroup lưu số suất/hệ số định lượng nếu từng món có phân bổ khác nhau theo nhóm tuổi. Nếu mọi món dùng cùng số suất của nhóm tuổi, có thể bỏ servings ở item-age và chỉ giữ portionFactor; cần thống nhất quy tắc tính để tránh lưu hai số liệu mâu thuẫn.
+- MealPlan.servings hiện tại nên là trường tương thích tạm thời hoặc bỏ sau backfill; nguồn số suất chuẩn là tổng MealPlanAgeGroup.servings. Không nhận tổng servings do client tự khai nếu có thể tính từ các nhóm tuổi.
+- Chỉ một revision SUBMITTED đang chờ duyệt tại một thời điểm cho một MealPlan. Có thể dùng partial unique index trên DB; Prisma schema không biểu diễn đầy đủ partial unique, nên cần migration SQL/trigger và service transaction.
+- MealPlanApproval là lịch sử quyết định; trạng thái hiện tại trên revision là projection. Approval không thay thế quyền kiểm tra scope của backend.
+- Revision APPROVED cũ tiếp tục có hiệu lực đến khi revision mới được APPROVED; sau đó mới chuyển bản cũ sang SUPERSEDED bằng sự kiện có audit.
+
+Đối chiếu hiện tại: MealPlan thiếu kitchenId, revision, age group và approval history; MealPlanItem trỏ Dish thay vì DishVersion. Giữ root và unique key; thay cấu trúc children theo revision. MealType hiện tại có BREAKFAST/LUNCH/DINNER/SNACK, giữ nguyên.
+
+### 14.7. Sản xuất và định mức thực tế
+
+| Model đề xuất | Trường chính | Khóa/ràng buộc |
+|---|---|---|
+| ProductionBatch | id, kitchenId, schoolId, mealPlanRevisionId, batchNo, status, plannedAt, startedAt?, completedAt?, createdById | unique revision + batchNo |
+| ProductionBatchItem | id, productionBatchId, mealPlanRevisionItemId, plannedServings, producedServings, acceptedServings? | unique batch + revisionItem |
+| ProductionRequirement | id, productionBatchItemId, ingredientId, plannedQty, unitId, calculationSnapshot | unique batchItem + ingredient + unit |
+| ProductionConsumption | id, productionBatchItemId, ingredientId, lotId, actualQty, unitId, stockMovementItemId | FK đến lot và movement item |
+| ProductionWaste | id, productionBatchItemId, ingredientId?, lotId?, quantity, unitId, reason, recordedById, recordedAt | reason bắt buộc |
+
+- ProductionBatch luôn tham chiếu revision đã APPROVED và cùng kitchenId/schoolId của revision/root.
+- Cho phép nhiều batch cho cùng revision (ví dụ chia ca hoặc sản xuất bổ sung); batchNo phân biệt từng đợt. Không tạo MealPlan mới để đại diện batch thứ hai.
+- ProductionRequirement là nhu cầu dự kiến tính từ DishVersion × số suất × portionFactor; không làm thay đổi tồn.
+- ProductionConsumption ghi lượng thực tế đã dùng, gắn lot cụ thể. Xuất kho phải có StockMovement ISSUE tương ứng trong cùng transaction nghiệp vụ.
+- Waste/return phải phân biệt hao hụt sơ chế, thành phẩm hỏng, nguyên liệu trả lại kho và tiêu hủy. Không gom tất cả vào một số chênh lệch không có lý do.
+- Nếu số suất thay đổi sau duyệt, không sửa revision; lập điều chỉnh/batch mới hoặc quy trình bổ sung có audit.
+
+### 14.8. Giao hàng và xác nhận tại trường
+
+| Model đề xuất | Trường chính | Khóa/ràng buộc |
+|---|---|---|
+| Delivery | id, kitchenId, schoolId, productionBatchId, deliveryNo, status, dispatchedAt?, deliveredAt?, driverName?, vehicleInfo?, sealCode? | unique kitchen + deliveryNo |
+| DeliveryItem | id, deliveryId, productionBatchItemId, mealPlanRevisionItemId, sentQuantity, unit, conditionAtDispatch? | quantity >= 0 |
+| DeliveryReceipt | id, deliveryId, receivedById, receivedAt, status, comment?, evidence? | một receipt xác nhận cuối cùng cho mỗi delivery |
+| DeliveryReceiptItem | id, receiptId, deliveryItemId, receivedQuantity, rejectedQuantity, condition, reason? | unique receipt + deliveryItem |
+| DeliveryIncident | id, deliveryId, schoolId, reportedById, incidentType, description, occurredAt, resolutionStatus | school phải trùng delivery.schoolId |
+
+- Một ProductionBatch có thể có nhiều Delivery; một Delivery thuộc đúng một bếp và một trường. Không giả định một chuyến giao phải giao nhiều trường.
+- DeliveryItem liên kết dòng sản xuất/món cụ thể để đối chiếu số lượng đã chế biến, đã xuất, đã gửi và đã nhận.
+- DeliveryReceipt là xác nhận của trường; nhân viên tiếp nhận trường có schoolId đúng đích giao. Họ không được post StockMovement của bếp.
+- Chênh lệch được tính từ sentQuantity so với receivedQuantity/rejectedQuantity, nhưng vẫn lưu số liệu gốc, người xác nhận, thời điểm và lý do.
+- Delivery đã xác nhận không bị sửa; sai sót lập biên bản điều chỉnh có tham chiếu receipt gốc.
+- Nếu có giao một phần, cho phép nhiều Delivery cho một batch; không ghi đè số đã giao trước đó.
+
+### 14.9. Food safety, truy xuất và audit
+
+- Giữ FoodSafetyCheck theo School cho kiểm tra tại trường; bổ sung kitchenId hoặc model KitchenInspection riêng cho kiểm tra tại bếp. Không dùng schoolId giả để ghi nhận kiểm tra bếp trung tâm.
+- TraceEvent hiện gắn InventoryLot và metadata Json. Giữ TraceEvent như nhật ký truy xuất, nhưng bổ sung FK nullable đến stockMovementItemId, productionBatchId, deliveryId và actor relation. Không bắt buộc một event phải tham chiếu tất cả; phải có đối tượng nghiệp vụ hợp lệ theo eventType.
+- Bổ sung AuditLog chung cho thay đổi quyền, phân công bếp, duyệt, hủy, điều chỉnh và thao tác nhạy cảm: actorId, action, resourceType, resourceId, occurredAt, reason, requestId/correlationId, before/after snapshot đã lọc dữ liệu nhạy cảm.
+- AuditLog không thay thế các bảng lịch sử nghiệp vụ có cấu trúc như MealPlanApproval, StockMovement, DeliveryReceipt.
+- Evidence file lưu metadata và storage key trong DB; không lưu binary lớn trong JSON/DB.
+
+### 14.10. Quan hệ tổng thể và khóa quan trọng
+
+Ward 1—N School; Ward 1—N Kitchen(CENTRAL); School 1—0..1 Kitchen(SCHOOL); Kitchen N—N School qua KitchenSchoolAssignment; Kitchen 1—N User.
+Kitchen N—N Supplier qua SupplierKitchen; Kitchen 1—N InventoryLocation 1—N InventoryLot; StockReceipt 1—N StockReceiptItem tạo InventoryLot; InventoryLot 1—N StockMovementItem; StockMovement 1—N StockMovementItem.
+Kitchen 1—N Dish 1—N DishVersion 1—N DishIngredient; DishIngredient N—1 Ingredient; DishVersion 1—N DishApproval; School 1—N DishApproval.
+School 1—N MealPlan 1—N MealPlanRevision; Kitchen 1—N MealPlanRevision; MealPlanRevision 1—N MealPlanRevisionItem N—1 DishVersion; MealPlanRevision 1—N MealPlanAgeGroup N—1 AgeGroup; MealPlanRevisionItem 1—N MealPlanItemAgeGroup.
+MealPlanRevision 1—N ProductionBatch 1—N ProductionBatchItem; ProductionBatchItem 1—N ProductionRequirement/ProductionConsumption; ProductionConsumption N—1 InventoryLot; ProductionBatch 1—N Delivery 1—N DeliveryItem; Delivery 1—0..1 DeliveryReceipt 1—N DeliveryReceiptItem.
+
+Unique/index tối thiểu:
+- Kitchen.code unique; Kitchen.schoolId unique khi type=SCHOOL; cần CHECK ràng buộc type/scope.
+- KitchenSchoolAssignment index (schoolId, startsAt, endsAt) và (kitchenId, startsAt, endsAt); kiểm tra không overlap theo school.
+- Supplier.code unique theo chính sách mã nhà cung cấp; SupplierKitchen unique (supplierId, kitchenId, startsAt).
+- InventoryLocation unique (kitchenId, code).
+- InventoryLot unique (kitchenId, lotCode), hoặc (kitchenId, ingredientId, lotCode) nếu cho phép trùng mã lô giữa nguyên liệu.
+- StockReceipt unique (kitchenId, receiptNo); StockMovement unique (kitchenId, movementNo).
+- Dish unique (kitchenId, code); DishVersion unique (dishId, versionNo); DishApproval unique (schoolId, dishVersionId).
+- MealPlan unique (schoolId, serviceDate, mealType) — đã chốt.
+- MealPlanRevision unique (mealPlanId, revisionNo); tối đa một revision SUBMITTED trên mỗi MealPlan.
+- ProductionBatch unique (mealPlanRevisionId, batchNo).
+- Delivery unique (kitchenId, deliveryNo).
+- Các FK liên quan kitchen/school cần bảo đảm cùng scope. Với các cặp FK cần kiểm tra đồng thời (ví dụ lot và movement cùng kitchen), dùng composite FK/unique phù hợp hoặc DB trigger + service transaction.
+
+### 14.11. So sánh hiện trạng → thay đổi vật lý
+
+| Model hiện tại | Hành động thiết kế | Mức thay đổi |
+|---|---|---|
+| Ward, School, Kitchen, KitchenSchoolAssignment, User | Giữ; bổ sung CHECK/temporal validation và index nếu thiếu | Nhỏ–vừa |
+| Supplier | Giữ dữ liệu pháp nhân; bỏ schoolId ownership, thêm SupplierKitchen | Cấu trúc |
+| Ingredient | Giữ danh mục; thêm category relation, baseUnitId, trạng thái, dinh dưỡng/dị ứng | Vừa |
+| InventoryLot | Chuyển schoolId sang kitchenId + inventoryLocationId; thêm chứng từ nhập và ledger | Cấu trúc lớn |
+| Dish | Thêm kitchenId; thay recipe Json bằng DishVersion/DishIngredient; đổi unique code | Cấu trúc lớn |
+| MealPlan | Giữ root và unique key; thêm revision, kitchen proposer, trạng thái/actor | Lớn |
+| MealPlanItem | Thay bằng revision item trỏ DishVersion và bảng phân bổ nhóm tuổi | Cấu trúc |
+| FoodSafetyCheck | Giữ school checks; bổ sung miền kiểm tra bếp nếu nghiệp vụ cần | Vừa |
+| TraceEvent | Giữ lot link; bổ sung FK đến movement/production/delivery | Vừa |
+| Các model mới | Unit, AgeGroup, SupplierKitchen, InventoryLocation, StockReceipt, StockMovement, DishVersion, DishApproval, MealPlanRevision, ProductionBatch, Delivery... | Mới |
+
+### 14.12. Chính sách xóa, trạng thái và bất biến
+
+- Master data: dùng isActive/archivedAt; không hard-delete khi đã được tham chiếu.
+- DishVersion: immutable sau RELEASED/SUBMITTED; thay đổi tạo version mới.
+- MealPlanRevision: immutable từ SUBMITTED; RETURNED tạo revision mới; APPROVED chỉ thay bằng revision mới được duyệt.
+- StockReceipt/StockMovement: draft có thể sửa; POSTED bất biến và chỉ đảo bằng chứng từ đối ứng.
+- ProductionBatch: PLANNED → IN_PROGRESS → COMPLETED hoặc CANCELLED; batch đã tiêu hao kho không thể xóa.
+- Delivery: PREPARING → DISPATCHED → RECEIVED/PARTIALLY_RECEIVED/REJECTED/CANCELLED; receipt đã xác nhận bất biến.
+- Không dùng cascade delete trên các quan hệ lịch sử. Cascade chỉ cân nhắc với bảng con nháp chưa phát sinh giao dịch và vẫn phải kiểm soát ở service.
+
+### 14.13. Các quyết định còn cần xác nhận trước khi khóa ERD
+
+Các đề xuất mặc định:
+1. Kho/vị trí: mỗi Kitchen có tối thiểu một InventoryLocation chính; có thể thêm nhiều kho/khu vực trong cùng bếp. Không tạo kho theo trường được phục vụ.
+2. Mã lô: mặc định unique (kitchenId, lotCode); nếu nhà cung cấp tái sử dụng mã lô giữa hai nguyên liệu thì chuyển sang unique (kitchenId, ingredientId, lotCode).
+3. Supplier: một Supplier là pháp nhân dùng chung; phạm vi mua được cấp qua SupplierKitchen. Không nhân bản cùng pháp nhân cho từng trường/bếp.
+4. Số suất: MealPlanAgeGroup là nguồn số suất chuẩn; item-age chỉ lưu portionFactor và quantity nếu món có khẩu phần riêng. Nếu món có số suất khác tổng số học sinh, thể hiện explicit servings tại item-age.
+5. Revision đang duyệt: revision APPROVED cũ tiếp tục có hiệu lực đến khi revision mới được APPROVED; lúc đó mới chuyển cũ sang SUPERSEDED.
+6. Batch: một revision có thể có nhiều ProductionBatch, mỗi batch phục vụ đúng một trường; một batch có thể có nhiều Delivery đến cùng trường.
+7. Delivery receipt: một lần xác nhận cuối cùng cho mỗi Delivery; nếu nhận nhiều đợt thì tạo nhiều Delivery thay vì nhiều receipt cuối cùng cho một delivery.
+8. Nutrition/allergen: lưu nguồn và snapshot tại DishVersion; không tự khẳng định giá trị dinh dưỡng tính toán là kết quả kiểm nghiệm.
+
+### 14.14. Kết luận kiểm tra và điều kiện chuyển sang bước migration design
+
+- Nền tảng Ward/School/Kitchen/Assignment hiện có có thể giữ lại.
+- Các miền Supplier/InventoryLot, Dish, MealPlan cần tái cấu trúc có kiểm soát; không thể chỉ thêm vài field vào schema cũ.
+- Không có căn cứ để đổi role SCHOOL_KITCHEN ngay; tiếp tục phân biệt nhân viên tiếp nhận trường theo schoolId và nhân viên bếp theo kitchenId.
+- Trước migration phải chạy data profiling trên DB thực tế: supplier, inventory lot, dish.recipe JSON, meal plan/item, assignment history. Bản ghi không ánh xạ chắc chắn phải vào exception report, không đoán.
+- Sau khi nghiệp vụ xác nhận mục 14.13, lập data dictionary chi tiết (type/precision/nullability/default/FK/delete/index), ERD Mermaid và migration sequence additive/backfill/validate/contract.
+- Tài liệu này không thay đổi schema.prisma, database, API source hoặc dữ liệu; không tạo migration trong bước này.
