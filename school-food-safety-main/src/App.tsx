@@ -1016,8 +1016,8 @@ function Shell() {
   const school =
     availableSchools.find((s) => s.id === schoolId) ??
     availableSchools[0] ??
-    (isWardWorkspace
-      ? { id: "", name: schoolQuery.isError ? "Không tải được trường thuộc phường" : "Đang tải trường được phân công…", address: "", mode: "ON_SITE" as const }
+    (isWardWorkspace || isRealSchoolAdmin
+      ? { id: "", name: schoolQuery.isError ? "Không tải được trường của tài khoản" : "Đang tải trường được gán…", address: "", mode: "ON_SITE" as const }
       : demoSchools[0]!);
   // Bản công khai của phụ huynh là nguồn đọc chuẩn cho cả năm vai trò, bao gồm quy tắc chỉ hiện ảnh đã duyệt.
   const query = useQuery({
@@ -1264,7 +1264,7 @@ function Shell() {
             </div>
           </div>
           <div className="top-actions">
-            {demo && <span className="demo-pill">BẢN DEMO</span>}
+            {demo && !isRealSchoolAdmin && <span className="demo-pill">BẢN DEMO</span>}
             <button
               aria-label="Tìm kiếm trường"
               className="icon-button"
@@ -1338,7 +1338,7 @@ function Shell() {
               <h1>{location.pathname === "/" ? homeHeading : current.label}</h1>
               <p>
                 {role !== "parent"
-                  ? {isRealSchoolAdmin ? "Theo dõi hoạt động bữa ăn và dữ liệu vận hành của trường đang được gán." : "Theo dõi, phối hợp và quản lý hoạt động bữa ăn trong không gian minh họa."}
+                  ? (isRealSchoolAdmin ? "Theo dõi hoạt động bữa ăn và dữ liệu vận hành của trường đang được gán." : "Theo dõi, phối hợp và quản lý hoạt động bữa ăn trong không gian minh họa.")
                   : location.pathname === "/"
                     ? "Cùng nhà trường chăm chút từng bữa ăn, đồng hành cùng con khôn lớn."
                     : "Thông tin minh bạch, cập nhật từ nhà trường và đơn vị phụ trách."}
