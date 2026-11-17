@@ -132,3 +132,36 @@ Giữ Ward, School, Kitchen, KitchenSchoolAssignment, User.
 ## 7. Phạm vi tài liệu này
 
 Tài liệu này **không phải migration** và không thay đổi schema.prisma, database hoặc dữ liệu hiện có. Các model/quan hệ trong ERD là thiết kế mục tiêu; trước khi viết migration cần hoàn thành bước kiểm kê dữ liệu thực tế và chốt các chi tiết còn mở ở mục 5.
+
+
+## 8. Chốt phạm vi tài khoản bếp tại trường (xác nhận ngày 17/11/2026)
+
+Hai tài khoản hiện có role `SCHOOL_KITCHEN` và `schoolId=TH Phạm Hùng` được xác nhận là **nhân viên phía trường**, không phải nhân viên của Bếp Long Hoa. Vì trường đang được bếp trung tâm phục vụ và không có bếp tại chỗ, cần phân biệt rõ vai trò theo nơi làm việc và nhiệm vụ thực tế:
+
+- Nhân viên phía trường: tiếp nhận suất ăn, kiểm đếm, kiểm tra tình trạng/chất lượng khi giao nhận, xác nhận giao nhận và ghi nhận sự cố tại trường. Phạm vi dữ liệu gắn với `schoolId`; không cấp quyền quản lý công thức, kho trung tâm, nhập hàng hoặc xuất kho của Bếp Long Hoa.
+- Nhân viên bếp trung tâm: thuộc `kitchenId` của Bếp Long Hoa; quản lý công thức do bếp sở hữu, nguyên liệu, nhà cung cấp trong phạm vi bếp, kho, sản xuất, xuất dùng và giao hàng.
+- BGH: thuộc `schoolId`; quản lý thực đơn của trường và luồng duyệt theo thẩm quyền đã phân công.
+- UBND: thuộc `wardId`; xem/quản lý phạm vi phường theo chính sách phân quyền.
+- SUPER_ADMIN: phạm vi toàn hệ thống, dành cho quản trị nền tảng.
+
+### Quy tắc dữ liệu và phân quyền phát sinh
+
+1. Không chuyển `schoolId` của hai tài khoản `SCHOOL_KITCHEN` sang `kitchenId`; không đổi vai trò chỉ vì tên role có chữ KITCHEN.
+2. Các API giao nhận phải xác thực nhân viên trường chỉ thao tác với Delivery/DeliveryItem thuộc trường được gắn trong tài khoản.
+3. Nhân viên trường có thể xác nhận số lượng, thời điểm, tình trạng giao nhận và tạo biên bản/sự cố; không được ghi sổ StockMovement của bếp trung tâm.
+4. Nhân viên bếp trung tâm chỉ thao tác kho và sản xuất thuộc kitchenId được cấp; việc giao đến trường phải nằm trong KitchenSchoolAssignment có hiệu lực tại thời điểm nghiệp vụ.
+5. Cần cân nhắc đổi tên role `SCHOOL_KITCHEN` thành tên phản ánh đúng nhiệm vụ (ví dụ `SCHOOL_MEAL_RECEIVER` hoặc `SCHOOL_FOOD_STAFF`) trong một thay đổi riêng. Chưa đổi enum hoặc dữ liệu role trong giai đoạn thiết kế này; nếu đổi phải có mapping migration và rà soát JWT/guards/frontend.
+6. Không mặc định mọi nhân viên trường đều có quyền duyệt món hoặc duyệt thực đơn. Quyền duyệt thuộc vai trò được ủy quyền ở trường (ví dụ SCHOOL_ADMIN hoặc người được phân quyền riêng).
+
+### Ma trận quyền tối thiểu đã chốt
+
+| Nghiệp vụ | Nhân viên trường (hiện role SCHOOL_KITCHEN) | Nhân viên bếp trung tâm |
+|---|---|---|
+| Xem thực đơn trường được phép | Có | Có, trong phạm vi trường được phân công khi cần thực hiện |
+| Xác nhận nhận suất ăn | Có | Không xác nhận thay bên nhận |
+| Ghi nhận thiếu/thừa/hư hỏng khi giao | Có | Xem và xử lý phía giao |
+| Quản lý công thức của bếp | Không | Có, trong phạm vi bếp |
+| Quản lý nhà cung cấp của bếp | Không | Có, trong phạm vi bếp |
+| Nhập/xuất/điều chỉnh tồn kho bếp | Không | Có, trong phạm vi bếp và quyền được cấp |
+| Tạo/điều phối đợt sản xuất | Không | Có |
+| Duyệt món/thực đơn | Không mặc định | Không mặc định; theo vai trò được ủy quyền |
