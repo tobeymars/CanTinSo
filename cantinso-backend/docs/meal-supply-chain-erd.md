@@ -1400,3 +1400,80 @@ Nếu dùng Prisma CLI mà chưa có \`psql\`, không thay script bằng thao t�
 Việc đồng ý các mặc định ở mục 14.13 khóa các quy tắc nghiệp vụ nêu tại 16.1; không đồng nghĩa đã xác nhận mọi chi tiết vật lý như enum cuối cùng, tên cột, độ chính xác numeric, delete policy và toàn bộ FK. Các chi tiết đó chỉ được khóa sau khi đối chiếu kết quả profiling và review kỹ thuật.
 
 **Trạng thái hiện tại:** tài liệu thiết kế và script kiểm kê đã được commit. Chưa chạy script trên PostgreSQL local của người dùng; chưa thay đổi \`schema.prisma\`, migration, database hoặc dữ liệu.
+
+## 17. Kết quả profiling PostgreSQL thực tế — 17/11/2026
+
+> Nguồn: chạy `meal-supply-chain-data-profile.sql` trực tiếp trong container `cantinso-postgres`, database `cantinso`, schema `public`. Thời điểm truy vấn: 16:36:33 +07. Giao dịch kết thúc bằng `ROLLBACK`; không phát sinh thay đổi dữ liệu.
+
+### 17.1. Số lượng dữ liệu tại thời điểm kiểm tra
+
+| Bảng | Số bản ghi |
+|---|---:|
+| wards | 1 |
+| schools | 1 |
+| kitchens | 1 |
+| kitchen_school_assignments | 1 |
+| users | 6 |
+| suppliers | 0 |
+| ingredients | 0 |
+| inventory_lots | 0 |
+| dishes | 0 |
+| meal_plans | 0 |
+| meal_plan_items | 0 |
+| trace_events | 0 |
+| food_safety_checks | 0 |
+
+Phân bố User theo role: SUPER_ADMIN 1; SCHOOL_ADMIN 1; UBND_ADMIN 1; CENTRAL_KITCHEN 1; SCHOOL_KITCHEN 2. Scope tương ứng: SCHOOL_ADMIN có schoolId; UBND_ADMIN có wardId; CENTRAL_KITCHEN có kitchenId; hai SCHOOL_KITCHEN có schoolId và không có kitchenId.
+
+### 17.2. Xác minh phân công bếp — trường
+
+Truy vấn chi tiết sau profiling xác nhận:
+- Bếp Long Hoa, type CENTRAL, đang hoạt động.
+- Được phân công phục vụ TH Phạm Hùng; assignment đang hoạt động.
+- startsAt: 2026-11-17 03:33:30.231 (giờ DB hiển thị).
+- endsAt: NULL (chưa đặt ngày kết thúc).
+- Phân công hiện có hiệu lực tại thời điểm truy vấn.
+- kitchen.wardId bằng school.wardId.
+- Không phát hiện khoảng ngày bất hợp lệ hoặc overlap trong tập dữ liệu hiện tại.
+
+Kết luận chỉ xác nhận quan hệ đang tồn tại giữa một bếp và một trường. Chưa thể kiểm chứng mô hình một bếp phục vụ nhiều trường cho tới khi có thêm assignment/trường thực tế.
+
+### 17.3. Kiểm tra chất lượng dữ liệu nghiệp vụ
+
+Do Supplier, Ingredient, InventoryLot, Dish, MealPlan và các bảng giao dịch liên quan đều chưa có bản ghi:
+- Không có orphan hoặc sai lệch số dư lô trong dữ liệu hiện tại; tuy nhiên đây là kết quả trên tập rỗng, không phải bằng chứng các quy tắc tồn kho đã được kiểm chứng.
+- Chưa thể đánh giá cấu trúc thực tế của Dish.recipe JSON.
+- Chưa thể đánh giá tính nhất quán servings giữa MealPlan và MealPlanItem.
+- Chưa thể xác định mapping lịch sử Supplier.schoolId hoặc InventoryLot.schoolId sang Kitchen.
+- Chưa thể kiểm tra traceability và độ phủ kiểm tra an toàn thực phẩm bằng giao dịch thực tế.
+
+Vì vậy, chiến lược backfill dữ liệu nghiệp vụ hiện tại là chưa cần thực thi trên các bảng rỗng; vẫn phải giữ thiết kế migration additive và các bước validate để bảo vệ dữ liệu phát sinh về sau.
+
+### 17.4. Foreign key và delete policy hiện có
+
+Profiling trả về 10 FK trong nhóm bảng mục tiêu:
+
+| Bảng.cột | Tham chiếu | ON DELETE |
+|---|---|---|
+| inventory_lots.school_id | schools.id | RESTRICT |
+| inventory_lots.ingredient_id | ingredients.id | RESTRICT |
+| inventory_lots.supplier_id | suppliers.id | RESTRICT |
+| kitchen_school_assignments.school_id | schools.id | RESTRICT |
+| kitchen_school_assignments.kitchen_id | kitchens.id | CASCADE |
+| meal_plan_items.dish_id | dishes.id | RESTRICT |
+| meal_plan_items.meal_plan_id | meal_plans.id | CASCADE |
+| meal_plans.school_id | schools.id | RESTRICT |
+| suppliers.school_id | schools.id | RESTRICT |
+| trace_events.lot_id | inventory_lots.id | CASCADE |
+
+**Điểm cần review trước physical schema:** `trace_events.lot_id ON DELETE CASCADE` có thể xóa lịch sử truy xuất khi lô bị xóa. Thiết kế mục tiêu yêu cầu bảo toàn lịch sử; cần đổi hướng sang RESTRICT/soft-delete hoặc cơ chế lưu trữ phù hợp. Tương tự, CASCADE từ Kitchen sang KitchenSchoolAssignment và từ MealPlan sang MealPlanItem chỉ được giữ nếu quy tắc xóa nghiệp vụ cho phép; với dữ liệu đã phát sinh nên ưu tiên vô hiệu hóa/archival thay vì xóa cứng.
+
+### 17.5. Kết luận và tác động đến thiết kế
+
+1. Scope tổ chức hiện tại phù hợp với quy tắc đã chốt: bếp trung tâm gắn ward; trường gắn cùng ward; assignment là cầu nối phục vụ.
+2. Hai tài khoản SCHOOL_KITCHEN là tài khoản phía trường theo schoolId; không chuyển sang kitchenId và không cấp quyền kho/sản xuất bếp trung tâm.
+3. Schema hiện tại vẫn còn mô hình Supplier và InventoryLot gắn School; đây là khoảng cách thiết kế cần giải quyết bằng SupplierKitchen và Kitchen/InventoryLocation ownership.
+4. Dish hiện chưa có Kitchen ownership/version/approval; MealPlan chưa có proposer kitchen/revision/approval.
+5. Do các bảng nghiệp vụ đang rỗng, chưa có dữ liệu thực tế để quyết định backfill mapping. Không tự suy luận chủ sở hữu lịch sử từ assignment hiện tại.
+6. Chưa tạo migration, chưa sửa schema.prisma, chưa thay đổi database hoặc dữ liệu. Bước tiếp theo là chốt physical schema: FK composite để bảo vệ cùng Kitchen, delete policy, enum, precision/nullability, unique/partial unique và transaction invariants.
+
