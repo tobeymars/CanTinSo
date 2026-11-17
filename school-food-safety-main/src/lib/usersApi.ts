@@ -121,7 +121,7 @@ export type AssignedCentralKitchen = {
     code: string;
     name: string;
     address: string | null;
-    contactName: string;
+    contactName: string | null;
     phone: string | null;
     capacity: number | null;
     ward: { id: string; name: string; code: string | null };
