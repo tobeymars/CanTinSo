@@ -11,6 +11,7 @@ import {
 } from "./lib/usersApi";
 import { getStoredUser } from "./lib/authApi";
 import "./UserManagement.css";
+import CentralKitchenManagement from "./CentralKitchenManagement";
 
 type Role = "UBND_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
 type FormState = { fullName: string; email: string; password: string; role: Role; wardId: string };
@@ -160,6 +161,8 @@ export default function UserManagement() {
   const wardName = (wardId: string | null) => wards.find(ward => ward?.id === wardId)?.name ?? "Chưa xác định";
 
   return (
+    <>
+    {isSuperAdmin && <CentralKitchenManagement />}
     <section className="user-management">
       <div className="um-intro">
         <div>
@@ -243,5 +246,6 @@ export default function UserManagement() {
         </form>
       </div>}
     </section>
+    </>
   );
 }
