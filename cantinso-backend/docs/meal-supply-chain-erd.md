@@ -585,3 +585,296 @@ Khi kết nối API thật, cần tách:
 5. **Food Safety/Receiving:** nhật ký kiểm thực, lưu mẫu, giao nhận và sự cố theo ngày/đợt.
 
 Không sửa frontend hoặc backend source, Prisma schema, database hay migration trong bước thiết kế API này.
+
+
+## 13. API contract mục tiêu — lập thực đơn, phân bổ khẩu phần và BGH phê duyệt
+
+> Thiết kế nối tiếp mục 12. Chưa triển khai controller/service, chưa sửa Prisma schema, chưa tạo migration. Các route dưới đây là hợp đồng mục tiêu; backend hiện chưa đăng ký module MealPlan trong AppModule.
+
+### 13.1. Quy tắc nghiệp vụ nền tảng
+
+1. **Thực đơn thuộc một trường**: mỗi MealPlan có đúng một schoolId, một serviceDate và một mealType. Bếp là đơn vị lập/gửi đề xuất, không phải chủ sở hữu thực đơn.
+2. **Một thực đơn cho một trường/ngày/loại bữa**: giữ unique `[schoolId, serviceDate, mealType]`. Không tạo nhiều MealPlan cùng loại bữa trong ngày. Nhiều món, nhóm tuổi và khẩu phần nằm bên trong một MealPlan.
+3. **Bếp lập và gửi; BGH duyệt**: cả bếp trung tâm lẫn bếp tại trường đều có thể lập và gửi đề xuất trong phạm vi phục vụ. SCHOOL_ADMIN/người được trường ủy quyền duyệt hoặc trả lại. Nhân viên tiếp nhận suất ăn SCHOOL_KITCHEN hiện hữu không có quyền lập/duyệt.
+4. **Phải có phân công hợp lệ tại ngày phục vụ**:
+   - Bếp trung tâm: Kitchen.type=CENTRAL và KitchenSchoolAssignment của đúng kitchenId + schoolId phải bao phủ serviceDate.
+   - Bếp tại trường: Kitchen.type=SCHOOL và Kitchen.schoolId phải bằng schoolId của thực đơn.
+   - Không tin kitchenId/schoolId từ client. Backend xác định bếp từ actor và trường đích từ assignment hợp lệ; nếu actor có nhiều trường được phân công thì request phải chọn schoolId, backend xác minh.
+5. **Chỉ dùng món đã duyệt cho đúng trường**: mỗi MealPlanItem tham chiếu DishVersion có DishApproval APPROVED cho đúng schoolId. Không chỉ kiểm tra Dish hoặc một version được trường khác duyệt.
+6. **Snapshot và lịch sử bất biến**: mỗi lần gửi là một MealPlanRevision bất biến. BGH duyệt đúng revision đã xem. Sửa sau khi gửi/duyệt không được thay đổi revision cũ.
+7. **Một công thức chuẩn dùng chung các nhóm tuổi**: nhóm tuổi, số suất, hệ số khẩu phần và lượng món thực tế theo tuổi được khai báo trong revision của thực đơn; không nhân bản DishVersion theo nhóm tuổi.
+8. **Không đồng nhất thực đơn với sản xuất/giao nhận**: duyệt thực đơn chỉ là phê duyệt kế hoạch. Phiếu sản xuất, xuất kho, lô nguyên liệu, giao hàng, số suất thực nhận, kiểm thực và lưu mẫu thuộc các nghiệp vụ sau.
+
+### 13.2. Mô hình dữ liệu logic cần có
+
+Các khái niệm dưới đây là mô hình logic để đối chiếu ERD, không phải xác nhận rằng Prisma đã có model tương ứng.
+
+**MealPlan (aggregate/root):**
+- `id`, `schoolId`, `serviceDate` (ngày địa phương của trường, lưu kiểu Date), `mealType`, `createdAt`, `updatedAt`.
+- `@@unique([schoolId, serviceDate, mealType])` tiếp tục được giữ.
+- Root đại diện cho một kỳ thực đơn duy nhất; không xóa/tạo root mới mỗi lần chỉnh sửa hoặc gửi lại.
+
+**MealPlanRevision (phiên bản đề xuất):**
+- `id`, `mealPlanId`, `revisionNo`, `kitchenId`, `createdById`, `submittedAt`, `status`, `reviewedById?`, `reviewedAt?`, `reviewComment?`, `createdAt`.
+- Unique `[mealPlanId, revisionNo]`.
+- Mỗi revision lưu snapshot các món/version công thức, nhóm tuổi, số suất và định lượng áp dụng. Sau khi SUBMITTED không sửa/xóa.
+- Root có thể có nhiều revision lịch sử; chỉ một revision hiện hành được đưa vào luồng duyệt/được dùng làm căn cứ kế hoạch tại một thời điểm. Không tạo hai revision PENDING đồng thời cho cùng MealPlan.
+- Bản DRAFT có thể chỉnh sửa; khi submit, backend chốt snapshot. RETURNED/REJECTED thì tạo revision kế tiếp, không mở khóa revision cũ để sửa.
+- Revision APPROVED là căn cứ sản xuất. Nếu cần thay đổi, tạo revision mới và duyệt lại; revision đã duyệt trước đó vẫn giữ lịch sử và trạng thái phê duyệt của nó.
+
+**MealPlanRevisionItem:**
+- Tham chiếu `dishVersionId` đã được trường duyệt.
+- Có `sequence`/vai trò món (ví dụ món chính, món canh, món rau, món phụ) và ghi chú phục vụ nếu cần.
+- Không chỉ tham chiếu Dish.id vì cùng một Dish có thể có nhiều version công thức.
+- Một DishVersion không được thêm trùng trong cùng revision nếu nghiệp vụ không có lý do rõ ràng; mặc định unique `[revisionId, dishVersionId]`.
+
+**MealPlanAgeGroup (phân bổ theo nhóm tuổi):**
+- Một dòng cho mỗi nhóm tuổi/lớp áp dụng trong revision: mã nhóm tuổi chuẩn, số suất dự kiến, ghi chú.
+- Unique `[revisionId, ageGroupId]`.
+- ageGroupId phải thuộc danh mục nhóm tuổi được cấu hình hợp lệ cho cấp học của trường. Không chấp nhận chuỗi tùy ý hoặc suy đoán nhóm tuổi chỉ từ tên trường.
+- Tổng suất dự kiến của revision được tính từ các nhóm tuổi; không nhận một tổng số suất độc lập có thể lệch với tổng chi tiết. Nếu cần hỗ trợ nhóm chưa xác định, phải có nhóm “khác/chưa phân loại” được định nghĩa trong danh mục.
+
+**MealPlanItemAgeGroup (định lượng món theo nhóm tuổi):**
+- Tham chiếu item và ageGroup; lưu portionFactor và/hoặc portionQuantity + unit theo chuẩn đã thống nhất.
+- Unique `[mealPlanRevisionItemId, ageGroupId]`.
+- Với mỗi món và nhóm tuổi có suất phục vụ, phải có phân bổ khẩu phần; không tự lấy định lượng của nhóm tuổi khác.
+- Giá trị định lượng được tính từ servingBasis của DishVersion × portionFactor hoặc khai báo lượng theo khẩu phần có kiểm soát. Cần chọn một quy ước đơn vị nhất quán ở tầng domain; không trộn gram nguyên liệu với gram thành phẩm.
+- Lượng nguyên liệu cần dự kiến cho sản xuất có thể được tính từ recipe × servings × factor; số liệu tính toán phải ghi rõ là nhu cầu dự kiến, chưa phải lượng xuất kho thực tế.
+
+**Review/Audit:**
+- Lưu riêng lịch sử quyết định duyệt/trả lại/từ chối: actor, thời điểm, comment/reason và revisionId.
+- Không chỉ lưu `reviewedBy`/status trên root vì sẽ mất lịch sử các lần duyệt và gửi lại.
+
+**Điểm cần hoàn thiện trong ERD trước migration:**
+- Prisma hiện chỉ có MealPlan.status String và MealPlanItem.dishId/servings; chưa có MealPlanRevision, snapshot version, nhóm tuổi, phân bổ khẩu phần hoặc review history.
+- Prisma `MealType` hiện có BREAKFAST, LUNCH, DINNER, SNACK; giữ enum hiện tại ở bước API, không tự ý bỏ DINNER chỉ vì một số màn hình demo chưa hiển thị.
+- Prisma hiện chưa có danh mục AgeGroup/portion unit chuẩn. Phải chốt danh mục này và quy đổi đơn vị trước migration; không dùng free-text để làm khóa nghiệp vụ.
+- MealPlan root hiện chưa có kitchenId. Bếp lập đề xuất phải được ghi trên từng revision, vì bếp phục vụ có thể thay đổi theo thời gian trong khi root và lịch sử thực đơn của trường vẫn tồn tại.
+
+### 13.3. Vòng đời revision
+
+Trạng thái mục tiêu của MealPlanRevision:
+- `DRAFT`: bếp tạo/chỉnh sửa; chưa gửi BGH.
+- `SUBMITTED`: đã khóa snapshot và đang chờ BGH.
+- `RETURNED`: BGH trả lại kèm yêu cầu chỉnh sửa; revision này bất biến.
+- `APPROVED`: BGH duyệt revision cụ thể; là căn cứ sản xuất.
+- `REJECTED`: BGH từ chối; muốn đề xuất lại phải tạo revision mới.
+- `SUPERSEDED`: revision đã được thay bằng revision mới được duyệt; chỉ dùng để chỉ lịch sử, không xóa dấu vết APPROVED trước đó. Có thể triển khai bằng quan hệ thay thế/active flag thay vì đổi trạng thái phê duyệt lịch sử; cần chốt cách biểu diễn vật lý trong ERD.
+
+Chuyển trạng thái:
+- DRAFT → SUBMITTED.
+- SUBMITTED → APPROVED / RETURNED / REJECTED.
+- RETURNED → không sửa revision cũ; tạo revisionNo kế tiếp ở DRAFT.
+- APPROVED → không sửa/xóa. Khi cần thay đổi, tạo revision mới và gửi duyệt. Revision mới được duyệt sẽ trở thành revision hiện hành; revision đã duyệt trước vẫn tra cứu được.
+- REJECTED → kết thúc; tạo revision mới nếu tiếp tục đề xuất.
+- Không có thao tác “duyệt một phần” trong cùng revision. Nếu BGH chỉ đồng ý một số món, trả revision để bếp lập lại bản hoàn chỉnh; tránh trạng thái nửa được duyệt khó dùng cho sản xuất.
+- Người tạo/gửi revision không được tự duyệt revision đó. Nếu người gửi là SCHOOL_ADMIN được phân quyền lập hộ trong tương lai, vẫn phải có người duyệt độc lập.
+- Không cho submit revision rỗng, không có món, thiếu nhóm tuổi/số suất hoặc chứa DishVersion không còn APPROVED cho trường.
+- Không cho hai người cùng duyệt tạo hai kết quả khác nhau: dùng conditional update/transaction và kiểm tra status=SUBMITTED tại thời điểm ghi.
+
+### 13.4. API phía bếp
+
+Prefix: `/api/v1/kitchen`. Kitchen scope lấy từ actor đã xác thực.
+
+| Method + route | Mục đích |
+|---|---|
+| `GET /kitchen/schools` | Danh sách trường mà bếp hiện được phép lập thực đơn, theo assignment đang hiệu lực |
+| `GET /kitchen/meal-plans` | Tra cứu các MealPlan/revision do bếp này lập; lọc schoolId, dateFrom/dateTo, mealType, status |
+| `POST /kitchen/meal-plans` | Tạo MealPlan root và revision DRAFT đầu tiên cho trường/ngày/loại bữa |
+| `GET /kitchen/meal-plans/:mealPlanId` | Xem chi tiết root, revision hiện hành và lịch sử trong scope |
+| `POST /kitchen/meal-plans/:mealPlanId/revisions` | Tạo revision DRAFT kế tiếp (có thể khởi tạo từ revision RETURNED/APPROVED để chỉnh) |
+| `PATCH /kitchen/meal-plans/:mealPlanId/revisions/:revisionId` | Sửa nội dung revision khi DRAFT |
+| `POST /kitchen/meal-plans/:mealPlanId/revisions/:revisionId/submit` | Chốt snapshot và gửi BGH |
+| `POST /kitchen/meal-plans/:mealPlanId/revisions/:revisionId/withdraw` | Rút revision đang SUBMITTED trước khi BGH ra quyết định, có lý do và audit |
+| `GET /kitchen/meal-plans/:mealPlanId/revisions/:revisionId` | Xem chi tiết snapshot, lỗi validate và lịch sử xử lý |
+
+Tạo root request:
+```json
+{
+  "schoolId": "uuid-school",
+  "serviceDate": "2026-11-20",
+  "mealType": "LUNCH"
+}
+```
+
+Backend xác định kitchenId từ actor. schoolId chỉ là target để kiểm tra assignment; không được tin chỉ vì client gửi lên. Nếu trường đã có MealPlan cùng serviceDate + mealType, trả 409 và cung cấp thông tin resource hiện có trong phạm vi bếp được phép xem; không tạo root trùng.
+
+Tạo/sửa revision request (payload là nội dung hoàn chỉnh của revision):
+```json
+{
+  "items": [
+    {
+      "dishVersionId": "uuid-approved-dish-version",
+      "sequence": 1,
+      "courseType": "MAIN",
+      "portions": [
+        {
+          "ageGroupId": "uuid-age-group-primary",
+          "servings": 180,
+          "portionFactor": 1.0
+        },
+        {
+          "ageGroupId": "uuid-age-group-older",
+          "servings": 95,
+          "portionFactor": 1.2
+        }
+      ]
+    },
+    {
+      "dishVersionId": "uuid-approved-soup-version",
+      "sequence": 2,
+      "courseType": "SOUP",
+      "portions": [
+        {
+          "ageGroupId": "uuid-age-group-primary",
+          "servings": 180,
+          "portionFactor": 1.0
+        },
+        {
+          "ageGroupId": "uuid-age-group-older",
+          "servings": 95,
+          "portionFactor": 1.0
+        }
+      ]
+    }
+  ],
+  "ageGroups": [
+    { "ageGroupId": "uuid-age-group-primary", "servings": 180 },
+    { "ageGroupId": "uuid-age-group-older", "servings": 95 }
+  ],
+  "notes": "Ghi chú chung của đề xuất."
+}
+```
+
+Quy tắc:
+- Backend kiểm tra ageGroups có đúng danh mục trường/cấp học và mỗi nhóm có số suất nguyên dương.
+- Tổng suất của plan được tính từ ageGroups; portions của từng item phải khớp số nhóm/số suất áp dụng. Nếu món không phục vụ nhóm tuổi nào, phải khai báo rõ phạm vi áp dụng thay vì tự suy diễn.
+- dishVersionId phải thuộc món của bếp đang lập và có DishApproval APPROVED cho đúng trường. Backend kiểm tra lại ở thời điểm submit, không chỉ lúc thêm item.
+- Mỗi món có tối đa một portion record cho một ageGroup trong cùng item.
+- PortionFactor > 0 và nằm trong giới hạn cấu hình; số lẻ dùng Decimal, không dùng floating point không kiểm soát. Giới hạn cụ thể cần chuyên gia dinh dưỡng/nghiệp vụ xác nhận trước khi triển khai.
+- Không nhận `status`, `reviewedById`, `kitchenId`, `createdById`, `totalServings` hoặc `approvedAt` từ client.
+- Việc cập nhật revision DRAFT là thay thế nội dung theo request có kiểm soát; backend validate toàn bộ payload trước khi lưu transaction.
+
+### 13.5. API phía BGH/trường
+
+Prefix: `/api/v1/schools/me`. School scope lấy từ actor.
+
+| Method + route | Mục đích |
+|---|---|
+| `GET /schools/me/meal-plan-approvals` | Inbox revision SUBMITTED, filter ngày/loại bữa/bếp |
+| `GET /schools/me/meal-plans` | Lịch thực đơn theo khoảng ngày và trạng thái |
+| `GET /schools/me/meal-plans/:mealPlanId` | Xem root, revision hiện hành, lịch sử revision |
+| `GET /schools/me/meal-plan-approvals/:revisionId` | Xem snapshot cần duyệt, món/công thức, nhóm tuổi, số suất, bếp đề xuất |
+| `POST /schools/me/meal-plan-approvals/:revisionId/approve` | Duyệt revision |
+| `POST /schools/me/meal-plan-approvals/:revisionId/return` | Trả lại bếp, bắt buộc reason |
+| `POST /schools/me/meal-plan-approvals/:revisionId/reject` | Từ chối, bắt buộc reason |
+
+Approve request:
+```json
+{
+  "comment": "Thống nhất thực đơn và số suất dự kiến."
+}
+```
+
+Return/reject request:
+```json
+{
+  "reason": "Cần điều chỉnh món chính và số suất nhóm mẫu giáo."
+}
+```
+
+Response quyết định:
+```json
+{
+  "revisionId": "uuid-revision",
+  "mealPlanId": "uuid-meal-plan",
+  "schoolId": "uuid-school",
+  "status": "APPROVED",
+  "reviewedById": "uuid-school-admin",
+  "reviewedAt": "2026-11-17T08:00:00.000Z",
+  "comment": "Thống nhất thực đơn và số suất dự kiến."
+}
+```
+
+BGH chỉ xem/duyệt revision có MealPlan.schoolId đúng schoolId của actor. Không nhận schoolId từ request để đổi phạm vi. UBND_ADMIN có thể có API giám sát riêng theo wardId ở giai đoạn sau, nhưng không nằm trong inbox phê duyệt và không thay BGH.
+
+### 13.6. Kiểm tra khi submit và approve
+
+**Khi bếp submit:**
+1. Revision thuộc MealPlan mà kitchen actor được phép quản lý; revision đang DRAFT.
+2. MealPlan có đúng một schoolId/serviceDate/mealType theo unique key; serviceDate hợp lệ theo múi giờ nghiệp vụ của trường.
+3. Kitchen đang hoạt động và quan hệ phục vụ bao phủ serviceDate:
+   - central: assignment đúng cặp kitchen-school với `startsAt <= serviceDate` và `endsAt` null hoặc sau ngày phục vụ; trạng thái active phải phù hợp lịch sử assignment.
+   - school kitchen: kitchen.schoolId = mealPlan.schoolId, Kitchen.type=SCHOOL và đang hoạt động.
+4. Mọi DishVersion được tham chiếu thuộc bếp đang lập và có approval APPROVED của đúng schoolId.
+5. Nhóm tuổi thuộc danh mục phù hợp; số suất là số nguyên dương; portions đầy đủ và không mâu thuẫn.
+6. Nếu có DishVersion bị thu hồi/cấm sử dụng, không cho submit.
+7. Lưu snapshot, người gửi, thời gian gửi, revision number và chuyển trạng thái SUBMITTED trong transaction.
+
+**Khi BGH approve:**
+1. Actor là SCHOOL_ADMIN hoặc user có quyền phê duyệt được ủy quyền; schoolId từ DB/JWT trùng MealPlan.schoolId.
+2. Revision đang SUBMITTED; quyết định chưa được ghi bởi người khác.
+3. Không tự duyệt revision do chính actor tạo/gửi.
+4. Kiểm tra lại tính toàn vẹn snapshot; nếu assignment phục vụ đã bị chấm dứt hoặc version món bị thu hồi trước ngày phục vụ, không duyệt một kế hoạch không còn khả thi; trả lỗi/ yêu cầu bếp lập lại.
+5. Ghi quyết định và audit; chuyển APPROVED. Không thay đổi nội dung snapshot.
+
+### 13.7. Quan hệ với sản xuất, kho và giao nhận
+
+- Chỉ revision APPROVED mới tạo được ProductionPlan/ProductionBatch ở bước thiết kế sau.
+- ProductionBatch tham chiếu revision được duyệt, không chỉ tham chiếu MealPlan root.
+- Nhu cầu nguyên liệu dự kiến được tính từ DishVersion recipe × số suất × portionFactor theo từng ageGroup; đây chỉ là nhu cầu kế hoạch.
+- Khi thực xuất, hệ thống mới phân bổ InventoryLot của đúng kho sở hữu. Bếp trung tâm xuất từ kho trung tâm; không trừ kho của từng trường chỉ vì trường nhận suất.
+- Giao hàng và xác nhận nhận hàng là Delivery/DeliveryReceipt độc lập; số suất thực giao/nhận có thể khác kế hoạch và phải lưu chênh lệch, người xác nhận, thời điểm.
+- Nếu thay đổi số suất sau khi đã tạo ProductionBatch, phải có quy trình điều chỉnh sản xuất riêng; không sửa ngược revision đã duyệt.
+- Trường hợp trường hủy bữa/ngày phục vụ sau khi duyệt cần trạng thái hủy kế hoạch có lý do/audit và xử lý liên kết batch/delivery; không xóa MealPlan.
+
+### 13.8. Mã lỗi HTTP và xử lý cạnh tranh
+
+| HTTP | Trường hợp |
+|---|---|
+| 400 | DTO/ngày/enum sai, thiếu reason, payload thiếu cấu phần |
+| 401 | Chưa xác thực |
+| 403 | Sai role/scope, không phải bếp phục vụ trường, không phải người duyệt |
+| 404 | MealPlan/revision không tồn tại trong scope; không tiết lộ resource ngoài scope |
+| 409 | Đã tồn tại MealPlan cho school/date/mealType; revision không còn DRAFT/SUBMITTED; duplicate item; assignment thay đổi; đã có quyết định duyệt |
+| 422 | Món chưa được trường duyệt, version bị thu hồi, ageGroup không phù hợp, số suất/portion không hợp lệ hoặc thiếu phân bổ |
+
+- Tạo root phải xử lý unique constraint đồng thời và trả 409 có kiểm soát.
+- Tạo revision kế tiếp và submit phải dùng transaction; không cho hai revision SUBMITTED cùng tồn tại cho một MealPlan.
+- Approve/return/reject dùng conditional update theo trạng thái SUBMITTED; request lặp không tạo hai review event.
+- Nên hỗ trợ `Idempotency-Key` cho thao tác tạo/submit khi frontend retry do timeout; cùng key + cùng payload trả lại kết quả cũ, cùng key + payload khác trả 409.
+- List APIs phân trang, giới hạn page size; filter ngày dùng định dạng YYYY-MM-DD và xử lý như ngày địa phương, không tự chuyển sang UTC làm lệch ngày.
+
+### 13.9. Ma trận test chấp nhận tối thiểu
+
+1. Central kitchen được lập plan cho school có assignment hiệu lực tại serviceDate.
+2. Central kitchen không lập plan cho school không được phân công hoặc assignment chưa bắt đầu/đã kết thúc.
+3. School kitchen chỉ lập plan cho schoolId gắn với Kitchen.schoolId.
+4. Nhân viên SCHOOL_KITCHEN có schoolId nhưng không có kitchenId không được tạo/sửa/submit MealPlan.
+5. Bếp A không đọc/sửa revision của bếp B.
+6. Một school/date/mealType chỉ có một MealPlan; hai request đồng thời không tạo hai root.
+7. Một MealPlan có nhiều món và nhiều nhóm tuổi nhưng vẫn chỉ một root.
+8. Không thể thêm DishVersion chưa APPROVED cho trường đó, dù version đã APPROVED ở trường khác.
+9. Không thể thêm DishVersion bị thu hồi.
+10. Bếp không sửa revision sau khi SUBMITTED; BGH không sửa nội dung revision.
+11. Chỉ SCHOOL_ADMIN/người được ủy quyền của đúng trường mới approve/return/reject.
+12. Bếp không tự duyệt revision do chính mình gửi.
+13. RETURNED tạo revision kế tiếp; lịch sử revision cũ không đổi.
+14. APPROVED revision không bị ghi đè khi tạo revision mới.
+15. MealPlanRevision thiếu ageGroup/servings/portion không submit được.
+16. Tổng servings được tính nhất quán từ ageGroups; không nhận totalServings giả từ client.
+17. Duyệt đồng thời chỉ một quyết định thắng; request lặp không tạo review trùng.
+18. Production chỉ tham chiếu revision APPROVED; thay đổi plan không sửa batch hoặc revision lịch sử.
+19. Ngày serviceDate không bị lệch khi API chạy trên server UTC và trường ở múi giờ Việt Nam.
+20. UBND_ADMIN không có quyền approve thay BGH.
+
+### 13.10. Đối chiếu frontend và phạm vi chưa triển khai
+
+Frontend DEMO hiện có các khái niệm món theo ngày, trường, loại bữa, số suất và ageBand trong `boardingMenu.ts`; tuy nhiên dữ liệu lưu localStorage và trạng thái APPROVED/REJECTED không phải quyết định backend. Khi chuyển sang API thật:
+- Chuyển thao tác tạo đề xuất sang workspace bếp, gắn bếp actor và trường được phân công từ backend.
+- Xây dựng inbox BGH xem snapshot, xem món/công thức, so sánh revision và duyệt/trả lại/từ chối.
+- Loại bỏ quyền duyệt giả lập từ localStorage/demo role; frontend chỉ hiển thị quyền backend trả về.
+- Giữ một MealPlan root cho trường/ngày/loại bữa; nhiều món/ageBand là children của revision.
+- Không dùng `expectedQuantity` trên Dish làm số suất thực đơn; số suất nằm ở MealPlanAgeGroup.
+- Không đưa `safetyMonitoring`, lotCode, supplier hoặc tồn kho vào MealPlanRevisionItem; các hồ sơ này thuộc food safety, inventory, production và delivery.
+- Không đổi enum, schema, API source, dữ liệu DB hoặc migration trong bước thiết kế này.
