@@ -109,6 +109,28 @@ export type CreateCentralKitchenPayload = {
   schoolIds: string[];
 };
 
+export type AssignedCentralKitchen = {
+  id: string;
+  kitchenId: string;
+  schoolId: string;
+  isActive: boolean;
+  startsAt: string;
+  endsAt: string | null;
+  kitchen: {
+    id: string;
+    code: string;
+    name: string;
+    address: string | null;
+    contactName: string;
+    phone: string | null;
+    capacity: number | null;
+    ward: { id: string; name: string; code: string | null };
+  };
+};
+
+export const getMyAssignedCentralKitchen = () =>
+  request<AssignedCentralKitchen | null>("/users/my-assigned-central-kitchen");
+
 export const getCentralKitchens = () => request<CentralKitchen[]>("/users/central-kitchens");
 
 export const createCentralKitchen = (payload: CreateCentralKitchenPayload) =>
