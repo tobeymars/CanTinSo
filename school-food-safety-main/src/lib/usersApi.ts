@@ -43,6 +43,28 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const getManagedUsers = () => request<ManagedUser[]>("/users");
 export const getManagedSchools = () => request<ManagedSchool[]>("/schools");
 
+export type MySchoolOverview = {
+  school: {
+    id: string;
+    name: string;
+    code: string | null;
+    ward: { id: string; name: string; code: string | null } | null;
+  };
+  counts: {
+    students: number;
+    suppliers: number;
+    foodSafetyChecks: number;
+    mealPlans: number;
+    plannedServings: number;
+    mealsInProgress: number;
+  };
+  mealPlans: { id: string; mealType: string; servings: number; status: string }[];
+  date: string;
+};
+
+export const getMySchoolOverview = (date: string) =>
+  request<MySchoolOverview>(`/schools/me/overview?date=${encodeURIComponent(date)}`);
+
 export function createManagedUser(payload: {
   email: string;
   fullName: string;
