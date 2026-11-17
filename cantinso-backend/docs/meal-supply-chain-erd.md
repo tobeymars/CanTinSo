@@ -1355,3 +1355,48 @@ Read-only profiling bắt buộc:
 - [ ] Không còn API/frontend phụ thuộc field cũ trước khi contract.
 - [ ] Prisma schema được cập nhật và prisma validate/generate thành công trong branch riêng; chưa deploy migration cho tới khi review hoàn tất.
 
+
+
+## 16. Xác nhận các mặc định ERD và thực thi kiểm kê read-only
+
+> Xác nhận nghiệp vụ: 17/11/2026. Người dùng đồng ý áp dụng toàn bộ 8 đề xuất mặc định tại mục 14.13 làm baseline thiết kế.
+
+### 16.1. Các quyết định được chốt
+
+1. Mỗi Kitchen có ít nhất một InventoryLocation chính; kho trung tâm không chia tồn vật lý theo trường được phục vụ.
+2. Mã lô mặc định unique theo (kitchenId, ingredientId, lotCode), cho phép trùng lotCode giữa hai nguyên liệu trong cùng bếp.
+3. Supplier là pháp nhân dùng chung; SupplierKitchen xác định bếp được phép giao dịch với nhà cung cấp.
+4. MealPlanAgeGroup là nguồn số suất chuẩn. MealPlanItemAgeGroup chỉ override servings khi có khác biệt thực tế; nếu không thì kế thừa số suất nhóm tuổi và lưu portionFactor/quantity.
+5. Revision APPROVED hiện hành tiếp tục có hiệu lực cho tới khi revision mới được phê duyệt; sau đó revision trước mới chuyển SUPERSEDED.
+6. Một revision có thể có nhiều ProductionBatch; mỗi batch phục vụ một trường. Một batch có thể có nhiều Delivery đến cùng trường.
+7. Mỗi Delivery có một xác nhận cuối cùng. Giao nhiều đợt thì tạo nhiều Delivery, không tạo nhiều receipt cuối cho cùng một Delivery.
+8. Nutrition/allergen phải lưu nguồn và snapshot tại DishVersion; dữ liệu tính toán không được trình bày như kết quả kiểm nghiệm.
+
+### 16.2. Tài liệu và script kiểm kê
+
+- Data dictionary: mục 15.1–15.6.
+- ERD Mermaid: mục 15.7.
+- Chiến lược backfill: mục 15.8–15.10.
+- Script SQL chỉ đọc: \`cantinso-backend/docs/sql/meal-supply-chain-data-profile.sql\`.
+
+Script chạy trong transaction READ ONLY và kết thúc bằng ROLLBACK. Script không tạo bảng, không cập nhật, không xóa dữ liệu. Nó xuất:
+- số lượng bản ghi theo bảng và phân bố scope người dùng;
+- phân công bếp có khoảng ngày sai hoặc chồng lấn;
+- nhà cung cấp/lô và các bếp ứng viên theo assignment tại thời điểm nhận;
+- đơn vị/ngành hàng nguyên liệu và hình dạng JSON công thức;
+- số dư lô, chênh lệch suất thực đơn và tham chiếu dish;
+- trace/food-safety và FK/delete rule hiện có.
+
+Chạy từ PowerShell tại thư mục \`D:\\CanTinSo\\cantinso-backend\`:
+
+\`\`\`powershell
+psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f .\\docs\\sql\\meal-supply-chain-data-profile.sql
+\`\`\`
+
+Nếu dùng Prisma CLI mà chưa có \`psql\`, không thay script bằng thao tác ghi dữ liệu. Cài PostgreSQL client hoặc chạy truy vấn SELECT tương đương trên công cụ quản trị DB. Lưu toàn bộ output kèm thời điểm, database name và commit schema làm hồ sơ profiling.
+
+### 16.3. Ranh giới xác nhận
+
+Việc đồng ý các mặc định ở mục 14.13 khóa các quy tắc nghiệp vụ nêu tại 16.1; không đồng nghĩa đã xác nhận mọi chi tiết vật lý như enum cuối cùng, tên cột, độ chính xác numeric, delete policy và toàn bộ FK. Các chi tiết đó chỉ được khóa sau khi đối chiếu kết quả profiling và review kỹ thuật.
+
+**Trạng thái hiện tại:** tài liệu thiết kế và script kiểm kê đã được commit. Chưa chạy script trên PostgreSQL local của người dùng; chưa thay đổi \`schema.prisma\`, migration, database hoặc dữ liệu.
