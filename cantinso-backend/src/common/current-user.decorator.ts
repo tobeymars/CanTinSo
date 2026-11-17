@@ -5,7 +5,7 @@ export interface AuthUser {
   email: string;
   role: string;
   schoolId: string | null;
-  wardId: string | null;
+  wardId: string | null;\n  kitchenId: string | null;
 }
 
 export const CurrentUser = createParamDecorator(
