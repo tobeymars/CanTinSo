@@ -317,7 +317,7 @@ export class UsersService {
 
     if (actor.role === UserRole.UBND_ADMIN) {
       if (target.role !== UserRole.CENTRAL_KITCHEN || dto.role !== undefined ||
-          dto.schoolId !== undefined || dto.wardId !== undefined || dto.kitchenId !== undefined) {
+          dto.schoolId !== undefined) {
         throw new ForbiddenException("UBND chỉ được quản lý thông tin và trạng thái tài khoản bếp thuộc phường mình.");
       }
     }
