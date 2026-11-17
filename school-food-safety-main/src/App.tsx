@@ -59,6 +59,7 @@ import type { LucideIcon } from "lucide-react";
 import { demoData, demo, demoMealViewer, schools as demoSchools } from "./lib/data";
 import type { DayData, PublicInspection, School } from "./lib/data";
 import { centralKitchenRouteAccess, useUI } from "./lib/store";
+import { getManagedSchools } from "./lib/usersApi";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
 import AuthGate from "./AuthGate";
@@ -971,22 +972,43 @@ function Shell() {
     };
   }, [queryClient]);
   const week = weekDates(date);
+  const isWardWorkspace = role === "culture_social_office";
   const schoolQuery = useQuery({
-    queryKey: ["schools"],
-    queryFn: demoData.schools,
+    queryKey: ["schools", isWardWorkspace ? "ward-scoped" : "demo"],
+    queryFn: async (): Promise<School[]> => {
+      if (!isWardWorkspace) return demoData.schools();
+      // UBND_ADMIN phải lấy danh sách thật từ API đã giới hạn theo wardId ở backend.
+      // Tuyệt đối không fallback sang danh sách demo nếu API lỗi hoặc chưa tải xong.
+      const rows = await getManagedSchools();
+      return rows.map((item) => ({
+        id: item.id,
+        name: item.name,
+        address: item.ward?.name ?? "Chưa xác định phường",
+        mode: "ON_SITE",
+      }));
+    },
   });
-  const allSchools = schoolQuery.data ?? demoSchools;
-  const availableSchools = allSchools;
+  const availableSchools = isWardWorkspace
+    ? (schoolQuery.data ?? [])
+    : (schoolQuery.data ?? demoSchools);
+  useEffect(() => {
+    if (!isWardWorkspace || !schoolQuery.data) return;
+    if (!schoolQuery.data.some((item) => item.id === schoolId)) {
+      if (schoolQuery.data[0]) setSchool(schoolQuery.data[0].id);
+    }
+  }, [isWardWorkspace, schoolQuery.data, schoolId, setSchool]);
   const school =
     availableSchools.find((s) => s.id === schoolId) ??
     availableSchools[0] ??
-    demoSchools[0]!;
+    (isWardWorkspace
+      ? { id: "", name: schoolQuery.isError ? "Không tải được trường thuộc phường" : "Đang tải trường được phân công…", address: "", mode: "ON_SITE" as const }
+      : demoSchools[0]!);
   // Bản công khai của phụ huynh là nguồn đọc chuẩn cho cả năm vai trò, bao gồm quy tắc chỉ hiện ảnh đã duyệt.
   const query = useQuery({
     queryKey: ["day", school.id, date, role === "parent" ? "parent" : role === "culture_social_office" ? "supervisor" : "shared"],
     queryFn: () => demoData.day(school, date,
       role === "parent" || role === "culture_social_office" ? demoMealViewer(role, school) : undefined),
-    enabled: !!schoolQuery.data,
+    enabled: !!school.id && !!schoolQuery.data,
   });
   const parentMealQuery = useQuery({
     queryKey: ["parent-meal-day", school.id, date, parentMealType],
@@ -1914,7 +1936,7 @@ function Shell() {
             />
           </label>
           <div className="search-results">
-            {(schoolQuery.data ?? (demo ? demoSchools : []))
+            {availableSchools
               .filter((s) =>
                 s.name
                   .toLocaleLowerCase("vi")
