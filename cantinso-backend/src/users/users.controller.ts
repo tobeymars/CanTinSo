@@ -15,6 +15,12 @@ import { CreateCentralKitchenDto } from './dto/create-central-kitchen.dto';
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
+  @Get('my-assigned-central-kitchen')
+  @Roles('SCHOOL_ADMIN')
+  getMyAssignedCentralKitchen(@CurrentUser() user: AuthUser) {
+    return this.users.getMyAssignedCentralKitchen(user);
+  }
+
   @Get('central-kitchens')
   @Roles('SUPER_ADMIN', 'UBND_ADMIN')
   listCentralKitchens(@CurrentUser() user: AuthUser) {
