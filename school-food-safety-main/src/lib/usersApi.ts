@@ -71,3 +71,46 @@ export function resetManagedUserPassword(id: string, password: string) {
     body: JSON.stringify({ password }),
   });
 }
+
+
+export type CentralKitchenUser = {
+  id: string;
+  email: string;
+  fullName: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type CentralKitchen = {
+  id: string;
+  code: string;
+  name: string;
+  address: string | null;
+  contactName: string;
+  phone: string | null;
+  capacity: number | null;
+  isActive: boolean;
+  schools: { school: { id: string; name: string; code: string | null } }[];
+  users: CentralKitchenUser[];
+};
+
+export type CreateCentralKitchenPayload = {
+  code: string;
+  name: string;
+  address?: string;
+  contactName: string;
+  phone?: string;
+  capacity?: number;
+  adminEmail: string;
+  adminFullName: string;
+  password: string;
+  schoolIds: string[];
+};
+
+export const getCentralKitchens = () => request<CentralKitchen[]>("/users/central-kitchens");
+
+export const createCentralKitchen = (payload: CreateCentralKitchenPayload) =>
+  request<CentralKitchen & { admin: CentralKitchenUser }>("/users/central-kitchens", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
