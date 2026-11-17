@@ -14,6 +14,18 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
+  @Get('central-kitchens')
+  @Roles('SUPER_ADMIN')
+  listCentralKitchens(@CurrentUser() user: AuthUser) {
+    return this.users.listCentralKitchens(user);
+  }
+
+  @Post('central-kitchens')
+  @Roles('SUPER_ADMIN')
+  createCentralKitchen(@CurrentUser() user: AuthUser, @Body() dto: CreateCentralKitchenDto) {
+    return this.users.createCentralKitchen(user, dto);
+  }
+
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.users.list(user);
