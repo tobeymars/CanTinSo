@@ -112,6 +112,7 @@ model School {
   wardId               String?                      @map("ward_id") @db.Uuid
   ward                 Ward?                        @relation(fields: [wardId], references: [id])
   users                User[]
+  onSiteKitchen        Kitchen?                     @relation("SchoolOnSiteKitchen")
   kitchenAssignments   KitchenSchoolAssignment[]
   classrooms           Classroom[]
   students             Student[]
@@ -133,6 +134,8 @@ model Kitchen {
   code        String          @unique
   name        String
   type        KitchenType     @default(CENTRAL)
+  schoolId    String?         @unique @map("school_id") @db.Uuid
+  school      School?         @relation("SchoolOnSiteKitchen", fields: [schoolId], references: [id], onDelete: Restrict)
   address     String?
   contactName String?         @map("contact_name")
   phone       String?
