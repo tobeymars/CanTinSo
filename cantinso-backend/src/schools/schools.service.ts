@@ -12,7 +12,7 @@ export class SchoolsService {
       throw new ForbiddenException("Tài khoản chưa được gán trường để xem tổng quan.");
     }
 
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) {
       throw new ForbiddenException("Ngày xem tổng quan không hợp lệ.");
     }
 
