@@ -291,6 +291,9 @@ export class UsersService {
     if (SCHOOL_SCOPED_ROLES.includes(nextRole) && !nextSchoolId) {
       throw new ConflictException("Vai trò này cần được gán schoolId.");
     }
+    if (nextRole === UserRole.CENTRAL_KITCHEN && !target.kitchenId) {
+      throw new ConflictException("Tài khoản Bếp trung tâm phải được gắn với hồ sơ bếp.");
+    }
     if (nextRole === UserRole.UBND_ADMIN) {
       if (!target.wardId || nextSchoolId) {
         throw new ConflictException(
@@ -314,6 +317,7 @@ export class UsersService {
         ...dto,
         fullName: dto.fullName?.trim(),
         wardId: nextRole === UserRole.UBND_ADMIN ? target.wardId : null,
+        kitchenId: nextRole === UserRole.CENTRAL_KITCHEN ? target.kitchenId : null,
       },
       select: {
         id: true,
@@ -323,6 +327,7 @@ export class UsersService {
         isActive: true,
         schoolId: true,
         wardId: true,
+        kitchenId: true,
         updatedAt: true,
       },
     });
