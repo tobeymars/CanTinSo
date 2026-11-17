@@ -159,6 +159,38 @@ export class UsersService {
   }
 
 
+  async getMyAssignedCentralKitchen(actor: AuthUser) {
+    if (actor.role !== UserRole.SCHOOL_ADMIN || !actor.schoolId) {
+      throw new ForbiddenException("Chỉ tài khoản Ban Giám hiệu đã được gán trường mới xem được bếp phục vụ.");
+    }
+
+    const assignment = await this.prisma.kitchenSchoolAssignment.findFirst({
+      where: {
+        schoolId: actor.schoolId,
+        isActive: true,
+        endsAt: null,
+        kitchen: { type: "CENTRAL", isActive: true },
+      },
+      include: {
+        kitchen: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            address: true,
+            contactName: true,
+            phone: true,
+            capacity: true,
+            ward: { select: { id: true, name: true, code: true } },
+          },
+        },
+      },
+      orderBy: { startsAt: "desc" },
+    });
+
+    return assignment;
+  }
+
   async listCentralKitchens(actor: AuthUser) {
     if (actor.role !== UserRole.SUPER_ADMIN && actor.role !== UserRole.UBND_ADMIN) {
       throw new ForbiddenException("Bạn không có quyền quản lý bếp trung tâm.");
