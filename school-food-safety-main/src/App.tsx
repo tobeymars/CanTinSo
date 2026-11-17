@@ -1390,7 +1390,7 @@ function Shell() {
               {isRealSchoolAdmin ? (
                 <div className="school-picker school-picker-locked">
                   <strong>{school.name}</strong>
-                  <span>Trường được gán theo tài khoản Ban Giám hiệu</span>
+                  <span><ShieldCheck size={14} /> Trường được phân công</span>
                 </div>
               ) : (
                 <div className="school-picker">
