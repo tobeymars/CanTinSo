@@ -20,6 +20,11 @@ enum UserRole {
   SCHOOL_KITCHEN
 }
 
+enum KitchenType {
+  SCHOOL
+  CENTRAL
+}
+
 enum StudentStatus {
   ACTIVE
   PAUSED
@@ -78,10 +83,13 @@ model User {
   wardId       String?  @map("ward_id") @db.Uuid
   school       School?  @relation(fields: [schoolId], references: [id])
   ward         Ward?    @relation(fields: [wardId], references: [id])
+  kitchenId    String?  @map("kitchen_id") @db.Uuid
+  kitchen      Kitchen? @relation(fields: [kitchenId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@index([schoolId, role])
+  @@index([kitchenId, role])
   @@map("users")
 }
 
@@ -104,6 +112,7 @@ model School {
   wardId               String?                      @map("ward_id") @db.Uuid
   ward                 Ward?                        @relation(fields: [wardId], references: [id])
   users                User[]
+  kitchenAssignments   KitchenSchoolAssignment[]
   classrooms           Classroom[]
   students             Student[]
   attendanceEvents     AttendanceEvent[]
@@ -117,6 +126,41 @@ model School {
 
   @@index([wardId])
   @@map("schools")
+}
+
+model Kitchen {
+  id          String          @id @default(uuid()) @db.Uuid
+  code        String          @unique
+  name        String
+  type        KitchenType     @default(CENTRAL)
+  address     String?
+  contactName String?         @map("contact_name")
+  phone       String?
+  capacity    Int?
+  isActive    Boolean         @default(true) @map("is_active")
+  users       User[]
+  schools     KitchenSchoolAssignment[]
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@map("kitchens")
+}
+
+model KitchenSchoolAssignment {
+  id        String    @id @default(uuid()) @db.Uuid
+  kitchenId String    @map("kitchen_id") @db.Uuid
+  schoolId  String    @map("school_id") @db.Uuid
+  isActive  Boolean   @default(true) @map("is_active")
+  startsAt  DateTime  @default(now()) @map("starts_at")
+  endsAt    DateTime? @map("ends_at")
+  kitchen   Kitchen   @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@unique([kitchenId, schoolId, startsAt])
+  @@index([schoolId, isActive])
+  @@index([kitchenId, isActive])
+  @@map("kitchen_school_assignments")
 }
 
 model Classroom {
