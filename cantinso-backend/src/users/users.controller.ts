@@ -7,6 +7,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UsersService } from './users.service';
+import { CreateCentralKitchenDto } from './dto/create-central-kitchen.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
