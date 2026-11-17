@@ -749,7 +749,7 @@ form .feedback-photo-picker.disabled{cursor:not-allowed;opacity:.6}
   flex: 0 0 auto;
   color: #f0c36f;
 }
-.school-hero:has(.school-picker-locked) .hero-address {
+.school-picker-locked + .hero-address {
   margin-top: 2px;
   font-size: 13px;
   font-weight: 600;
