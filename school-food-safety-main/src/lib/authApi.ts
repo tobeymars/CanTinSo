@@ -7,7 +7,8 @@ export type AuthUser = {
   email: string;
   fullName: string;
   role: string;
-  schoolId: string | null;\n  kitchenId?: string | null;
+  schoolId: string | null;
+  kitchenId?: string | null;
 };
 
 type AuthResponse = {
