@@ -169,7 +169,7 @@ export class UsersService {
         schoolId: actor.schoolId,
         isActive: true,
         endsAt: null,
-        kitchen: { type: "CENTRAL", isActive: true },
+        kitchen: { is: { type: "CENTRAL", isActive: true } },
       },
       include: {
         kitchen: {
