@@ -28,7 +28,7 @@
 - InventoryLot 1—N StockMovementItem; StockMovement 1—N StockMovementItem.
 - Kitchen 1—N Dish; Dish 1—N DishVersion; DishVersion 1—N DishIngredient.
 - DishIngredient N—1 Ingredient; DishVersion 1—N DishApproval; School 1—N DishApproval.
-- School 1—N MealPlan; Kitchen 1—N MealPlan; MealPlan 1—N MealPlanItem.
+- School 1—N MealPlan; Kitchen 1—N MealPlan; MealPlan 1—N MealPlanItem. Mỗi MealPlan do đúng một bếp lập đề xuất cho đúng một trường.
 - MealPlanItem N—1 DishVersion và N—1 AgeGroup; MealPlan 1—N MealPlanApproval và 1—N MealPlanRevision.
 - MealPlan/revision 1—N ProductionBatch; ProductionBatch liên kết các giao dịch xuất kho và Delivery.
 - InventoryLot 1—N TraceEvent; TraceEvent có thể tham chiếu StockMovement, ProductionBatch hoặc Delivery.
@@ -74,12 +74,13 @@ Giữ Ward, School, Kitchen, KitchenSchoolAssignment, User.
 
 ### 3.5 Thực đơn, nhóm tuổi và duyệt thực đơn
 
-- MealPlan: thuộc một School, chỉ rõ Kitchen chuẩn bị, ngày phục vụ, trạng thái và người lập. Trường là chủ thể của thực đơn; bếp là đơn vị thực hiện.
+- MealPlan: thuộc một School, chỉ rõ Kitchen lập đề xuất/chuẩn bị, ngày phục vụ, trạng thái và người lập. Bếp là bên khởi tạo và gửi đề xuất; trường là bên xem xét và phê duyệt. Quy tắc này áp dụng như nhau cho Kitchen.type=CENTRAL và Kitchen.type=SCHOOL.
 - Ràng buộc tạo/sửa: tại ngày phục vụ, bếp phải có phân công hiệu lực với trường hoặc là bếp tại trường của trường đó. Backend xác thực quan hệ này.
 - Không dùng một thực đơn chung cho nhiều trường. Cùng bếp/cùng món vẫn tạo các MealPlan độc lập.
+- Mỗi trường chỉ có một MealPlan chính cho một serviceDate + mealType: unique (schoolId, serviceDate, mealType). Không bổ sung MealSession/ServingShift ở giai đoạn này. Nhiều nhóm tuổi, định lượng khác nhau và nhiều đợt giao nhận được biểu diễn ở các dòng khẩu phần/giao nhận, không tạo MealPlan thứ hai.
 - MealPlanItem: tham chiếu DishVersion cụ thể; số suất, nhóm tuổi, hệ số khẩu phần/định lượng áp dụng và snapshot tên món/công thức/dinh dưỡng cần thiết để bảo toàn lịch sử.
 - AgeGroup: danh mục nhóm tuổi/khối lớp. Một công thức chuẩn có thể dùng cho nhiều nhóm tuổi; hệ số khẩu phần và số suất đặt ở dòng thực đơn theo nhóm tuổi, không nhân bản DishVersion chỉ vì tuổi khác nhau.
-- Cần bỏ giả định hiện tại mỗi trường/ngày/bữa chỉ có đúng một bản ghi nếu nghiệp vụ cho phép nhiều đợt/ca hoặc nhiều thực đơn phiên bản. Đề xuất khóa nghiệp vụ gồm trường + ngày + bữa + ca/mealSession (nếu có), kết hợp revision; không đặt unique quá chặt trước khi chốt ca ăn.
+- Giữ unique (schoolId, serviceDate, mealType): mỗi trường chỉ có một thực đơn chính cho mỗi loại bữa trong ngày. Revision lưu lịch sử các lần gửi/sửa của cùng thực đơn; không tạo MealPlan mới cho từng lần chỉnh sửa hoặc từng đợt giao nhận.
 - MealPlanApproval: lịch sử SUBMITTED/APPROVED/RETURNED/REJECTED, người thao tác, thời điểm, nhận xét/lý do. Duyệt món và duyệt thực đơn là hai luồng riêng.
 - MealPlanRevision: snapshot từng lần gửi duyệt; khi Bếp sửa sau khi bị trả lại, tạo revision mới. Không sửa nội dung revision đã duyệt.
 - Chỉ revision đã được BGH duyệt mới đủ điều kiện công khai. Công khai là trạng thái/record có thời điểm và người thực hiện, không suy ra chỉ từ việc bản ghi tồn tại.
@@ -101,7 +102,7 @@ Giữ Ward, School, Kitchen, KitchenSchoolAssignment, User.
 | Ingredient | Danh mục global, có unit dạng String và category String | Giữ ý tưởng global; chuẩn hóa Unit, conversion, nutrition, allergen và trạng thái |
 | InventoryLot | Bắt buộc schoolId, có supplier/ingredient, quantity/remainingQty; không có kitchen/location/receipt/ledger | Chuyển scope sang Kitchen + InventoryLocation; thêm chứng từ nhập và ledger. Giữ lot cũ, backfill school → kitchen theo lịch phân công tại thời điểm nhận |
 | Dish | Global, code unique toàn hệ thống, recipe JSON | Thêm kitchenId; chuyển recipe thành DishVersion + DishIngredient; code unique theo bếp; cần chuyển JSON recipe có cấu trúc thành dòng nguyên liệu |
-| MealPlan | Có schoolId, date, mealType, servings, status String; chưa có kitchenId, submit/approval history | Giữ school ownership; thêm kitchenId, enum status, session/revision, actor/timestamps; approval history riêng |
+| MealPlan | Có schoolId, date, mealType, servings, status String; chưa có kitchenId, submit/approval history | Giữ school ownership; thêm kitchenId lập đề xuất, enum status, người lập/gửi, actor/timestamps, revision và approval history; unique schoolId + serviceDate + mealType |
 | MealPlanItem | Chỉ có dishId + servings; unique plan + dish | Tham chiếu DishVersion, AgeGroup, portionFactor và snapshot; unique theo plan + version + ageGroup/session phù hợp |
 | TraceEvent | Gắn InventoryLot; metadata JSON | Giữ, bổ sung liên kết optional đến stock movement, production batch, delivery và actor có FK |
 | FoodSafetyCheck | Gắn School | Giữ phạm vi trường; các kiểm tra tại bếp có thể cần kitchenId hoặc thực thể KitchenInspection riêng |
@@ -112,7 +113,7 @@ Giữ Ward, School, Kitchen, KitchenSchoolAssignment, User.
 2. **Backfill InventoryLot:** phải ánh xạ schoolId → kitchenId và kho nhận. Trường hợp không xác định được bếp lịch sử phải đưa vào báo cáo ngoại lệ để xử lý thủ công, không đoán.
 3. **Dish.recipe JSON:** cần kiểm tra shape dữ liệu thực tế ở DB và localStorage/demo. Chỉ chuyển tự động khi ánh xạ được nguyên liệu/đơn vị; phần không khớp đưa vào danh sách cần rà soát.
 4. **MealPlan hiện tại:** status là String; chuẩn hóa enum phải có bảng mapping giá trị cũ. MealPlanItem.dishId hiện trỏ Dish global; cần xác định kitchen owner sau khi thêm kitchenId.
-5. **Uniqueness của MealPlan:** unique hiện tại (schoolId, serviceDate, mealType) có thể cản trở ca ăn hoặc revision. Không drop trước khi xác định dữ liệu trùng và quy tắc nhiều ca.
+5. **Uniqueness của MealPlan:** giữ unique (schoolId, serviceDate, mealType) theo nghiệp vụ đã chốt. Revision và các đợt giao nhận là bản ghi con, không phải MealPlan khác.
 6. **Tính tồn:** remainingQty hiện là số dư ghi trực tiếp; khi thêm ledger cần đối chiếu tổng nhập - xuất ± điều chỉnh với remainingQty trước khi chuyển nguồn sự thật.
 7. **Phân công bếp:** một trường chỉ có một bếp hiệu lực; mọi meal plan phải kiểm tra bếp đúng với assignment có hiệu lực ở serviceDate. Dữ liệu lịch sử phải giữ kitchenId cũ.
 8. **Duyệt món:** approval là theo School + DishVersion; không đặt một cờ approved chung trên Dish vì sẽ làm một trường duyệt thay cho trường khác.
@@ -125,7 +126,7 @@ Giữ Ward, School, Kitchen, KitchenSchoolAssignment, User.
 4. Xây danh mục nguyên liệu/đơn vị/dinh dưỡng.
 5. Xây Supplier + SupplierKitchen và quy trình nhập kho/lot/ledger theo Kitchen.
 6. Xây Dish + DishVersion + DishIngredient + DishApproval.
-7. Xây MealPlan + MealPlanItem + approval/revision theo School và Kitchen.
+7. Xây MealPlan + MealPlanItem + approval/revision: bếp trung tâm hoặc bếp tại trường lập và gửi đề xuất; BGH/người được ủy quyền ở trường duyệt.
 8. Xây sản xuất, xuất kho, giao nhận và truy xuất.
 9. Sau mỗi giai đoạn chạy Prisma validate/generate, backend build, migration status, test phân quyền và đối chiếu dữ liệu.
 
@@ -165,3 +166,35 @@ Hai tài khoản hiện có role `SCHOOL_KITCHEN` và `schoolId=TH Phạm Hùng`
 | Nhập/xuất/điều chỉnh tồn kho bếp | Không | Có, trong phạm vi bếp và quyền được cấp |
 | Tạo/điều phối đợt sản xuất | Không | Có |
 | Duyệt món/thực đơn | Không mặc định | Không mặc định; theo vai trò được ủy quyền |
+
+
+## 9. Quy trình lập và duyệt thực đơn (xác nhận ngày 17/11/2026)
+
+### Quy tắc chung cho cả hai mô hình bếp
+
+1. **Bên lập đề xuất:** tài khoản thuộc Kitchen được quyền lập MealPlan cho trường mà bếp đang phục vụ. Với bếp trung tâm, phải có KitchenSchoolAssignment hiệu lực tại serviceDate. Với bếp tại trường, Kitchen.schoolId phải đúng School.id.
+2. **Gửi duyệt:** người lập gửi bản đề xuất (revision) sang trường; nội dung revision đã gửi phải được lưu bất biến.
+3. **Bên duyệt:** SCHOOL_ADMIN hoặc người dùng được trường ủy quyền có quyền xem xét. Người duyệt có thể APPROVE hoặc RETURN yêu cầu chỉnh sửa kèm nhận xét/lý do. Nhân viên tiếp nhận suất ăn không mặc nhiên có quyền duyệt.
+4. **Chỉnh sửa:** khi trường trả lại, bếp chỉnh sửa và gửi revision mới của cùng MealPlan; giữ nguyên revision cũ và lịch sử thao tác.
+5. **Sau phê duyệt:** revision được duyệt là căn cứ cho sản xuất. Nếu cần thay đổi nội dung đã duyệt, phải tạo revision thay thế và đi qua luồng duyệt lại; không sửa đè snapshot đã duyệt.
+6. **Phạm vi:** bếp chỉ thấy/lập thực đơn cho các trường được phân công; trường chỉ xem/duyệt thực đơn thuộc chính schoolId của mình. Backend phải kiểm tra scope, không tin schoolId/kitchenId do client tự gửi.
+7. **Một thực đơn chính:** unique (schoolId, serviceDate, mealType). Nhiều nhóm tuổi và khẩu phần nằm ở MealPlanItem/portion allocation; giao nhiều đợt nằm ở Delivery/DeliveryItem.
+
+### Phân biệt nhân sự bếp trường và nhân viên tiếp nhận tại trường
+
+- Nhân sự làm việc cho **bếp tại trường** là người dùng thuộc Kitchen.schoolId và phải được scope bằng kitchenId để lập thực đơn, quản lý công thức/kho/sản xuất theo quyền được cấp. Không nhầm nhóm này với nhân viên trường đang nhận suất ăn.
+- Nhân viên **tiếp nhận suất ăn phía trường** tiếp tục thuộc schoolId (role hiện tại SCHOOL_KITCHEN); được xem thực đơn đã gửi/được duyệt và xác nhận giao nhận, ghi nhận sự cố. Không có quyền lập thực đơn với tư cách bếp, quản lý kho bếp hoặc duyệt thực đơn.
+- Với bếp trung tâm, nhân sự bếp thuộc kitchenId như quy tắc đã chốt. Role cụ thể và quyền chi tiết phải được rà soát toàn bộ enum/guards/frontend trước khi đổi tên hoặc tái sử dụng role hiện có.
+
+### Ma trận quyền bổ sung
+
+| Nghiệp vụ | Nhân sự bếp trung tâm | Nhân sự bếp tại trường | BGH/người được ủy quyền | Nhân viên tiếp nhận tại trường |
+|---|---|---|---|---|
+| Lập MealPlan đề xuất | Có, trường được phân công | Có, trường sở hữu bếp | Không mặc định | Không |
+| Sửa đề xuất bị trả lại | Có, trong scope | Có, trong scope | Không | Không |
+| Gửi revision để duyệt | Có | Có | Không | Không |
+| Xem và duyệt/trả lại | Không duyệt thay trường | Không duyệt thay trường | Có, trong school scope | Không mặc định |
+| Quản lý công thức/kho/sản xuất | Có, kitchen scope | Có, kitchen scope và quyền được cấp | Không mặc định | Không |
+| Xác nhận giao nhận tại trường | Không xác nhận thay bên nhận | Không xác nhận thay bên nhận nếu chính bếp là bên giao | Có thể giám sát | Có, school scope |
+
+Quyền tạo thực đơn cho bếp trường cần gắn với tài khoản thực sự thuộc Kitchen (kitchenId), không cấp cho mọi User có schoolId. Không thay đổi enum role hiện tại cho đến khi có thiết kế role/scope và kế hoạch chuyển đổi riêng.
