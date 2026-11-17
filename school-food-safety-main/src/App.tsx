@@ -59,7 +59,7 @@ import type { LucideIcon } from "lucide-react";
 import { demoData, demo, demoMealViewer, schools as demoSchools } from "./lib/data";
 import type { DayData, PublicInspection, School } from "./lib/data";
 import { centralKitchenRouteAccess, useUI } from "./lib/store";
-import { getManagedSchools } from "./lib/usersApi";
+import { getManagedSchools, getMySchoolOverview } from "./lib/usersApi";
 import { getStoredUser } from "./lib/authApi";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
@@ -93,6 +93,7 @@ const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
 const FeedbackForm = lazy(() => import("./FeedbackForm"));
 const CentralKitchenManagementPanel = lazy(() => import("./CentralKitchenManagement"));
 const KitchenManagementPanel = lazy(() => import("./KitchenManagement"));
+const SchoolDashboard = lazy(() => import("./SchoolDashboard"));
 const roleLabels: Record<ViewRole, string> = {
   parent: "Phụ huynh",
   school_board: "Ban Giám hiệu",
@@ -976,30 +977,42 @@ function Shell() {
   }, [queryClient]);
   const week = weekDates(date);
   const isWardWorkspace = role === "culture_social_office";
+  const isRealSchoolAdmin = getStoredUser()?.role === "SCHOOL_ADMIN";
   const schoolQuery = useQuery({
-    queryKey: ["schools", isWardWorkspace ? "ward-scoped" : "demo"],
+    queryKey: ["schools", isWardWorkspace ? "ward-scoped" : isRealSchoolAdmin ? "school-account" : "demo", isRealSchoolAdmin ? date : ""],
     queryFn: async (): Promise<School[]> => {
-      if (!isWardWorkspace) return demoData.schools();
-      // UBND_ADMIN phải lấy danh sách thật từ API đã giới hạn theo wardId ở backend.
-      // Tuyệt đối không fallback sang danh sách demo nếu API lỗi hoặc chưa tải xong.
-      const rows = await getManagedSchools();
-      return rows.map((item) => ({
-        id: item.id,
-        name: item.name,
-        address: item.ward?.name ?? "Chưa xác định phường",
-        mode: "ON_SITE",
-      }));
+      if (isWardWorkspace) {
+        // UBND_ADMIN chỉ nhận danh sách trường thuộc wardId của tài khoản.
+        const rows = await getManagedSchools();
+        return rows.map((item) => ({
+          id: item.id,
+          name: item.name,
+          address: item.ward?.name ?? "Chưa xác định phường",
+          mode: "ON_SITE",
+        }));
+      }
+      if (isRealSchoolAdmin) {
+        // BGH không dùng danh sách trường mẫu; backend tự giới hạn theo schoolId của JWT.
+        const overview = await getMySchoolOverview(date);
+        return [{
+          id: overview.school.id,
+          name: overview.school.name,
+          address: overview.school.ward?.name ?? "Chưa xác định phường",
+          mode: "ON_SITE",
+        }];
+      }
+      return demoData.schools();
     },
   });
-  const availableSchools = isWardWorkspace
+  const availableSchools = isWardWorkspace || isRealSchoolAdmin
     ? (schoolQuery.data ?? [])
     : (schoolQuery.data ?? demoSchools);
   useEffect(() => {
-    if (!isWardWorkspace || !schoolQuery.data) return;
+    if ((!isWardWorkspace && !isRealSchoolAdmin) || !schoolQuery.data) return;
     if (!schoolQuery.data.some((item) => item.id === schoolId)) {
       if (schoolQuery.data[0]) setSchool(schoolQuery.data[0].id);
     }
-  }, [isWardWorkspace, schoolQuery.data, schoolId, setSchool]);
+  }, [isWardWorkspace, isRealSchoolAdmin, schoolQuery.data, schoolId, setSchool]);
   const school =
     availableSchools.find((s) => s.id === schoolId) ??
     availableSchools[0] ??
@@ -1325,7 +1338,7 @@ function Shell() {
               <h1>{location.pathname === "/" ? homeHeading : current.label}</h1>
               <p>
                 {role !== "parent"
-                  ? "Theo dõi, phối hợp và quản lý hoạt động bữa ăn trong không gian minh họa."
+                  ? {isRealSchoolAdmin ? "Theo dõi hoạt động bữa ăn và dữ liệu vận hành của trường đang được gán." : "Theo dõi, phối hợp và quản lý hoạt động bữa ăn trong không gian minh họa."}
                   : location.pathname === "/"
                     ? "Cùng nhà trường chăm chút từng bữa ăn, đồng hành cùng con khôn lớn."
                     : "Thông tin minh bạch, cập nhật từ nhà trường và đơn vị phụ trách."}
@@ -1363,24 +1376,31 @@ function Shell() {
                     ? "TRƯỜNG ĐANG THEO DÕI"
                     : "PHẠM VI NHÀ TRƯỜNG"}
               </span>
-              <div className="school-picker">
-                <Select
-                  label="Chọn trường"
-                  variant="hero"
-                  value={school.id}
-                  onValueChange={setSchool}
-                  options={availableSchools.map((s) => ({
-                    value: s.id,
-                    label: s.name,
-                    description: s.address,
-                  }))}
-                />
-              </div>
+              {isRealSchoolAdmin ? (
+                <div className="school-picker school-picker-locked">
+                  <strong>{school.name}</strong>
+                  <span>Trường được gán theo tài khoản Ban Giám hiệu</span>
+                </div>
+              ) : (
+                <div className="school-picker">
+                  <Select
+                    label="Chọn trường"
+                    variant="hero"
+                    value={school.id}
+                    onValueChange={setSchool}
+                    options={availableSchools.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                      description: s.address,
+                    }))}
+                  />
+                </div>
+              )}
               <p className="hero-address">{school.address}</p>
               <div className="hero-bottom">
                 <span>
                   <span className="live-dot" />
-                  {demo ? "Dữ liệu minh họa" : "Thông tin công khai"}
+                  {isRealSchoolAdmin ? "Dữ liệu hệ thống" : demo ? "Dữ liệu minh họa" : "Thông tin công khai"}
                 </span>
                 <span className="hero-separator" />
                 <span>
@@ -1429,7 +1449,11 @@ function Shell() {
                     </div>
                   }
                 >
-                  <AdminPanel school={school} />
+                  {isRealSchoolAdmin && location.pathname === "/" ? (
+                    <SchoolDashboard date={date} />
+                  ) : (
+                    <AdminPanel school={school} />
+                  )}
                 </Suspense>
               )}
               {location.pathname === "/quan-ly-tai-khoan" && role === "school_board" && <UserManagement />}
