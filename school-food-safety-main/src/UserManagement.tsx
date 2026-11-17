@@ -28,7 +28,9 @@ const roleLabel = (role: string) =>
   role === "SCHOOL_STAFF" ? "Nhân viên trường" : role;
 
 export default function UserManagement() {
-  const isSuperAdmin = getStoredUser()?.role === "SUPER_ADMIN";
+  const currentRole = getStoredUser()?.role;
+  const isSuperAdmin = currentRole === "SUPER_ADMIN";
+  const isWardAdmin = currentRole === "UBND_ADMIN";
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [wards, setWards] = useState<ManagedSchool["ward"][]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,11 @@ export default function UserManagement() {
     setLoading(true);
     setError("");
     try {
+      if (isWardAdmin) {
+        setUsers([]);
+        setWards([]);
+        return;
+      }
       const userRows = await getManagedUsers();
       if (isSuperAdmin) {
         const schoolRows = await getManagedSchools();
@@ -162,8 +169,8 @@ export default function UserManagement() {
 
   return (
     <>
-    {isSuperAdmin && <CentralKitchenManagement />}
-    <section className="user-management">
+    {(isSuperAdmin || isWardAdmin) && <CentralKitchenManagement />}
+    {!isWardAdmin && <section className="user-management">
       <div className="um-intro">
         <div>
           <span className="um-eyebrow"><ShieldCheck size={15} /> {isSuperAdmin ? "QUẢN TRỊ TỔ CHỨC" : "QUẢN TRỊ TRONG PHẠM VI TRƯỜNG"}</span>
@@ -245,7 +252,7 @@ export default function UserManagement() {
           <div className="um-modal-actions"><button type="button" className="um-secondary" onClick={() => setPasswordTarget(null)}>Hủy</button><button className="um-primary" disabled={busy}>{busy ? "Đang lưu..." : "Đặt lại mật khẩu"}</button></div>
         </form>
       </div>}
-    </section>
+    </section>}
     </>
   );
 }
