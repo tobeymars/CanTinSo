@@ -92,6 +92,7 @@ const BoardingMenuManager = lazy(() => import("./BoardingMenuManager"));
 const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
 const FeedbackForm = lazy(() => import("./FeedbackForm"));
 const CentralKitchenManagementPanel = lazy(() => import("./CentralKitchenManagement"));
+const KitchenManagementPanel = lazy(() => import("./KitchenManagement"));
 const roleLabels: Record<ViewRole, string> = {
   parent: "Phụ huynh",
   school_board: "Ban Giám hiệu",
@@ -1077,6 +1078,8 @@ function Shell() {
       ? navigation
       : role === "culture_social_office"
         ? [...adminNav, ...(isWardAdminAccount ? [{ path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])]
+        : role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN"
+          ? [...adminNav, { path: "/quan-ly-bep", label: "Quản lý bếp", icon: CookingPot }]
         : role === "school_kitchen"
           ? [...adminNav.slice(0, 2), { path: "/tao-mon", label: "Tạo món & dinh dưỡng", icon: CookingPot }, ...adminNav.slice(2)]
           : role === "central_kitchen" && centralKitchenRouteAccess[kitchenRole].includes("/tao-mon")
@@ -1418,7 +1421,7 @@ function Shell() {
           )}
           {role !== "parent" ? (
             <>
-              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam"].includes(location.pathname) && (
+              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam", "/quan-ly-bep"].includes(location.pathname) && (
                 <Suspense
                   fallback={
                     <div className="loading-grid">
@@ -1430,6 +1433,11 @@ function Shell() {
                 </Suspense>
               )}
               {location.pathname === "/quan-ly-tai-khoan" && role === "school_board" && <UserManagement />}
+              {location.pathname === "/quan-ly-bep" && role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN" && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <KitchenManagementPanel />
+                </Suspense>
+              )}
               {location.pathname === "/quan-ly-bep-trung-tam" && isWardAdminAccount && (
                 <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
                   <CentralKitchenManagementPanel />
