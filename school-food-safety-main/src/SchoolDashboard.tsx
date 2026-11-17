@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Building2, CalendarDays, ChefHat, ClipboardList, Users, Utensils } from "lucide-react";
 import { getMyKitchen, getMySchoolOverview } from "./lib/usersApi";
+import "./SchoolDashboard.css";
 
 type Props = { date: string };
 
@@ -38,8 +39,8 @@ export default function SchoolDashboard({ date }: Props) {
   ];
 
   return <div className="school-real-dashboard">
-    <div className="admin-stats">
-      {stats.map(item => <div className="card admin-stat" key={item.label}>
+    <div className="school-dashboard-stats">
+      {stats.map(item => <div className="card school-dashboard-stat" key={item.label}>
         <item.icon size={21}/>
         <strong>{item.value.toLocaleString("vi-VN")}</strong>
         <span>{item.label}</span>
