@@ -1104,3 +1104,254 @@ Các đề xuất mặc định:
 - Trước migration phải chạy data profiling trên DB thực tế: supplier, inventory lot, dish.recipe JSON, meal plan/item, assignment history. Bản ghi không ánh xạ chắc chắn phải vào exception report, không đoán.
 - Sau khi nghiệp vụ xác nhận mục 14.13, lập data dictionary chi tiết (type/precision/nullability/default/FK/delete/index), ERD Mermaid và migration sequence additive/backfill/validate/contract.
 - Tài liệu này không thay đổi schema.prisma, database, API source hoặc dữ liệu; không tạo migration trong bước này.
+
+## 15. Data dictionary, ERD quan hệ và chiến lược chuyển đổi dữ liệu
+
+> Trạng thái: thiết kế chi tiết phục vụ review. Đây chưa phải schema.prisma cuối cùng và không được dùng để chạy migration trực tiếp. Precision, enum và tên field có thể điều chỉnh sau khi chốt nghiệp vụ và kiểm tra dữ liệu thực tế.
+
+### 15.1. Quy ước kiểu dữ liệu
+
+| Kiểu logic | PostgreSQL | Prisma | Quy ước |
+|---|---|---|---|
+| ID | uuid | String @db.Uuid | UUID, không tái sử dụng |
+| Mã nghiệp vụ | varchar(50–100) | String @db.VarChar(n) | unique theo phạm vi đã nêu |
+| Tên | varchar(255) | String @db.VarChar(255) | không dùng làm khóa |
+| Mô tả/hướng dẫn | text | String @db.Text | giới hạn ở DTO/service |
+| Số lượng nguyên liệu | numeric(14,4) | Decimal @db.Decimal(14,4) | không dùng Float |
+| Hệ số portion/conversion | numeric(14,6) | Decimal @db.Decimal(14,6) | phải > 0 |
+| Đơn giá/thành tiền | numeric(18,2) | Decimal @db.Decimal(18,2) | lưu currencyCode nếu đa tiền tệ |
+| Số suất | integer | Int | >= 0; số suất kế hoạch thường > 0 |
+| Ngày nghiệp vụ | date | DateTime @db.Date | serviceDate, expiryDate |
+| Thời điểm | timestamptz | DateTime @db.Timestamptz(3) | lưu UTC |
+| Metadata | jsonb | Json? | chỉ dữ liệu mở rộng |
+
+Quy tắc số lượng:
+- Chuẩn hóa lượng nguyên liệu về Unit chuẩn của Ingredient trước khi tính tồn và tiêu hao.
+- Không cộng/trừ hai số lượng khác đơn vị nếu chưa quy đổi hợp lệ.
+- Không làm tròn ở từng bước trung gian; quy định rounding tại điểm ghi nhận thực tế/hiển thị.
+- Không cho phép tồn âm theo mặc định.
+
+### 15.2. Data dictionary — danh mục và đơn vị
+
+| Bảng | Cột chính | Kiểu/NULL | Ràng buộc |
+|---|---|---|---|
+| ingredient_categories | id, code, name, is_active, created_at | UUID, varchar, varchar, bool, timestamptz | code unique |
+| units | id, code, name, dimension, decimal_precision, is_active | UUID, varchar, varchar, enum/varchar, smallint, bool | dimension MASS/VOLUME/COUNT |
+| ingredients | id, code, name, category_id, base_unit_id, is_active, created_at | UUID, varchar, varchar, UUID NULL, UUID, bool, timestamptz | code unique; base_unit bắt buộc |
+| ingredient_unit_conversions | id, ingredient_id, from_unit_id, to_unit_id, factor | UUID, UUID, UUID, UUID, numeric(14,6) | unique ingredient/from/to; factor > 0 |
+| age_groups | id, code, name, min_age_months, max_age_months, sort_order, is_active | UUID, varchar, varchar, int NULL, int NULL, int, bool | min/max tháng tuổi |
+| allergens | id, code, name, is_active | UUID, varchar, varchar, bool | code unique |
+| ingredient_allergens | ingredient_id, allergen_id, note | UUID, UUID, text NULL | composite PK ingredient/allergen |
+| ingredient_nutritions | id, ingredient_id, nutrient_code, basis_quantity, basis_unit_id, value, source, effective_from | UUID, UUID, varchar, numeric, UUID, numeric, text, date | unique ingredient/nutrient/effective date |
+
+Ingredient.baseUnitId tham chiếu Unit. Quy đổi kg↔g có thể là quy đổi chung; ml↔g hoặc cup↔g phụ thuộc nguyên liệu phải lưu theo Ingredient. Không tự động chuyển Ingredient.unit dạng String cũ nếu không có mapping được xác nhận. AgeGroup không gắn cứng vào DishVersion.
+
+### 15.3. Data dictionary — nhà cung cấp và tồn kho
+
+| Bảng | Cột chính | Kiểu/NULL | Ràng buộc |
+|---|---|---|---|
+| suppliers | id, code, name, tax_code, contact_name, phone, email, address, status | UUID, varchar, varchar, varchar NULL, ... | code unique theo pháp nhân |
+| supplier_kitchens | id, supplier_id, kitchen_id, status, starts_at, ends_at | UUID, UUID, UUID, enum, timestamptz, timestamptz NULL | unique supplier/kitchen/starts_at |
+| inventory_locations | id, kitchen_id, code, name, location_type, is_active | UUID, UUID, varchar, varchar, enum, bool | unique kitchen/code |
+| stock_receipts | id, kitchen_id, location_id, supplier_id, receipt_no, received_at, status, created_by_id, posted_at | UUID, UUID, UUID, UUID, varchar, timestamptz, enum, UUID, timestamptz NULL | unique kitchen/receipt_no |
+| stock_receipt_items | id, receipt_id, ingredient_id, quantity, unit_id, unit_cost, lot_code, manufactured_at, expiry_date | UUID, UUID, UUID, numeric, UUID, numeric NULL, varchar, date NULL, date NULL | quantity > 0 |
+| inventory_lots | id, kitchen_id, location_id, ingredient_id, supplier_id, receipt_item_id, lot_code, received_qty, remaining_qty, unit_id, received_at, expiry_date, status | UUID, UUID, UUID, UUID, UUID NULL, UUID NULL, varchar, numeric, numeric, UUID, timestamptz, date NULL, enum | 0 <= remaining <= received |
+| stock_movements | id, kitchen_id, movement_no, movement_type, status, occurred_at, actor_id, reason, reference_type, reference_id, posted_at | UUID, UUID, varchar, enum, enum, timestamptz, UUID, text NULL, varchar NULL, UUID NULL, timestamptz NULL | unique kitchen/movement_no |
+| stock_movement_items | id, movement_id, lot_id, quantity, from_location_id, to_location_id | UUID, UUID, UUID, numeric, UUID NULL, UUID NULL | quantity > 0 |
+
+- Mặc định mã lô unique theo (kitchen_id, ingredient_id, lot_code), vì nhà cung cấp có thể tái sử dụng mã lô giữa các nguyên liệu.
+- Một dòng StockReceiptItem đại diện một lot; nếu nhận nhiều lot vật lý thì tách dòng.
+- StockMovementItem không lưu signed quantity. MovementType xác định chiều tăng/giảm; from/to location xác định chuyển kho.
+- StockMovement POSTED là bất biến. Post receipt/movement phải transaction, khóa lot liên quan, kiểm tra số dư rồi mới cập nhật ledger/cache.
+- Lot thuộc đúng một Kitchen. Chuyển giữa hai bếp phải xuất ở bếp nguồn và nhập ở bếp đích, không đổi kitchenId của lot cũ.
+
+### 15.4. Data dictionary — món, công thức và duyệt
+
+| Bảng | Cột chính | Kiểu/NULL | Ràng buộc |
+|---|---|---|---|
+| dishes | id, kitchen_id, code, name, category_id, is_active, created_by_id, created_at | UUID, UUID, varchar, varchar, UUID NULL, bool, UUID, timestamptz | unique kitchen/code |
+| dish_versions | id, dish_id, version_no, status, yield_quantity, yield_unit_id, instructions, effective_from, created_by_id, created_at, released_at | UUID, UUID, int, enum, numeric, UUID, text, date NULL, UUID, timestamptz, timestamptz NULL | unique dish/version |
+| dish_ingredients | id, dish_version_id, ingredient_id, quantity, unit_id, preparation_note, edible_rate | UUID, UUID, UUID, numeric, UUID, text NULL, numeric NULL | quantity > 0 |
+| dish_nutritions | id, dish_version_id, nutrient_code, value, basis, method, calculated_at, source_snapshot | UUID, UUID, varchar, numeric, varchar, varchar, timestamptz, jsonb | unique version/nutrient/basis |
+| dish_approvals | id, school_id, dish_version_id, status, submitted_at, reviewed_by_id, reviewed_at, comment | UUID, UUID, UUID, enum, timestamptz, UUID NULL, timestamptz NULL, text NULL | unique school/version |
+| dish_approval_events | id, approval_id, action, actor_id, acted_at, comment | UUID, UUID, enum, UUID, timestamptz, text NULL | append-only |
+
+Dish thuộc Kitchen; DishVersion bất biến sau RELEASED. DishIngredient tham chiếu Ingredient/Unit chuẩn, tuyệt đối không tham chiếu InventoryLot. Một DishVersion có approval riêng cho từng School. Approval projection và approval event tách riêng để không ghi đè lịch sử khi gửi lại/duyệt lại. edible_rate thống nhất tỷ lệ 0..1 (ví dụ 0.85), không trộn với 85.
+
+### 15.5. Data dictionary — thực đơn và revision
+
+| Bảng | Cột chính | Kiểu/NULL | Ràng buộc |
+|---|---|---|---|
+| meal_plans | id, school_id, service_date, meal_type, status, created_at, cancelled_at, cancel_reason | UUID, UUID, date, MealType, enum, timestamptz, timestamptz NULL, text NULL | unique school/date/meal |
+| meal_plan_revisions | id, meal_plan_id, revision_no, kitchen_id, status, created_by_id, submitted_by_id, submitted_at, snapshot_at, reviewed_at | UUID, UUID, int, UUID, enum, UUID, UUID NULL, timestamptz NULL, timestamptz, timestamptz NULL | unique plan/revision |
+| meal_plan_revision_items | id, revision_id, dish_version_id, sequence, course_type, display_name_snapshot | UUID, UUID, UUID, int, enum/varchar, varchar | unique revision/sequence |
+| meal_plan_age_groups | id, revision_id, age_group_id, servings | UUID, UUID, UUID, int | unique revision/age group; servings > 0 |
+| meal_plan_item_age_groups | id, revision_item_id, age_group_id, portion_factor, portion_quantity, portion_unit_id, servings | UUID, UUID, UUID, numeric, numeric NULL, UUID NULL, int NULL | unique item/age group |
+| meal_plan_approval_events | id, revision_id, action, actor_id, acted_at, comment | UUID, UUID, enum, UUID, timestamptz, text NULL | append-only |
+
+- MealPlan giữ unique (schoolId, serviceDate, mealType).
+- MealPlanRevision unique (mealPlanId, revisionNo); tối đa một revision SUBMITTED trên một MealPlan.
+- MealPlanAgeGroup là nguồn số suất chuẩn. Item-age servings nullable: null nghĩa là kế thừa số suất nhóm tuổi; có giá trị nghĩa là số suất riêng của món/nhóm tuổi.
+- Revision APPROVED cũ tiếp tục có hiệu lực đến khi revision mới được duyệt; sau đó mới đánh dấu SUPERSEDED.
+- Cần partial unique index/trigger cho một revision SUBMITTED và một revision APPROVED hiện hành; Prisma không biểu diễn đầy đủ mọi partial unique.
+- Enum đề xuất: MealPlanRevisionStatus DRAFT/SUBMITTED/RETURNED/APPROVED/REJECTED/SUPERSEDED/WITHDRAWN. CourseType cần danh mục mã ổn định, nhãn tiếng Việt nằm ở UI.
+
+### 15.6. Data dictionary — sản xuất, giao nhận và an toàn thực phẩm
+
+| Bảng | Cột chính | Kiểu/NULL | Ràng buộc |
+|---|---|---|---|
+| production_batches | id, kitchen_id, school_id, revision_id, batch_no, status, planned_at, started_at, completed_at, created_by_id | UUID, UUID, UUID, UUID, varchar, enum, timestamptz, timestamptz NULL, timestamptz NULL, UUID | unique revision/batch_no |
+| production_batch_items | id, batch_id, revision_item_id, planned_servings, produced_servings, accepted_servings | UUID, UUID, UUID, int, int, int NULL | unique batch/revision item |
+| production_requirements | id, batch_item_id, ingredient_id, planned_quantity, unit_id, calculation_snapshot | UUID, UUID, UUID, numeric, UUID, jsonb | unique batch item/ingredient/unit |
+| production_consumptions | id, batch_item_id, ingredient_id, lot_id, actual_quantity, unit_id, movement_item_id | UUID, UUID, UUID, UUID, numeric, UUID, UUID | quantity > 0 |
+| production_wastes | id, batch_item_id, ingredient_id, lot_id, quantity, unit_id, reason, recorded_by_id, recorded_at | UUID, UUID, UUID NULL, UUID NULL, numeric, UUID, text, UUID, timestamptz | reason bắt buộc |
+| deliveries | id, kitchen_id, school_id, batch_id, delivery_no, status, dispatched_at, delivered_at, driver_name, vehicle_info | UUID, UUID, UUID, UUID, varchar, enum, timestamptz NULL, timestamptz NULL, varchar NULL, varchar NULL | unique kitchen/delivery_no |
+| delivery_items | id, delivery_id, batch_item_id, revision_item_id, sent_quantity, unit_id | UUID, UUID, UUID, UUID, numeric, UUID | quantity >= 0 |
+| delivery_receipts | id, delivery_id, received_by_id, received_at, status, comment, evidence | UUID, UUID, UUID, timestamptz, enum, text NULL, jsonb NULL | unique delivery cho receipt cuối |
+| delivery_receipt_items | id, receipt_id, delivery_item_id, received_quantity, rejected_quantity, condition, reason | UUID, UUID, UUID, numeric, numeric, enum, text NULL | unique receipt/delivery item |
+| delivery_incidents | id, delivery_id, school_id, reported_by_id, incident_type, description, occurred_at, resolution_status | UUID, UUID, UUID, UUID, enum, text, timestamptz, enum | school scope khớp delivery |
+| kitchen_inspections | id, kitchen_id, checked_by_id, checked_at, category, status, notes, evidence | UUID, UUID, timestamptz, varchar, enum, text NULL, jsonb NULL | index kitchen/checked_at |
+| audit_logs | id, actor_id, action, resource_type, resource_id, occurred_at, reason, request_id, before_data, after_data | UUID, UUID NULL, varchar, varchar, UUID, timestamptz, text NULL, varchar NULL, jsonb NULL, jsonb NULL | index resource và actor/time |
+
+FoodSafetyCheck hiện tại tiếp tục dành cho kiểm tra tại trường; KitchenInspection dành cho kiểm tra tại bếp. ProductionConsumption phải tham chiếu StockMovementItem để chứng minh lượng xuất kho thực tế.
+
+### 15.7. ERD Mermaid — quan hệ cốt lõi
+
+```mermaid
+erDiagram
+  WARD ||--o{ SCHOOL : governs
+  WARD ||--o{ KITCHEN : locates
+  SCHOOL ||--o| KITCHEN : on_site
+  KITCHEN ||--o{ KITCHEN_SCHOOL_ASSIGNMENT : serves
+  SCHOOL ||--o{ KITCHEN_SCHOOL_ASSIGNMENT : assigned
+  KITCHEN ||--o{ USER : employs
+  SCHOOL ||--o{ USER : employs
+
+  SUPPLIER ||--o{ SUPPLIER_KITCHEN : approved_for
+  KITCHEN ||--o{ SUPPLIER_KITCHEN : uses
+  KITCHEN ||--o{ INVENTORY_LOCATION : owns
+  INVENTORY_LOCATION ||--o{ INVENTORY_LOT : stores
+  INGREDIENT ||--o{ INVENTORY_LOT : identifies
+  SUPPLIER ||--o{ STOCK_RECEIPT : supplies
+  STOCK_RECEIPT ||--|{ STOCK_RECEIPT_ITEM : contains
+  STOCK_RECEIPT_ITEM ||--o| INVENTORY_LOT : creates
+  KITCHEN ||--o{ STOCK_MOVEMENT : records
+  STOCK_MOVEMENT ||--|{ STOCK_MOVEMENT_ITEM : contains
+  INVENTORY_LOT ||--o{ STOCK_MOVEMENT_ITEM : moved
+
+  KITCHEN ||--o{ DISH : owns
+  DISH ||--|{ DISH_VERSION : versions
+  DISH_VERSION ||--|{ DISH_INGREDIENT : contains
+  INGREDIENT ||--o{ DISH_INGREDIENT : used_in
+  DISH_VERSION ||--o{ DISH_APPROVAL : submitted
+  SCHOOL ||--o{ DISH_APPROVAL : reviews
+
+  SCHOOL ||--o{ MEAL_PLAN : owns
+  MEAL_PLAN ||--|{ MEAL_PLAN_REVISION : revisions
+  KITCHEN ||--o{ MEAL_PLAN_REVISION : proposes
+  MEAL_PLAN_REVISION ||--|{ MEAL_PLAN_REVISION_ITEM : contains
+  DISH_VERSION ||--o{ MEAL_PLAN_REVISION_ITEM : selected
+  MEAL_PLAN_REVISION ||--o{ MEAL_PLAN_AGE_GROUP : allocates
+  AGE_GROUP ||--o{ MEAL_PLAN_AGE_GROUP : classifies
+  MEAL_PLAN_REVISION ||--o{ MEAL_PLAN_APPROVAL_EVENT : audited
+
+  MEAL_PLAN_REVISION ||--o{ PRODUCTION_BATCH : produces
+  PRODUCTION_BATCH ||--|{ PRODUCTION_BATCH_ITEM : contains
+  PRODUCTION_BATCH_ITEM ||--o{ PRODUCTION_CONSUMPTION : consumes
+  INVENTORY_LOT ||--o{ PRODUCTION_CONSUMPTION : source
+  PRODUCTION_BATCH ||--o{ DELIVERY : dispatches
+  DELIVERY ||--|{ DELIVERY_ITEM : contains
+  DELIVERY ||--o| DELIVERY_RECEIPT : acknowledged
+  DELIVERY_RECEIPT ||--|{ DELIVERY_RECEIPT_ITEM : checks
+```
+
+ERD này biểu diễn quan hệ nghiệp vụ trọng tâm, không thay thế FK/index/check/partial unique. Các invariant như lot và stock movement cùng Kitchen cần composite FK hoặc DB trigger/service transaction.
+
+### 15.8. Data profiling — hiện trạng đã biết và việc phải chạy lại
+
+Kết quả read-only audit gần nhất được ghi nhận trong dự án:
+- Ward: 1; School: 1; Kitchen: 1; KitchenSchoolAssignment: 1; User: 6.
+- Supplier: 0; Ingredient: 0; InventoryLot: 0; Dish: 0; MealPlan: 0; MealPlanItem: 0; TraceEvent: 0; FoodSafetyCheck: 0.
+- Kitchen hiện có là Bếp Long Hoa, type CENTRAL; assignment nối bếp này với TH Phạm Hùng.
+- Hai user role SCHOOL_KITCHEN có schoolId và không có kitchenId; theo dữ liệu đã kiểm tra đây là nhân viên tiếp nhận tại trường, không được tự chuyển thành nhân viên bếp.
+- User CENTRAL_KITCHEN đang gắn kitchenId bếp trung tâm.
+
+Các số liệu trên là kết quả audit trước đó, không phải xác nhận DB đang chạy tại thời điểm viết mục 15. Trước migration phải chạy lại truy vấn và lưu kết quả kèm timestamp.
+
+Read-only profiling bắt buộc:
+1. Đếm tổng và null count cho mọi FK/field sẽ đổi.
+2. Tìm orphan FK ở Supplier, InventoryLot, Dish, MealPlanItem, TraceEvent.
+3. Phân tích giá trị Ingredient.unit/category và cấu trúc Dish.recipe JSON.
+4. Kiểm tra Supplier.schoolId có thể ánh xạ sang Kitchen nào qua chứng từ và assignment tại thời điểm giao dịch.
+5. Kiểm tra InventoryLot.schoolId: xác định Kitchen owner theo chứng từ nhập và lịch sử tại receivedAt; không suy luận từ assignment hiện tại.
+6. Phân loại Dish.recipe JSON có thể chuyển thành DishVersion/DishIngredient và cấu trúc cần xử lý thủ công.
+7. Kiểm tra MealPlanItem có Dish tương ứng; tổng servings có nhất quán với MealPlan.servings không.
+8. Kiểm tra KitchenSchoolAssignment overlap, khoảng ngày bất hợp lệ và lịch sử.
+9. Xuất exception report CSV gồm source table/id, lý do, phương án đề xuất và người xác nhận; không tự chọn giá trị cho dữ liệu mơ hồ.
+
+### 15.9. Chiến lược chuyển đổi dữ liệu — additive, backfill, validate, contract
+
+**Phase 0 — Freeze và snapshot**
+- Chốt schema hiện tại, commit SHA, migration status và backup PostgreSQL.
+- Chạy data profiling read-only; lưu exception report và số liệu đối soát.
+- Không sửa dữ liệu nghiệp vụ trong quá trình kiểm kê.
+
+**Phase 1 — Additive schema**
+- Tạo bảng danh mục chuẩn Unit, IngredientCategory, AgeGroup, Allergen.
+- Tạo SupplierKitchen, InventoryLocation, StockReceipt/Items, StockMovement/Items.
+- Tạo DishVersion/Ingredient/Approval events.
+- Tạo MealPlanRevision/Items/AgeGroups/Approval events.
+- Tạo Production/Delivery/Inspection/Audit tables.
+- Thêm cột nullable mới cần backfill; chưa drop school_id, recipe, dish_id, servings cũ.
+- Tạo index; với index lớn dùng chiến lược concurrent nếu môi trường cho phép.
+
+**Phase 2 — Backfill master và scope**
+- Map Ingredient.unit sang Unit bằng bảng mapping được duyệt; đơn vị không rõ vào exception.
+- Map Ingredient.category sang IngredientCategory; giữ raw value để đối chiếu.
+- Tạo InventoryLocation mặc định cho từng Kitchen sau khi chủ sở hữu kho được xác nhận.
+- Map Supplier sang pháp nhân dùng chung; tạo SupplierKitchen chỉ khi có bằng chứng supplier–kitchen.
+- Không chuyển Supplier.schoolId sang kitchen dựa đơn thuần vào assignment hiện tại.
+
+**Phase 3 — Backfill lot/ledger**
+- Với mỗi InventoryLot cũ, xác định Kitchen owner theo chứng từ nhập và lịch sử vận hành tại receivedAt.
+- Nếu không xác định được, không gán bừa; đưa vào exception staging để xác minh.
+- Sau xác minh, tạo InventoryLot thuộc Kitchen/Location và opening-balance StockMovement tham chiếu lot cũ.
+- Đối chiếu quantity, remainingQty, unit, receivedAt, expiryDate, supplier, lotCode; tổng số dư sau chuyển phải bằng số dư nguồn đã xác minh.
+- Giữ TraceEvent cũ và ánh xạ sang lot mới qua mapping table; không xóa event.
+
+**Phase 4 — Backfill món và công thức**
+- Xác định Kitchen owner từng Dish từ bằng chứng nguồn; không mặc định mọi món thuộc bếp trung tâm.
+- Chuyển recipe JSON thành DishVersion/DishIngredient chỉ khi parser xác nhận cấu trúc và map được ingredient/unit.
+- JSON không parse được hoặc ingredient không xác định vào exception; lưu raw JSON để bảo toàn.
+- DishVersion backfill mang trạng thái LEGACY_IMPORTED/DRAFT_REVIEW (cần bổ sung enum nếu được duyệt), không tự đánh dấu APPROVED.
+- Chỉ tạo DishApproval APPROVED khi có hồ sơ duyệt lịch sử kiểm chứng được; nếu không phải duyệt lại.
+
+**Phase 5 — Backfill thực đơn**
+- Mỗi MealPlan cũ trở thành root; MealPlanItem chuyển vào revision đầu tiên.
+- Xác định kitchenId từ tác giả/audit/assignment tại serviceDate; thiếu bằng chứng thì exception.
+- MealPlan.servings cũ không thể tự chia cho AgeGroup nếu thiếu dữ liệu nhóm tuổi. Không nhân bản tổng servings cho mọi nhóm.
+- MealPlanItem.dishId phải map sang DishVersion cụ thể. Nếu không có version lịch sử, tạo legacy snapshot và đánh dấu LEGACY_IMPORTED; không coi là đã duyệt.
+- Chỉ revision có chứng cứ duyệt lịch sử mới được backfill APPROVED.
+- Giữ nguyên MealPlan id và unique (schoolId, serviceDate, mealType).
+
+**Phase 6 — Validate và cutover**
+- So sánh row counts, tổng tồn theo lot/ingredient/kitchen, số thực đơn/item, tổng servings và quan hệ FK trước/sau.
+- Kiểm tra mọi lot có kitchen/location; movement item cùng Kitchen với lot; revision có school/root và kitchen hợp lệ.
+- Chạy shadow-read đối chiếu API cũ/mới; chỉ chuyển write path khi kết quả đạt.
+- Giữ read-only legacy columns trong một chu kỳ đối soát.
+- Chỉ drop cột/bảng cũ ở phase contract riêng, sau backup, kiểm tra không còn code/API phụ thuộc và có phê duyệt.
+- Có rollback plan: khôi phục backup hoặc quay lại read path cũ; không xóa dữ liệu nguồn trước khi đối soát xong.
+
+### 15.10. Điều kiện nghiệm thu trước migration
+
+- [ ] Data dictionary được duyệt: enum, precision, nullability, defaults, FK và delete policy.
+- [ ] ERD Mermaid được duyệt bởi nghiệp vụ và kỹ thuật.
+- [ ] Mỗi dữ liệu cũ có mapping xác định hoặc exception có người chịu trách nhiệm.
+- [ ] Supplier và InventoryLot có quy tắc xác định Kitchen owner theo thời điểm.
+- [ ] Dish.recipe JSON có parser/mapping và báo cáo lỗi.
+- [ ] MealPlan legacy có chính sách kitchen proposer, age group và approval history.
+- [ ] Có backup/restore rehearsal và row-count/balance reconciliation.
+- [ ] Có thứ tự migration additive/backfill/validate/contract và rollback.
+- [ ] Không còn API/frontend phụ thuộc field cũ trước khi contract.
+- [ ] Prisma schema được cập nhật và prisma validate/generate thành công trong branch riêng; chưa deploy migration cho tới khi review hoàn tất.
+
