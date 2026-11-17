@@ -60,6 +60,7 @@ import { demoData, demo, demoMealViewer, schools as demoSchools } from "./lib/da
 import type { DayData, PublicInspection, School } from "./lib/data";
 import { centralKitchenRouteAccess, useUI } from "./lib/store";
 import { getManagedSchools } from "./lib/usersApi";
+import { getStoredUser } from "./lib/authApi";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
 import AuthGate from "./AuthGate";
@@ -90,6 +91,7 @@ const PortionTracePage = lazy(() => import("./PortionTracePage"));
 const BoardingMenuManager = lazy(() => import("./BoardingMenuManager"));
 const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
 const FeedbackForm = lazy(() => import("./FeedbackForm"));
+const CentralKitchenManagementPanel = lazy(() => import("./CentralKitchenManagement"));
 const roleLabels: Record<ViewRole, string> = {
   parent: "Phụ huynh",
   school_board: "Ban Giám hiệu",
@@ -1061,6 +1063,7 @@ function Shell() {
     parentMealType === "LUNCH" ? data : parentMealQuery.data;
   const parentReadyEvent = parentMealData?.events.find(event => event.status === "READY");
   const parentReadyPhoto = parentReadyEvent?.confirmed ? parentReadyEvent.photos[0] : undefined;
+  const isWardAdminAccount = getStoredUser()?.role === "UBND_ADMIN";
   const adminNav = adminNavigation.filter((item) => {
     if (item.path === "/quan-ly-hoc-sinh" && role !== "school_board") return false;
     if (item.path === "/quan-ly-tai-khoan" && role !== "school_board") return false;
@@ -1073,7 +1076,7 @@ function Shell() {
     role === "parent"
       ? navigation
       : role === "culture_social_office"
-        ? adminNav
+        ? [...adminNav, ...(isWardAdminAccount ? [{ path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])]
         : role === "school_kitchen"
           ? [...adminNav.slice(0, 2), { path: "/tao-mon", label: "Tạo món & dinh dưỡng", icon: CookingPot }, ...adminNav.slice(2)]
           : role === "central_kitchen" && centralKitchenRouteAccess[kitchenRole].includes("/tao-mon")
@@ -1400,7 +1403,7 @@ function Shell() {
               </span>
             </div>
           </SpotlightCard>
-          {role === "culture_social_office" && (
+          {role === "culture_social_office" && !isWardAdminAccount && (
             <div className="ward-readonly-banner" role="status">
               <ShieldCheck size={20} />
               <div>
@@ -1415,7 +1418,7 @@ function Shell() {
           )}
           {role !== "parent" ? (
             <>
-              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan"].includes(location.pathname) && (
+              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam"].includes(location.pathname) && (
                 <Suspense
                   fallback={
                     <div className="loading-grid">
@@ -1427,6 +1430,11 @@ function Shell() {
                 </Suspense>
               )}
               {location.pathname === "/quan-ly-tai-khoan" && role === "school_board" && <UserManagement />}
+              {location.pathname === "/quan-ly-bep-trung-tam" && isWardAdminAccount && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <CentralKitchenManagementPanel />
+                </Suspense>
+              )}
               {sharedAdminArea && (
                 <div className="section-toolbar shared-admin-toolbar">
                   <div className="segmented">
