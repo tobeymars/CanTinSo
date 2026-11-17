@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
+import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { AuthUser, CurrentUser } from "../common/current-user.decorator";
 import { Roles } from "../common/roles.decorator";
@@ -9,6 +9,12 @@ import { SchoolsService } from "./schools.service";
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SchoolsController {
   constructor(private readonly schools: SchoolsService) {}
+
+  @Get("me/overview")
+  @Roles("SCHOOL_ADMIN")
+  getMyOverview(@CurrentUser() user: AuthUser, @Query("date") date: string) {
+    return this.schools.getMyOverview(user, date);
+  }
 
   @Get()
   @Roles("SUPER_ADMIN", "UBND_ADMIN")
