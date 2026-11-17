@@ -198,3 +198,82 @@ Hai tài khoản hiện có role `SCHOOL_KITCHEN` và `schoolId=TH Phạm Hùng`
 | Xác nhận giao nhận tại trường | Không xác nhận thay bên nhận | Không xác nhận thay bên nhận nếu chính bếp là bên giao | Có thể giám sát | Có, school scope |
 
 Quyền tạo thực đơn cho bếp trường cần gắn với tài khoản thực sự thuộc Kitchen (kitchenId), không cấp cho mọi User có schoolId. Không thay đổi enum role hiện tại cho đến khi có thiết kế role/scope và kế hoạch chuyển đổi riêng.
+
+## 10. Đối chiếu phân quyền backend và frontend (rà soát ngày 17/11/2026)
+
+### 10.1. Nguyên tắc thiết kế
+
+- Role xác định nhóm nghiệp vụ; scope xác định phạm vi dữ liệu. Không xem role là bằng chứng đủ để truy cập mọi bản ghi.
+- Mỗi request phải lấy danh tính và scope từ phiên đã xác thực ở backend. Không tin `schoolId`, `wardId`, `kitchenId` do frontend gửi lên để quyết định quyền.
+- `SCHOOL_KITCHEN` hiện được giữ cho nhân viên tiếp nhận suất ăn tại trường (school receiver), có `schoolId`, không mặc định là nhân sự vận hành Kitchen.
+- Nhân sự vận hành bếp trường phải gắn với `kitchenId` của bản ghi `Kitchen.type = SCHOOL`; nhân sự bếp trung tâm phải gắn với `kitchenId` của `Kitchen.type = CENTRAL`.
+- Các role nghiệp vụ bếp dùng chung cho hai loại bếp (quản lý, dinh dưỡng, kho) chỉ được phép hoạt động trong đúng kitchen scope. Loại bếp quyết định những nghiệp vụ được phép thực hiện.
+- BGH hoặc người được trường ủy quyền là bên duyệt thực đơn. Nhân viên tiếp nhận suất ăn không có quyền lập/duyệt thực đơn chỉ vì đang có `schoolId`.
+
+### 10.2. Ma trận role và scope mục tiêu
+
+| Backend role | Scope bắt buộc | Quyền chính | Không được mặc định |
+|---|---|---|---|
+| `SUPER_ADMIN` | Toàn hệ thống | Quản trị và giám sát toàn hệ thống; thao tác theo đơn vị được chọn có kiểm tra rõ ràng | Không được bỏ qua kiểm tra tính hợp lệ của đơn vị mục tiêu |
+| `UBND_ADMIN` | `wardId` | Quản lý bếp trung tâm thuộc phường; phân công bếp cho trường trong phường; xem giám sát trong địa bàn | Không xem/sửa dữ liệu phường khác |
+| `SCHOOL_ADMIN` | `schoolId` | Quản trị trường; quản lý nhân sự thuộc trường; duyệt/trả lại phiên bản thực đơn; giám sát giao nhận | Không sửa kho/công thức của bếp trung tâm |
+| `CENTRAL_KITCHEN` | `kitchenId`, Kitchen.type=CENTRAL | Tài khoản quản trị/đầu mối bếp trung tâm; quản lý bếp trong phạm vi được cấp; lập đề xuất thực đơn cho trường đang được phân công | Không thao tác bếp trung tâm khác hoặc trường ngoài assignment |
+| `KITCHEN_MANAGER` | `kitchenId` | Điều hành bếp, phân công công việc và nghiệp vụ bếp được cấp | Không truy cập bếp khác |
+| `NUTRITIONIST` | `kitchenId` | Công thức, định lượng, dinh dưỡng và đề xuất thực đơn | Không tự duyệt thực đơn thay trường |
+| `WAREHOUSE_STAFF` | `kitchenId` | Nhập, xuất, kiểm kê, lô hàng và tồn kho của bếp | Không thao tác kho của bếp khác |
+| `SCHOOL_KITCHEN` | `schoolId` | Tiếp nhận suất ăn, kiểm đếm, kiểm tra chất lượng, xác nhận giao nhận, báo cáo sự cố | Không quản lý công thức, nhà cung cấp, mua hàng, tồn kho hoặc sản xuất của bếp |
+| `SCHOOL_STAFF` | `schoolId` | Nghiệp vụ trường học được phân quyền cụ thể | Không mặc định có quyền quản trị học sinh hoặc bếp |
+| `PARENT` | Liên kết tài khoản-phụ huynh-học sinh | Xem dữ liệu được phép của học sinh được liên kết | Không truy cập dữ liệu học sinh khác |
+
+Ghi chú: `CENTRAL_KITCHEN` là role đầu mối hiện hữu được tạo cùng hồ sơ bếp trung tâm. `KITCHEN_MANAGER`, `NUTRITIONIST`, `WAREHOUSE_STAFF` là role nhân sự bếp hiện hữu trong enum. Chưa đổi enum hoặc tạo role mới trong bước thiết kế này. Việc phân tách quyền theo loại bếp và quyền tác vụ cần được hiện thực bằng policy/service guard sau khi thống nhất.
+
+### 10.3. Đối chiếu frontend hiện tại
+
+| Backend role / nhóm | Ánh xạ frontend hiện tại | Kết quả rà soát |
+|---|---|---|
+| `SUPER_ADMIN` | `school_board` | Đang dùng chung không gian BGH; cần tách quyền quản trị toàn hệ thống khỏi giao diện trường |
+| `SCHOOL_ADMIN` | `school_board` | Phù hợp không gian BGH |
+| `UBND_ADMIN` | `culture_social_office` | Có giao diện quản lý bếp trung tâm khi tài khoản là UBND |
+| `CENTRAL_KITCHEN` | `central_kitchen` | Có workspace bếp trung tâm |
+| `SCHOOL_KITCHEN` | `school_kitchen` | Sai với nghiệp vụ đã chốt: tài khoản hiện hữu là nhân viên tiếp nhận tại trường, không mặc định là nhân sự bếp |
+| `KITCHEN_MANAGER`, `NUTRITIONIST`, `WAREHOUSE_STAFF` | Chưa ánh xạ | AuthGate không tìm thấy workspace và từ chối hiển thị ứng dụng |
+| `SCHOOL_STAFF` | Chưa ánh xạ | AuthGate không tìm thấy workspace |
+| `PARENT` | `parent` | Có workspace, nhưng cần hoàn thiện kiểm tra quan hệ phụ huynh-học sinh ở backend |
+
+Frontend hiện có các view legacy `school_receiver` và `meal_service_staff`, nhưng chúng không thuộc tập `ActiveViewRole`; bộ chọn demo hiện chỉ có năm workspace. View demo và localStorage không phải cơ chế phân quyền bảo mật. Các thao tác thật phải được backend xác thực và kiểm tra scope.
+
+### 10.4. Các sai lệch backend đã xác định
+
+1. `RolesGuard` hiện chỉ kiểm tra danh sách role từ decorator, không kiểm tra `schoolId`, `wardId`, `kitchenId`. Scope hiện được kiểm tra rải rác trong từng service; cần policy thống nhất và kiểm thử truy cập chéo đơn vị.
+2. `UsersService.create`: BGH tạo `SCHOOL_KITCHEN` hoặc `SCHOOL_STAFF` bằng cách gán `schoolId`; chưa có luồng tạo user vận hành bếp trường gắn `kitchenId`.
+3. DTO tạo user chưa nhận `kitchenId`; DTO cập nhật cũng chưa có trường này. Không bổ sung trường này theo cách cho client tự chọn kitchenId; backend phải suy ra hoặc xác minh từ quyền quản trị và quan hệ Kitchen-School.
+4. `SCHOOL_KITCHEN` hiện nằm trong nhóm role có school scope; cần giữ điều này cho nhân viên tiếp nhận, không chuyển các tài khoản hiện hữu sang kitchen scope.
+5. `CENTRAL_KITCHEN` được tạo cùng hồ sơ bếp và gắn kitchenId. Tuy nhiên các role nhân sự bếp khác chưa có luồng tạo/gán/quản lý tài khoản gắn cùng kitchen.
+6. `StudentsController` và `AttendanceController` khai báo SUPER_ADMIN có quyền, nhưng các service hiện yêu cầu user có schoolId. Cần quy định rõ SUPER_ADMIN phải chọn school scope hợp lệ cho từng thao tác; không tự ý bỏ điều kiện scope.
+7. `AttendanceController` không cho UBND truy cập dữ liệu giám sát điểm danh; đây không phải mặc định là lỗi, cần tách rõ dữ liệu điểm danh học sinh khỏi báo cáo giám sát bữa ăn.
+8. `StudentBulkImportController` khai báo SUPER_ADMIN, nhưng import service chỉ làm việc với schoolId từ user; cần một cơ chế chọn trường được backend kiểm tra nếu tiếp tục cho SUPER_ADMIN sử dụng.
+9. Tài khoản PARENT có workspace frontend nhưng chưa thấy quan hệ user-parent-student trong schema hiện tại; chưa đủ cơ sở để mở API dữ liệu riêng tư cho phụ huynh.
+10. Một số nghiệp vụ frontend hiện còn dùng dữ liệu DEMO/localStorage (ví dụ danh mục món trong KitchenDishCatalog); không được xem thao tác trên giao diện demo là luồng nghiệp vụ backend đã hoàn tất.
+
+### 10.5. Lộ trình triển khai sau khi chốt thiết kế
+
+1. Giữ nguyên các role và dữ liệu tài khoản hiện có; không đổi role `SCHOOL_KITCHEN` hiện hữu.
+2. Thống nhất ma trận permission theo tác vụ (read/create/update/submit/approve/receive/issue stock), phân biệt theo Kitchen.type và scope.
+3. Thiết kế luồng quản trị nhân sự bếp: UBND/SUPER_ADMIN quản lý đầu mối bếp trung tâm; đầu mối/quản lý bếp tạo nhân sự bếp trong cùng kitchen; BGH quản lý nhân viên trường và nhân viên tiếp nhận.
+4. Thiết kế backend scope policy dùng lại được; mọi truy vấn và mutation phải ràng buộc scope tại service/database query, có kiểm thử IDOR/truy cập chéo trường, phường và bếp.
+5. Sửa AuthGate để ánh xạ `SCHOOL_KITCHEN` sang workspace tiếp nhận tại trường; ánh xạ các role bếp theo kitchen scope; không cấp quyền chỉ bằng cách đổi view role.
+6. Tách workspace SUPER_ADMIN khỏi SCHOOL_ADMIN; bổ sung cơ chế chọn đơn vị mục tiêu có kiểm tra ở backend.
+7. Hoàn thiện quan hệ phụ huynh-học sinh trước khi cấp dữ liệu cá nhân cho PARENT.
+8. Sau khi permission matrix, API contract và test cases được duyệt mới triển khai code; sau đó mới đánh giá thay đổi Prisma schema/migration. Không tạo migration trong giai đoạn thiết kế.
+
+### 10.6. Kiểm thử phân quyền bắt buộc
+
+- UBND phường A không đọc/ghi được trường, bếp hoặc user thuộc phường B.
+- Bếp trung tâm A không đọc/ghi công thức, kho, lô hàng, sản xuất hoặc đề xuất thực đơn của bếp B.
+- Bếp trung tâm chỉ lập đề xuất cho trường có assignment hiệu lực tại ngày phục vụ.
+- Bếp trường chỉ thao tác dữ liệu của Kitchen.type=SCHOOL gắn với chính tài khoản; không dùng schoolId đơn thuần để cấp quyền vận hành bếp.
+- Nhân viên tiếp nhận `SCHOOL_KITCHEN` chỉ thao tác tiếp nhận/giao nhận của trường mình; không truy cập API kho, công thức, mua hàng, sản xuất.
+- BGH chỉ duyệt thực đơn của trường mình; không duyệt thực đơn trường khác.
+- SUPER_ADMIN khi thao tác nghiệp vụ có đối tượng trường/bếp phải chỉ định đối tượng hợp lệ; API không được bỏ lọc chỉ vì role toàn cục.
+- Tài khoản không hoạt động bị từ chối; tài khoản bị đổi scope phải có hiệu lực ngay ở request tiếp theo.
+- PARENT chỉ xem học sinh đã được liên kết và được người giám hộ xác minh.
