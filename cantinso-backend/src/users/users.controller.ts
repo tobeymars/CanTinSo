@@ -11,18 +11,18 @@ import { CreateCentralKitchenDto } from './dto/create-central-kitchen.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'SCHOOL_ADMIN')
+@Roles('SUPER_ADMIN', 'SCHOOL_ADMIN', 'UBND_ADMIN')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Get('central-kitchens')
-  @Roles('SUPER_ADMIN')
+  @Roles('SUPER_ADMIN', 'UBND_ADMIN')
   listCentralKitchens(@CurrentUser() user: AuthUser) {
     return this.users.listCentralKitchens(user);
   }
 
   @Post('central-kitchens')
-  @Roles('SUPER_ADMIN')
+  @Roles('SUPER_ADMIN', 'UBND_ADMIN')
   createCentralKitchen(@CurrentUser() user: AuthUser, @Body() dto: CreateCentralKitchenDto) {
     return this.users.createCentralKitchen(user, dto);
   }
