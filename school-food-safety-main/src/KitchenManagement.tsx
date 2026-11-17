@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Building2, CookingPot, MapPin, Phone, Users } from "lucide-react";
+import { AlertCircle, CookingPot } from "lucide-react";
 import { getMyKitchen, type MyKitchen } from "./lib/usersApi";
 import { getStoredUser } from "./lib/authApi";
 
