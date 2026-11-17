@@ -1182,7 +1182,7 @@ function Shell() {
             <small>
               {role === "parent"
                 ? "Đồng hành cùng nhà trường"
-                : "Không gian làm việc DEMO"}
+                : isRealSchoolAdmin ? "Quản lý trường được phân công" : "Không gian làm việc DEMO"}
             </small>
           </div>
           <span className="small-dot" />
@@ -1226,14 +1226,25 @@ function Shell() {
             Trung tâm hỗ trợ
             <ArrowRight size={15} />
           </button>
-          <button className="profile" onClick={() => setModal("login")}>
-            <span className="avatar">PH</span>
-            <span>
-              {displayRole}
-              <small>Chuyển không gian DEMO</small>
-            </span>
-            <LogIn size={17} />
-          </button>
+          {isRealSchoolAdmin ? (
+            <div className="profile" aria-label="Tài khoản Ban Giám hiệu">
+              <span className="avatar">BGH</span>
+              <span>
+                Ban Giám hiệu
+                <small>Tài khoản hệ thống</small>
+              </span>
+              <ShieldCheck size={17} />
+            </div>
+          ) : (
+            <button className="profile" onClick={() => setModal("login")}>
+              <span className="avatar">PH</span>
+              <span>
+                {displayRole}
+                <small>Chuyển không gian DEMO</small>
+              </span>
+              <LogIn size={17} />
+            </button>
+          )}
         </div>
       </aside>
       <div className="main-wrap">
