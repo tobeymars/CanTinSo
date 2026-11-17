@@ -90,6 +90,8 @@ export type CentralKitchen = {
   phone: string | null;
   capacity: number | null;
   isActive: boolean;
+  wardId: string | null;
+  ward: { id: string; name: string; code: string | null } | null;
   schools: { school: { id: string; name: string; code: string | null } }[];
   users: CentralKitchenUser[];
 };
