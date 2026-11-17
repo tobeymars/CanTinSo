@@ -66,6 +66,9 @@ DECLARE
   school_ward UUID;
 BEGIN
   IF NEW."is_active" = true AND NEW."ends_at" IS NULL THEN
+    -- Serialize provider changes for this school across kitchen tables.
+    PERFORM 1 FROM "schools" WHERE "id" = NEW."school_id" FOR UPDATE;
+
     SELECT "ward_id" INTO kitchen_ward
     FROM "kitchens"
     WHERE "id" = NEW."kitchen_id" AND "type" = 'CENTRAL' AND "is_active" = true;
@@ -106,6 +109,10 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
+  IF NEW."type" = 'SCHOOL' AND NEW."is_active" = true THEN
+    PERFORM 1 FROM "schools" WHERE "id" = NEW."school_id" FOR UPDATE;
+  END IF;
+
   IF NEW."type" = 'SCHOOL' AND NEW."is_active" = true AND EXISTS (
     SELECT 1 FROM "kitchen_school_assignments"
     WHERE "school_id" = NEW."school_id"
@@ -122,3 +129,30 @@ CREATE TRIGGER "on_site_kitchen_provider_exclusivity_trigger"
 BEFORE INSERT OR UPDATE OF "is_active", "school_id", "type" ON "kitchens"
 FOR EACH ROW
 EXECUTE FUNCTION "enforce_on_site_kitchen_provider_exclusivity"();
+
+-- A school cannot change wards while it has an active central-kitchen assignment
+-- that would become cross-ward. End the assignment first.
+CREATE OR REPLACE FUNCTION "prevent_school_ward_change_with_active_kitchen"()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW."ward_id" IS DISTINCT FROM OLD."ward_id" AND EXISTS (
+    SELECT 1
+    FROM "kitchen_school_assignments" a
+    JOIN "kitchens" k ON k."id" = a."kitchen_id"
+    WHERE a."school_id" = NEW."id"
+      AND a."is_active" = true
+      AND a."ends_at" IS NULL
+      AND k."ward_id" IS DISTINCT FROM NEW."ward_id"
+  ) THEN
+    RAISE EXCEPTION 'End the active central kitchen assignment before moving this school to another ward.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "prevent_school_ward_change_with_active_kitchen_trigger"
+BEFORE UPDATE OF "ward_id" ON "schools"
+FOR EACH ROW
+EXECUTE FUNCTION "prevent_school_ward_change_with_active_kitchen"();
