@@ -360,3 +360,228 @@ Frontend hiện có các view legacy `school_receiver` và `meal_service_staff`,
 - Không cho nhân viên tiếp nhận tại trường thao tác kho/sản xuất của bếp.
 - Chưa triển khai API nghiệp vụ thực đơn/kho/giao nhận trong bước này. Trước khi code cần chốt API contract, DTO, trạng thái, audit và test matrix.
 - Không sửa source code, Prisma schema hoặc migration trong lần cập nhật tài liệu này.
+
+
+## 12. API contract mục tiêu — danh mục món và duyệt phiên bản món
+
+> Thiết kế API mục tiêu, chưa triển khai. Các route dưới đây chưa tồn tại trong backend được rà soát. Tên route có thể chuẩn hóa khi chốt convention toàn backend; hợp đồng quyền, dữ liệu và trạng thái bên dưới là phần cần giữ.
+
+### 12.1. Phân tách hai miền dữ liệu
+
+**Miền của bếp (Kitchen-owned):**
+- Bếp tạo và sở hữu `Dish`; mã món chỉ cần duy nhất trong phạm vi bếp (`@@unique([kitchenId, code])`), không duy nhất toàn hệ thống.
+- Bếp tạo các `DishVersion` chứa snapshot công thức. Bếp trung tâm có thể gửi cùng một phiên bản đến nhiều trường đang được phân công.
+- Bếp chỉ sửa bản nháp. Khi phiên bản đã gửi đi duyệt, nội dung phiên bản là bất biến; muốn thay đổi phải tạo phiên bản mới.
+
+**Miền của trường (School approval):**
+- Mỗi trường có một `DishApproval` riêng cho từng `DishVersion`.
+- Trạng thái duyệt ở trường A không cấp quyền sử dụng cho trường B.
+- BGH hoặc người được trường ủy quyền duyệt/trả lại; nhân viên tiếp nhận suất ăn không có quyền này.
+- Khi bếp được phân công cho trường mới, phải gửi phiên bản đến trường đó và trường đó duyệt độc lập.
+
+**Không trộn với thực đơn/kho:**
+- Không lưu `schoolId`, số suất, nhóm tuổi hoặc mã lô kho trong định danh/công thức dùng chung của món.
+- Không lưu `inventoryItemId`, `inventoryLotId`, supplier hoặc mã lô trong `DishVersion`/`DishIngredient`. Công thức chỉ tham chiếu `Ingredient` chuẩn và đơn vị chuẩn. Chọn lô ở bước xuất kho/sản xuất.
+- Không đưa nhật ký kiểm thực/lưu mẫu thực tế vào công thức. Đây là dữ liệu theo ngày phục vụ/đợt sản xuất/giao nhận, thuộc module kiểm thực.
+- Một công thức chuẩn dùng chung các nhóm tuổi. Hệ số khẩu phần, gram/ml thực tế theo nhóm tuổi và số suất thuộc MealPlanItem/portion allocation.
+
+### 12.2. Phạm vi actor và quyền
+
+| Actor | Scope bắt buộc | Quyền trong module món |
+|---|---|---|
+| SUPER_ADMIN | Toàn hệ thống; phải xác định target kitchen khi thao tác | Đọc/kiểm tra/quản trị có audit; không duyệt thay trường trong quy trình thường lệ |
+| CENTRAL_KITCHEN | `kitchenId` của Kitchen.type=CENTRAL | Tạo/sửa nháp, tạo phiên bản, gửi phiên bản đến các trường đang được phân công |
+| KITCHEN_MANAGER | `kitchenId` hợp lệ | Quản lý món/phiên bản trong bếp theo quyền tác vụ được cấp |
+| NUTRITIONIST | `kitchenId` hợp lệ | Tạo/sửa nội dung công thức, định lượng và thông tin dinh dưỡng; gửi duyệt nếu được cấp quyền submit |
+| WAREHOUSE_STAFF | `kitchenId` hợp lệ | Chỉ đọc công thức/thành phần cần cho chuẩn bị; không sửa/phát hành món |
+| SCHOOL_ADMIN / người được trường ủy quyền | `schoolId` | Xem phiên bản được gửi đến trường; APPROVE hoặc RETURN/REJECT trong trường mình |
+| SCHOOL_KITCHEN (nhân viên tiếp nhận hiện hữu) | `schoolId` | Chỉ xem thông tin món đã được trường duyệt và cần cho tiếp nhận; không tạo/sửa/duyệt |
+| UBND_ADMIN | `wardId` | Chỉ giám sát trạng thái món/duyệt trong ward; không tạo công thức hoặc duyệt thay trường |
+
+Nhân sự vận hành bếp tại trường phải có `kitchenId` gắn Kitchen.type=SCHOOL. Không dùng tài khoản SCHOOL_KITCHEN hiện hữu (schoolId) làm tài khoản vận hành bếp.
+
+### 12.3. API phía bếp
+
+Prefix đề xuất: `/api/v1/kitchen`. Backend lấy kitchenId từ actor đã xác thực; không nhận kitchenId từ body để quyết định quyền.
+
+| Method + route | Mục đích | Quyền |
+|---|---|---|
+| `GET /kitchen/dishes` | Danh sách món thuộc kitchen; lọc q/category/status | CENTRAL_KITCHEN, KITCHEN_MANAGER, NUTRITIONIST, WAREHOUSE_STAFF (read-only) |
+| `POST /kitchen/dishes` | Tạo danh tính món và phiên bản nháp đầu tiên | CENTRAL_KITCHEN, KITCHEN_MANAGER, NUTRITIONIST nếu được cấp create |
+| `GET /kitchen/dishes/:dishId` | Chi tiết món, phiên bản và trạng thái gửi trường | Cùng kitchen scope |
+| `PATCH /kitchen/dishes/:dishId` | Sửa metadata của món; không sửa nội dung version đã phát hành | CENTRAL_KITCHEN/KITCHEN_MANAGER |
+| `POST /kitchen/dishes/:dishId/versions` | Tạo phiên bản nháp mới; có thể clone từ version trước | CENTRAL_KITCHEN/KITCHEN_MANAGER/NUTRITIONIST |
+| `GET /kitchen/dishes/:dishId/versions/:versionId` | Xem chi tiết version | Cùng kitchen scope |
+| `PATCH /kitchen/dishes/:dishId/versions/:versionId` | Sửa version DRAFT | Người có quyền sửa công thức; chỉ khi version còn DRAFT |
+| `POST /kitchen/dishes/:dishId/versions/:versionId/submissions` | Gửi version đến một hoặc nhiều trường được phân công | CENTRAL_KITCHEN/KITCHEN_MANAGER; NUTRITIONIST nếu có quyền submit |
+| `GET /kitchen/dishes/:dishId/versions/:versionId/approvals` | Xem kết quả duyệt theo từng trường | Cùng kitchen scope |
+
+#### Request tạo món và version đầu tiên
+
+```json
+{
+  "code": "MON-001",
+  "name": "Gà kho gừng",
+  "category": "MAIN_DISH",
+  "version": {
+    "servingBasis": {
+      "quantity": 1,
+      "unit": "PORTION"
+    },
+    "ingredients": [
+      {
+        "ingredientId": "uuid-ingredient",
+        "quantity": 80,
+        "unitId": "uuid-unit",
+        "preparationLossPercent": 0
+      }
+    ],
+    "preparationSteps": [
+      { "step": 1, "instruction": "Sơ chế và ướp nguyên liệu." },
+      { "step": 2, "instruction": "Kho chín theo quy trình của bếp." }
+    ],
+    "notes": "Công thức chuẩn của bếp."
+  }
+}
+```
+
+Quy tắc validate:
+- `code`, `name` bắt buộc; code chuẩn hóa trước khi kiểm tra trùng trong cùng kitchen.
+- Mỗi version phải có ít nhất một ingredient; ingredientId và unitId phải tồn tại, đang hoạt động và đơn vị phải quy đổi được.
+- Quantity phải > 0; preparationLossPercent trong khoảng 0–100.
+- Không chấp nhận `schoolId`, `kitchenId`, `inventoryLotId`, `inventoryItemId`, `supplierId`, `expectedQuantity`, `ageBand` hoặc dữ liệu kiểm thực trong payload công thức.
+- Dữ liệu dinh dưỡng tính từ ingredient chuẩn phải lưu phương pháp/nguồn và snapshot kết quả; không cho client tự khai báo số liệu dinh dưỡng như dữ liệu đã xác minh.
+- Ảnh chỉ là metadata/media reference; không được dùng URL ảnh làm bằng chứng kiểm định hay truy xuất nguồn gốc.
+
+#### Request gửi version đến trường
+
+```json
+{
+  "schoolIds": ["uuid-school-a", "uuid-school-b"],
+  "message": "Đề nghị nhà trường xem xét phiên bản công thức này."
+}
+```
+
+Backend phải:
+1. Lấy kitchenId từ actor và xác thực Kitchen đang hoạt động, đúng loại.
+2. Kiểm tra Dish và DishVersion thuộc kitchenId đó bằng truy vấn có scope.
+3. Chỉ cho gửi version đã hoàn chỉnh; tạo snapshot bất biến trước khi gửi.
+4. Xác thực từng schoolId tồn tại và có KitchenSchoolAssignment hiệu lực tại thời điểm gửi (hoặc Kitchen.type=SCHOOL có schoolId tương ứng).
+5. Không cho gửi đến trường ngoài ward nếu chính sách phân công không cho phép; assignment là căn cứ chính, không suy đoán từ wardId.
+6. Tạo một DishApproval trạng thái PENDING cho từng trường. Nếu đã có approval cho cặp version + school, trả conflict hoặc xử lý idempotent theo request key; tuyệt đối không tạo bản ghi trùng.
+7. Ghi actor, thời điểm, danh sách trường, message và audit event.
+
+### 12.4. API phía trường
+
+Prefix đề xuất: `/api/v1/schools/me`. School scope lấy từ actor; không nhận schoolId tự do từ client.
+
+| Method + route | Mục đích | Quyền |
+|---|---|---|
+| `GET /schools/me/dish-approvals` | Danh sách món/phiên bản chờ duyệt hoặc đã duyệt của trường | SCHOOL_ADMIN/người được ủy quyền |
+| `GET /schools/me/dish-approvals/:approvalId` | Chi tiết phiên bản và công thức snapshot | SCHOOL_ADMIN/người được ủy quyền |
+| `POST /schools/me/dish-approvals/:approvalId/approve` | Duyệt phiên bản cho trường | SCHOOL_ADMIN/người được ủy quyền |
+| `POST /schools/me/dish-approvals/:approvalId/return` | Trả lại để bếp chỉnh sửa, bắt buộc có lý do | SCHOOL_ADMIN/người được ủy quyền |
+| `POST /schools/me/dish-approvals/:approvalId/reject` | Từ chối phiên bản, bắt buộc có lý do | SCHOOL_ADMIN/người được ủy quyền |
+
+Request approve:
+```json
+{
+  "comment": "Đã xem xét, thống nhất sử dụng phiên bản này."
+}
+```
+
+Request return/reject:
+```json
+{
+  "reason": "Cần điều chỉnh định lượng muối và mô tả quy trình sơ chế."
+}
+```
+
+Response approve/return/reject tối thiểu trả về:
+```json
+{
+  "id": "uuid-approval",
+  "schoolId": "uuid-school",
+  "dishVersionId": "uuid-version",
+  "status": "APPROVED",
+  "reviewedBy": "uuid-user",
+  "reviewedAt": "2026-11-17T08:00:00.000Z",
+  "comment": "Đã xem xét, thống nhất sử dụng phiên bản này."
+}
+```
+
+Không trả dữ liệu nội bộ của trường khác trong response, kể cả khi cùng một version đã được gửi nhiều trường.
+
+### 12.5. Vòng đời version và approval
+
+**DishVersion:**
+- `DRAFT`: bếp được phép sửa.
+- `RELEASED`: đã gửi ít nhất một trường; nội dung bất biến.
+- `ARCHIVED`: không còn dùng để lập thực đơn mới; giữ lịch sử.
+
+Không dùng một trạng thái tổng hợp APPROVED trên DishVersion, vì cùng một version có thể được trường A duyệt nhưng trường B đang chờ hoặc đã trả lại.
+
+**DishApproval** (unique `[schoolId, dishVersionId]`):
+- `PENDING`: trường cần xem xét.
+- `APPROVED`: trường cho phép dùng version này trong thực đơn của chính trường.
+- `RETURNED`: yêu cầu bếp chỉnh sửa; version cũ giữ nguyên, bếp tạo version mới.
+- `REJECTED`: trường từ chối version; muốn đề xuất lại phải tạo version mới.
+- `WITHDRAWN`: bếp rút đề xuất trước khi trường duyệt; không dùng để xóa lịch sử.
+
+Quy tắc chuyển trạng thái:
+- DRAFT → RELEASED khi gửi lần đầu.
+- RELEASED → ARCHIVED khi có version mới thay thế hoặc quản trị bếp chủ động ngừng sử dụng; không xóa version.
+- PENDING → APPROVED / RETURNED / REJECTED.
+- PENDING → WITHDRAWN chỉ bởi bếp sở hữu version và trước khi có quyết định của trường.
+- RETURNED/REJECTED không được sửa để gửi lại cùng version. Tạo version mới, sau đó tạo approval mới cho trường.
+- APPROVED không bị ghi đè hoặc xóa. Nếu cần ngừng sử dụng vì an toàn/chất lượng, cần một thao tác thu hồi/chặn sử dụng có audit và thông báo trường; đây là trạng thái/endpoint riêng cần thiết kế trước khi triển khai.
+- Người tạo/gửi version không được tự duyệt; backend phải kiểm tra actorId khác người gửi hoặc áp dụng quy tắc độc lập đã được trường phê duyệt. Mặc định: cấm tự duyệt.
+
+### 12.6. Quy tắc chọn món vào thực đơn
+
+Khi MealPlan API được thiết kế ở bước tiếp theo:
+- Backend chỉ cho chọn DishVersion có DishApproval.status=APPROVED với đúng schoolId của MealPlan.
+- Kiểm tra bếp tạo món có còn là bếp phục vụ trường tại serviceDate theo KitchenSchoolAssignment hoặc quan hệ Kitchen.type=SCHOOL.
+- Không tự động chuyển approval của version cũ sang version mới.
+- Nếu version mới chưa được trường duyệt, thực đơn mới không được tham chiếu version đó; thực đơn đã duyệt trước đó vẫn giữ snapshot lịch sử.
+- Số suất, ageGroup, portionFactor và định lượng theo tuổi nằm ở MealPlanItem; không sửa công thức gốc khi lập thực đơn.
+
+### 12.7. Lỗi API và mã HTTP
+
+| HTTP | Trường hợp |
+|---|---|
+| 400 | DTO sai, quantity/unit không hợp lệ, thiếu reason khi return/reject |
+| 401 | Chưa xác thực hoặc token không hợp lệ |
+| 403 | Sai role, thiếu scope, kitchen/school ngoài phạm vi, không phải người được ủy quyền |
+| 404 | Không tìm thấy resource trong scope của actor (không tiết lộ resource tồn tại ở scope khác) |
+| 409 | Trùng code trong kitchen; approval đã tồn tại; version không ở trạng thái cho phép; assignment hết hiệu lực; thao tác lặp/xung đột trạng thái |
+| 422 | Công thức thiếu ingredient/đơn vị quy đổi, dữ liệu dinh dưỡng không thể tính hoặc vi phạm quy tắc nghiệp vụ |
+
+### 12.8. Yêu cầu kỹ thuật và kiểm thử chấp nhận
+
+- Mọi truy vấn Dish/DishVersion của bếp phải ràng buộc `kitchenId` từ actor trong cùng câu truy vấn; mọi truy vấn approval của trường phải ràng buộc `schoolId` từ actor.
+- Tạo version + snapshot + approval cho nhiều trường phải dùng transaction; nếu một schoolId không hợp lệ thì mặc định rollback toàn bộ request (atomic), không gửi một phần mà client không biết. Nếu muốn partial success thì phải thiết kế response rõ từng trường; mặc định không dùng.
+- Unique: `Dish(kitchenId, code)`; `DishVersion(dishId, versionNumber)`; `DishApproval(schoolId, dishVersionId)`.
+- Version đã RELEASED bất biến ở tầng service; không chỉ khóa nút sửa trên frontend.
+- Approval action phải dùng transaction/conditional update để chống hai người duyệt đồng thời hoặc request lặp.
+- Lưu audit cho create/update draft, version creation, submit, approve, return, reject, withdraw, archive và revoke.
+- Test tối thiểu: bếp A không đọc/sửa món bếp B; bếp A không gửi cho trường ngoài assignment; bếp tại trường chỉ gửi cho trường sở hữu; trường A không xem/duyệt approval của trường B; nhân viên SCHOOL_KITCHEN không duyệt; WAREHOUSE_STAFF không sửa công thức; version RELEASED không sửa; version mới không kế thừa approval; người gửi không tự duyệt; request lặp không tạo approval trùng; assignment hết hiệu lực không cho gửi/lập thực đơn mới.
+- API list phải phân trang, giới hạn page size, hỗ trợ filter theo trạng thái và tìm kiếm; response không trả toàn bộ audit log nếu client không yêu cầu.
+- Không tin role/schoolId/kitchenId gửi trong body, query hoặc header tùy ý. JWT strategy hiện đọc User từ DB; policy mới phải tiếp tục dùng scope từ DB.
+
+### 12.9. Đối chiếu UI hiện tại và việc cần tách khi triển khai
+
+Giao diện `KitchenDishCatalog`/`KitchenDishEditor` hiện là luồng DEMO/localStorage, chưa gọi API món thật. Một số trường dữ liệu UI đang trộn các miền:
+- `schoolId`, `expectedQuantity`, `ageBand`: dữ liệu gắn trường/thực đơn, không thuộc công thức dùng chung.
+- `inventoryItemId`, `lotCode`, `supplier`, `origin`: không được lưu vào công thức chuẩn; chuyển sang chọn lô ở nghiệp vụ kho/sản xuất.
+- `safetyMonitoring`: nhật ký kiểm thực/lưu mẫu thực tế theo ngày phục vụ; chuyển sang module kiểm thực/giao nhận.
+- `createdBy` dạng view role và `demo: true`: chỉ là dữ liệu demo, không dùng làm quyền hoặc actor backend.
+
+Khi kết nối API thật, cần tách:
+1. **Kitchen Dish Catalog:** metadata món và các version công thức thuộc bếp.
+2. **School Dish Approval Inbox:** danh sách phiên bản chờ trường duyệt, có compare version và lịch sử nhận xét.
+3. **Meal Plan Builder:** chọn version đã APPROVED cho trường, cấu hình nhóm tuổi/số suất.
+4. **Inventory/Production:** ánh xạ ingredient demand sang lô thực tế và ghi sổ xuất kho.
+5. **Food Safety/Receiving:** nhật ký kiểm thực, lưu mẫu, giao nhận và sự cố theo ngày/đợt.
+
+Không sửa frontend hoặc backend source, Prisma schema, database hay migration trong bước thiết kế API này.
