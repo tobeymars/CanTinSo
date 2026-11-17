@@ -73,7 +73,7 @@ export default function SchoolDashboard({ date }: Props) {
       <div className="card-header"><div><div className="section-kicker">MÔ HÌNH BẾP</div><h2>Bếp đang phục vụ trường</h2></div></div>
       {kitchen.isPending ? <p>Đang tải thông tin phân công bếp…</p>
         : kitchen.isError ? <p className="error">Không tải được thông tin bếp: {kitchen.error instanceof Error ? kitchen.error.message : "Lỗi kết nối"}</p>
-        : kitchen.data ? <div className="supplier-document-grid">
+        : kitchen.data ? <div className="school-dashboard-kitchen-grid">
           <div><span>Loại bếp</span><strong>{kitchen.data.providerType === "CENTRAL" ? "Bếp trung tâm" : "Bếp tại trường"}</strong></div>
           <div><span>Tên bếp</span><strong>{kitchen.data.kitchen.name}</strong></div>
           <div><span>Địa chỉ</span><strong>{kitchen.data.kitchen.address || "Chưa cập nhật"}</strong></div>
