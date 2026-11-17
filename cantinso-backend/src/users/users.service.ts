@@ -10,6 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuthUser } from "../common/current-user.decorator";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { CreateCentralKitchenDto } from "./dto/create-central-kitchen.dto";
 
 const SCHOOL_ADMIN_CREATABLE_ROLES: UserRole[] = [
   UserRole.SCHOOL_KITCHEN,
@@ -56,6 +57,7 @@ export class UsersService {
         isActive: true,
         schoolId: true,
         wardId: true,
+        kitchenId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -153,6 +155,89 @@ export class UsersService {
         wardId: true,
         createdAt: true,
       },
+    });
+  }
+
+
+  async listCentralKitchens(actor: AuthUser) {
+    if (actor.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException("Chỉ SUPER_ADMIN được quản lý bếp trung tâm.");
+    }
+    return this.prisma.kitchen.findMany({
+      include: {
+        schools: {
+          where: { isActive: true, endsAt: null },
+          include: { school: { select: { id: true, name: true, code: true } } },
+        },
+        users: {
+          where: { role: UserRole.CENTRAL_KITCHEN },
+          select: { id: true, email: true, fullName: true, isActive: true, createdAt: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async createCentralKitchen(actor: AuthUser, dto: CreateCentralKitchenDto) {
+    if (actor.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException("Chỉ SUPER_ADMIN được tạo bếp trung tâm.");
+    }
+    const schoolIds = [...new Set(dto.schoolIds)];
+    if (schoolIds.length !== dto.schoolIds.length) {
+      throw new ConflictException("Danh sách trường bị trùng.");
+    }
+    const email = dto.adminEmail.toLowerCase().trim();
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser) throw new ConflictException("Email quản trị bếp đã được sử dụng.");
+    const existingKitchen = await this.prisma.kitchen.findUnique({ where: { code: dto.code.trim().toUpperCase() } });
+    if (existingKitchen) throw new ConflictException("Mã bếp trung tâm đã tồn tại.");
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    return this.prisma.$transaction(async (tx) => {
+      const schools = await tx.school.findMany({
+        where: { id: { in: schoolIds } },
+        select: { id: true },
+      });
+      if (schools.length !== schoolIds.length) {
+        throw new NotFoundException("Có trường học không tồn tại.");
+      }
+      const alreadyAssigned = await tx.kitchenSchoolAssignment.findMany({
+        where: { schoolId: { in: schoolIds }, isActive: true, endsAt: null },
+        include: { kitchen: { select: { name: true } }, school: { select: { name: true } } },
+      });
+      if (alreadyAssigned.length) {
+        throw new ConflictException(
+          `Trường "${alreadyAssigned[0].school.name}" đã được gán cho bếp "${alreadyAssigned[0].kitchen.name}". Hãy kết thúc phân công cũ trước.`,
+        );
+      }
+
+      const kitchen = await tx.kitchen.create({
+        data: {
+          code: dto.code.trim().toUpperCase(),
+          name: dto.name.trim(),
+          address: dto.address?.trim() || null,
+          contactName: dto.contactName.trim(),
+          phone: dto.phone?.trim() || null,
+          capacity: dto.capacity ?? null,
+          type: "CENTRAL",
+          schools: {
+            create: schoolIds.map((schoolId) => ({ schoolId })),
+          },
+        },
+      });
+      const admin = await tx.user.create({
+        data: {
+          email,
+          passwordHash,
+          fullName: dto.adminFullName.trim(),
+          role: UserRole.CENTRAL_KITCHEN,
+          kitchenId: kitchen.id,
+          schoolId: null,
+          wardId: null,
+        },
+        select: { id: true, email: true, fullName: true, role: true, isActive: true },
+      });
+      return { ...kitchen, admin };
     });
   }
 
