@@ -31,7 +31,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       role: user.role,
       schoolId: user.schoolId,
-      wardId: user.wardId,\n      kitchenId: user.kitchenId,
+      wardId: user.wardId,
+      kitchenId: user.kitchenId,
     };
   }
 }
