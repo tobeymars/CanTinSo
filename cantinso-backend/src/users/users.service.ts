@@ -160,11 +160,19 @@ export class UsersService {
 
 
   async listCentralKitchens(actor: AuthUser) {
-    if (actor.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException("Chỉ SUPER_ADMIN được quản lý bếp trung tâm.");
+    if (actor.role !== UserRole.SUPER_ADMIN && actor.role !== UserRole.UBND_ADMIN) {
+      throw new ForbiddenException("Bạn không có quyền quản lý bếp trung tâm.");
+    }
+    if (actor.role === UserRole.UBND_ADMIN && !actor.wardId) {
+      throw new ForbiddenException("Tài khoản UBND chưa được gán phường.");
     }
     return this.prisma.kitchen.findMany({
+      where: {
+        type: "CENTRAL",
+        ...(actor.role === UserRole.UBND_ADMIN ? { wardId: actor.wardId! } : {}),
+      },
       include: {
+        ward: { select: { id: true, name: true, code: true } },
         schools: {
           where: { isActive: true, endsAt: null },
           include: { school: { select: { id: true, name: true, code: true } } },
@@ -179,8 +187,11 @@ export class UsersService {
   }
 
   async createCentralKitchen(actor: AuthUser, dto: CreateCentralKitchenDto) {
-    if (actor.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException("Chỉ SUPER_ADMIN được tạo bếp trung tâm.");
+    if (actor.role !== UserRole.SUPER_ADMIN && actor.role !== UserRole.UBND_ADMIN) {
+      throw new ForbiddenException("Bạn không có quyền tạo bếp trung tâm.");
+    }
+    if (actor.role === UserRole.UBND_ADMIN && !actor.wardId) {
+      throw new ForbiddenException("Tài khoản UBND chưa được gán phường.");
     }
     const schoolIds = [...new Set(dto.schoolIds)];
     if (schoolIds.length !== dto.schoolIds.length) {
@@ -195,16 +206,40 @@ export class UsersService {
 
     return this.prisma.$transaction(async (tx) => {
       const schools = await tx.school.findMany({
-        where: { id: { in: schoolIds } },
-        select: { id: true },
+        where: {
+          id: { in: schoolIds },
+          ...(actor.role === UserRole.UBND_ADMIN ? { wardId: actor.wardId! } : {}),
+        },
+        select: { id: true, wardId: true, name: true },
       });
       if (schools.length !== schoolIds.length) {
-        throw new NotFoundException("Có trường học không tồn tại.");
+        throw new ForbiddenException(
+          "Có trường không tồn tại, chưa được gán phường hoặc nằm ngoài phạm vi quản lý của bạn.",
+        );
+      }
+      const wardIds = [...new Set(schools.map((school) => school.wardId).filter((id): id is string => !!id))];
+      if (schools.some((school) => !school.wardId) || wardIds.length !== 1) {
+        throw new ConflictException(
+          "Các trường được chọn phải cùng thuộc một phường và đã được gán phường.",
+        );
+      }
+      const kitchenWardId = wardIds[0];
+      if (actor.role === UserRole.UBND_ADMIN && kitchenWardId !== actor.wardId) {
+        throw new ForbiddenException("Không được tạo bếp cho phường khác.");
       }
       const alreadyAssigned = await tx.kitchenSchoolAssignment.findMany({
         where: { schoolId: { in: schoolIds }, isActive: true, endsAt: null },
         include: { kitchen: { select: { name: true } }, school: { select: { name: true } } },
       });
+      const schoolsWithOnSiteKitchen = await tx.kitchen.findMany({
+        where: { type: "SCHOOL", isActive: true, schoolId: { in: schoolIds } },
+        select: { schoolId: true },
+      });
+      if (schoolsWithOnSiteKitchen.length) {
+        throw new ConflictException(
+          "Có trường đang sử dụng bếp tại trường. Hãy kết thúc mô hình bếp hiện tại trước khi gán bếp trung tâm.",
+        );
+      }
       if (alreadyAssigned.length) {
         throw new ConflictException(
           `Trường "${alreadyAssigned[0].school.name}" đã được gán cho bếp "${alreadyAssigned[0].kitchen.name}". Hãy kết thúc phân công cũ trước.`,
@@ -220,6 +255,7 @@ export class UsersService {
           phone: dto.phone?.trim() || null,
           capacity: dto.capacity ?? null,
           type: "CENTRAL",
+          wardId: kitchenWardId,
           schools: {
             create: schoolIds.map((schoolId) => ({ schoolId })),
           },
@@ -242,17 +278,25 @@ export class UsersService {
   }
 
   private async findManagedUser(actor: AuthUser, id: string) {
-    const target = await this.prisma.user.findUnique({ where: { id } });
+    const target = await this.prisma.user.findUnique({
+      where: { id },
+      include: { kitchen: { select: { wardId: true } } },
+    });
     if (!target) {
       throw new NotFoundException("Không tìm thấy tài khoản.");
     }
 
-    if (
-      actor.role !== UserRole.SUPER_ADMIN &&
-      (actor.role !== UserRole.SCHOOL_ADMIN ||
-        !actor.schoolId ||
-        target.schoolId !== actor.schoolId)
-    ) {
+    const isWardKitchenAdmin =
+      actor.role === UserRole.UBND_ADMIN &&
+      target.role === UserRole.CENTRAL_KITCHEN &&
+      !!actor.wardId &&
+      target.kitchen?.wardId === actor.wardId;
+    const isSchoolManaged =
+      actor.role === UserRole.SCHOOL_ADMIN &&
+      !!actor.schoolId &&
+      target.schoolId === actor.schoolId;
+
+    if (actor.role !== UserRole.SUPER_ADMIN && !isWardKitchenAdmin && !isSchoolManaged) {
       throw new ForbiddenException("Bạn không có quyền quản lý tài khoản này.");
     }
 
@@ -270,6 +314,13 @@ export class UsersService {
 
   async update(actor: AuthUser, id: string, dto: UpdateUserDto) {
     const target = await this.findManagedUser(actor, id);
+
+    if (actor.role === UserRole.UBND_ADMIN) {
+      if (target.role !== UserRole.CENTRAL_KITCHEN || dto.role !== undefined ||
+          dto.schoolId !== undefined || dto.wardId !== undefined || dto.kitchenId !== undefined) {
+        throw new ForbiddenException("UBND chỉ được quản lý thông tin và trạng thái tài khoản bếp thuộc phường mình.");
+      }
+    }
 
     if (actor.role === UserRole.SCHOOL_ADMIN) {
       if (dto.role && !SCHOOL_ADMIN_CREATABLE_ROLES.includes(dto.role)) {
