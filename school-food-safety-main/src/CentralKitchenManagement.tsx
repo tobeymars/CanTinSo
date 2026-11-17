@@ -43,6 +43,8 @@ export default function CentralKitchenManagement() {
   }
   useEffect(() => { void load(); }, []);
 
+  const assignedSchoolIds = useMemo(() => new Set(kitchens.flatMap(k => k.schools.map(item => item.school.id))), [kitchens]);
+
   const filtered = useMemo(() => kitchens.filter(k =>
     `${k.code} ${k.name} ${k.contactName}`.toLocaleLowerCase("vi").includes(keyword.toLocaleLowerCase("vi"))
   ), [kitchens, keyword]);
@@ -113,7 +115,7 @@ export default function CentralKitchenManagement() {
       <tbody>{filtered.map(k=><tr key={k.id}>
         <td><strong>{k.name}</strong><small>{k.code} · {k.contactName}{k.phone ? ` · ${k.phone}` : ""}</small></td>
         <td><strong>{k.schools.length} trường</strong><small>{k.schools.map(x=>x.school.name).join(", ")}</small></td>
-        <td>{k.users.map(u=><div key={u.id} className="um-central-user"><strong>{u.fullName}</strong><small>{u.email}</small><div className="um-actions">
+        <td>{k.users.map(u=><div key={u.id} className="um-central-user"><strong>{u.fullName}</strong><small>{u.email} · {u.isActive ? "Đang hoạt động" : "Đã khóa"}</small><div className="um-actions">
           <button title="Đặt lại mật khẩu" onClick={()=>{setPasswordUser({id:u.id,email:u.email});setNewPassword("");}}><KeyRound size={15}/></button>
           <button title={u.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"} disabled={busy} onClick={()=>void toggleUser(u)}>{u.isActive?<UserRoundX size={15}/>:<UserRound size={15}/>}</button>
         </div></div>)}</td>
@@ -134,7 +136,7 @@ export default function CentralKitchenManagement() {
           <label>Năng lực (suất/ngày)<input type="number" min="1" value={form.capacity} onChange={e=>setForm({...form,capacity:e.target.value})}/></label>
         </div>
         <h4>Trường được bếp phục vụ</h4>
-        <div className="um-school-checks">{schools.map(s=><label key={s.id}><input type="checkbox" checked={form.schoolIds.includes(s.id)} onChange={()=>toggleSchool(s.id)}/><span>{s.name}{s.ward?.name ? ` · ${s.ward.name}` : ""}</span></label>)}</div>
+        <div className="um-school-checks">{schools.map(s=><label key={s.id}><input type="checkbox" checked={form.schoolIds.includes(s.id)} disabled={assignedSchoolIds.has(s.id) && !form.schoolIds.includes(s.id)} onChange={()=>toggleSchool(s.id)}/><span>{s.name}{s.ward?.name ? ` · ${s.ward.name}` : ""}{assignedSchoolIds.has(s.id) && !form.schoolIds.includes(s.id) ? " · Đã được phân công" : ""}</span></label>)}</div>
         {!schools.length && <div className="um-error">Chưa có trường trong hệ thống.</div>}
         <h4>Tài khoản quản trị bếp trung tâm</h4>
         <label>Họ và tên<input required value={form.adminFullName} onChange={e=>setForm({...form,adminFullName:e.target.value})}/></label>
