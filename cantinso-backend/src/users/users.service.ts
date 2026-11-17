@@ -159,9 +159,9 @@ export class UsersService {
   }
 
 
-  async getMyAssignedCentralKitchen(actor: AuthUser) {
+  async getMyKitchen(actor: AuthUser) {
     if (actor.role !== UserRole.SCHOOL_ADMIN || !actor.schoolId) {
-      throw new ForbiddenException("Chỉ tài khoản Ban Giám hiệu đã được gán trường mới xem được bếp phục vụ.");
+      throw new ForbiddenException("Chỉ tài khoản Ban Giám hiệu đã được gán trường mới xem được thông tin bếp.");
     }
 
     const assignment = await this.prisma.kitchenSchoolAssignment.findFirst({
@@ -177,6 +177,7 @@ export class UsersService {
             id: true,
             code: true,
             name: true,
+            type: true,
             address: true,
             contactName: true,
             phone: true,
@@ -188,7 +189,37 @@ export class UsersService {
       orderBy: { startsAt: "desc" },
     });
 
-    return assignment;
+    if (assignment) {
+      return {
+        providerType: "CENTRAL" as const,
+        assignmentId: assignment.id,
+        startsAt: assignment.startsAt,
+        kitchen: assignment.kitchen,
+      };
+    }
+
+    const onSiteKitchen = await this.prisma.kitchen.findFirst({
+      where: {
+        schoolId: actor.schoolId,
+        type: "SCHOOL",
+        isActive: true,
+      },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        type: true,
+        address: true,
+        contactName: true,
+        phone: true,
+        capacity: true,
+        ward: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    return onSiteKitchen
+      ? { providerType: "SCHOOL" as const, assignmentId: null, startsAt: null, kitchen: onSiteKitchen }
+      : null;
   }
 
   async listCentralKitchens(actor: AuthUser) {
