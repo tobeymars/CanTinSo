@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getStoredUser } from "./lib/authApi";
 import { Factory, KeyRound, Plus, RefreshCw, Search, ShieldCheck, UserRound, UserRoundX } from "lucide-react";
 import {
   createCentralKitchen,
@@ -20,6 +21,7 @@ const emptyForm = (): FormState => ({
 });
 
 export default function CentralKitchenManagement() {
+  const isWardAdmin = getStoredUser()?.role === "UBND_ADMIN";
   const [kitchens, setKitchens] = useState<CentralKitchen[]>([]);
   const [schools, setSchools] = useState<ManagedSchool[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -100,7 +102,7 @@ export default function CentralKitchenManagement() {
     <div className="um-intro"><div>
       <span className="um-eyebrow"><Factory size={15}/> QUẢN TRỊ ĐƠN VỊ BẾP</span>
       <h2>Quản lý bếp trung tâm</h2>
-      <p>SUPER_ADMIN tạo hồ sơ bếp, tài khoản quản trị và phân công các trường được phục vụ.</p>
+      <p>{isWardAdmin ? "Quản lý bếp trung tâm và phân công trường trong phường của bạn." : "Quản trị nền tảng: tạo hồ sơ bếp, tài khoản quản trị và phân công trường cùng phường."}</p>
     </div><button className="um-primary" onClick={() => {setForm(emptyForm());setError("");setShowForm(true);}}><Plus size={17}/> Tạo bếp trung tâm</button></div>
     <div className="um-stats">
       <div><Factory/><span><strong>{kitchens.length}</strong><small>Tổng bếp trung tâm</small></span></div>
@@ -122,7 +124,7 @@ export default function CentralKitchenManagement() {
         <td><span className={`um-status ${k.isActive?"active":"inactive"}`}>{k.isActive?"Đang hoạt động":"Đã khóa"}</span></td>
       </tr>)}</tbody>
     </table></div>}
-    <p className="um-footnote">Mỗi trường chỉ được có một phân công bếp đang hiệu lực. Việc chuyển trường sang bếp khác cần kết thúc phân công cũ trước.</p>
+    <p className="um-footnote">Mỗi trường chỉ được có một đơn vị cung cấp suất ăn chính đang hiệu lực. Bếp trung tâm chỉ được phục vụ trường cùng phường.</p>
 
     {showForm && <div className="um-modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setShowForm(false);}}>
       <form className="um-modal um-central-modal" onSubmit={submit}>
