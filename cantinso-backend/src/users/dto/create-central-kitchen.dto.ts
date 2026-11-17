@@ -1,4 +1,4 @@
-import { ArrayMinSize, IsArray, IsEmail, IsInt, IsOptional, IsPhoneNumber, IsString, Min, MinLength, MaxLength, IsUUID } from "class-validator";
+import { ArrayMinSize, IsArray, IsEmail, IsInt, IsOptional, IsString, Min, MinLength, MaxLength, IsUUID } from "class-validator";
 
 export class CreateCentralKitchenDto {
   @IsString() @MinLength(2) @MaxLength(30)
