@@ -201,7 +201,6 @@ export class DishesService {
         isActive: true,
         startsAt: { lte: now },
         OR: [{ endsAt: null }, { endsAt: { gte: now } }],
-        school: { wardId: { not: null } },
       },
       select: { schoolId: true },
     });
