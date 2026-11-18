@@ -1800,3 +1800,185 @@ Kết quả profiling ngày 17/11/2026 cho thấy các bảng suppliers, ingredi
 6. Chỉ drop cột/quan hệ legacy sau khi code mới đã cutover và xác nhận không còn consumer.
 
 **Kết luận:** Schema Prisma hiện tại chưa đáp ứng Physical Schema v1. Có thể giữ nguyên miền học sinh/điểm danh và khung Kitchen/School/User, nhưng Supplier, InventoryLot, Dish, MealPlan, MealPlanItem và TraceEvent cần tái cấu trúc đáng kể. Lộ trình an toàn là additive migration theo miền, xác minh dữ liệu trước từng bước, giữ legacy đến khi cutover. Chưa có migration nào được tạo hoặc triển khai trong lần đối chiếu này.
+
+
+## 20. Thiết kế chi tiết M1–M3: món ăn, thực đơn và quy trình duyệt (18/11/2026)
+
+> Trạng thái: đặc tả thiết kế để review trước khi sửa Prisma. Chỉ cập nhật tài liệu; không sửa schema.prisma, không tạo migration, không chạy DDL/DML và không thay đổi dữ liệu. Thiết kế kế thừa các quy tắc nghiệp vụ đã chốt ở mục 14, 18 và 19.
+
+### 20.1. Phạm vi và nguyên tắc
+
+M1–M3 chỉ triển khai miền món ăn và thực đơn:
+- M1: Dish ownership, DishVersion, DishIngredient, duyệt DishVersion theo từng School.
+- M2: MealPlan, MealPlanRevision, revision items, nhóm tuổi và định lượng.
+- M3: API gửi/duyệt/trả lại, audit events, phân quyền và truy vấn cho CENTRAL_KITCHEN và SCHOOL_ADMIN.
+
+Không triển khai trong M1–M3: kho/nhập xuất, ProductionBatch, Delivery, giao nhận, kiểm thực, nhà cung cấp và thay đổi 5 workspace. Không thêm role hoặc enum UserRole mới. Không cấp quyền lập thực đơn bếp cho SCHOOL_KITCHEN receiver chỉ vì tên role; tài khoản school scope không có kitchenId tiếp tục là nhân viên tiếp nhận.
+
+Nguyên tắc dữ liệu:
+1. Dish thuộc Kitchen tạo ra. Central Kitchen có thể chia sẻ cùng DishVersion với nhiều School; mỗi School duyệt độc lập.
+2. DishVersion là snapshot bất biến sau khi gửi duyệt. Sửa công thức tạo version mới.
+3. Recipe version dùng chung cho các nhóm tuổi. Khẩu phần/hệ số theo nhóm tuổi nằm ở revision item/age-group portion, không nhân bản recipe.
+4. MealPlan thuộc một School, có một Kitchen proposer, một serviceDate và mealType. Giữ unique (schoolId, serviceDate, mealType).
+5. Một MealPlan có nhiều revision; mỗi lần submit/resubmit tạo revision snapshot mới. Không ghi đè revision đã submit/duyệt.
+6. Chỉ revision APPROVED hiện hành là thực đơn hiệu lực. Revision cũ thành SUPERSEDED trong cùng transaction khi revision mới được duyệt.
+7. Kitchen proposer không được tự duyệt. SCHOOL_ADMIN có schoolId trùng MealPlan.schoolId mới được duyệt/trả lại.
+8. KitchenSchoolAssignment phải hiệu lực tại serviceDate, không chỉ tại thời điểm hiện tại.
+9. CENTRAL_KITCHEN chỉ thao tác trong kitchenId của mình và các trường được phân công hợp lệ. SCHOOL_ADMIN chỉ xem dữ liệu schoolId của mình.
+10. Backend là ranh giới bảo mật; không tin schoolId, kitchenId, proposerId hoặc approverId do client gửi.
+
+### 20.2. M1 — mô hình món ăn và duyệt món
+
+**Dish (điều chỉnh model hiện tại)**
+- Bổ sung kitchenId UUID NOT NULL FK Kitchen; code, name, category, status, createdAt, updatedAt.
+- Unique (kitchenId, code); index (kitchenId, status, name).
+- Cột recipe JSON hiện tại chỉ giữ trong giai đoạn chuyển tiếp; không tiếp tục là nguồn chuẩn lâu dài.
+
+**DishVersion (mới)**
+- id UUID PK; dishId UUID FK Dish; versionNo integer; status; recipeSnapshot JSON có schema version; nutritionSnapshot JSON; allergenSnapshot JSON; createdById; createdAt; submittedAt/publishedAt nullable.
+- Unique (dishId, versionNo); index (dishId, status).
+- Snapshot phải đủ tái lập tên món, thành phần, định lượng chuẩn, quy trình, dinh dưỡng/allergen và nguồn dữ liệu.
+- Khi version đã SUBMITTED/PUBLISHED hoặc được tham chiếu bởi approval/MealPlanRevision thì không sửa nội dung; sửa phải tạo versionNo tiếp theo.
+
+**DishIngredient (mới)**
+- dishVersionId FK DishVersion; ingredientId FK Ingredient; quantity Decimal(14,3); unit chuẩn; optional preparationNote.
+- Đây là định lượng recipe chuẩn, không phải lô tồn kho. Lot chỉ được chọn ở giai đoạn sản xuất.
+- Chốt unique (dishVersionId, ingredientId) nếu một nguyên liệu chỉ có một dòng; nếu cần nhiều công đoạn/dòng thì dùng lineNo.
+
+**DishApproval (mới)**
+- schoolId FK School; dishVersionId FK DishVersion; status; submittedAt; decidedAt; decidedById; decisionNote; createdAt; updatedAt.
+- Unique (schoolId, dishVersionId); index (schoolId, status, updatedAt).
+- Duyệt theo từng School. Approval ở trường A không có hiệu lực tại trường B.
+- MealPlanRevision chỉ được submit khi DishVersion có DishApproval APPROVED tại chính School đó.
+
+**DishApprovalEvent (mới)**
+- id; dishApprovalId; eventType; actorId; actorRole snapshot; note; occurredAt.
+- Append-only; ghi SUBMITTED, APPROVED, RETURNED, REJECTED, WITHDRAWN. Không xóa/sửa event cũ.
+
+Enum mục tiêu M1: DishStatus DRAFT/ACTIVE/ARCHIVED; DishVersionStatus DRAFT/SUBMITTED/PUBLISHED/WITHDRAWN; DishApprovalStatus PENDING/APPROVED/RETURNED/REJECTED/WITHDRAWN. Phải mapping mọi giá trị cũ trước migration.
+
+### 20.3. M2 — MealPlan revision và định lượng theo nhóm tuổi
+
+**MealPlan (điều chỉnh model hiện tại)**
+- Giữ id, schoolId, serviceDate, mealType và unique (schoolId, serviceDate, mealType).
+- Bổ sung kitchenId NOT NULL sau khi backfill có xác minh; status chuyển enum chỉ sau khi mapping mọi giá trị String.
+- MealPlan là identity ổn định cho một trường/ngày/loại bữa; nội dung từng lần gửi nằm trong revision.
+
+**MealPlanRevision (mới)**
+- id; mealPlanId; revisionNo; status DRAFT/SUBMITTED/APPROVED/RETURNED/REJECTED/SUPERSEDED; proposedById; submittedAt; decidedAt; decidedById; decisionNote; createdAt.
+- Unique (mealPlanId, revisionNo); index (mealPlanId, status).
+- DB partial unique index bảo đảm tối đa một revision APPROVED hiện hành trên mỗi MealPlan.
+- Sau SUBMITTED, revision bất biến. RETURNED/REJECTED không sửa lại; tạo revisionNo mới.
+
+**MealPlanAgeGroup (danh mục dùng chung, nếu chưa có)**
+- id, code unique, name, minAgeMonths, maxAgeMonths, sortOrder, isActive.
+- Không tạo danh mục riêng theo bếp/trường. Phải chốt mapping nhóm tuổi với khối lớp; không suy tuổi chỉ từ tên lớp.
+
+**MealPlanRevisionAgeGroup (mới)**
+- revisionId; ageGroupId; plannedServings; notes.
+- Unique (revisionId, ageGroupId); CHECK plannedServings > 0.
+- Đây là nguồn số suất chuẩn theo nhóm tuổi của revision.
+
+**MealPlanRevisionItem (mới)**
+- id; revisionId; dishVersionId; mealSlot/sequence; isDefault; note.
+- Mỗi item tham chiếu DishVersion cụ thể, không tham chiếu Dish đang thay đổi.
+- Service phải xác minh DishApproval APPROVED của đúng School; cần DB trigger/composite constraint nếu muốn bảo vệ thêm ở DB.
+
+**MealPlanItemAgeGroupPortion (mới)**
+- revisionItemId; ageGroupId; portionFactor Decimal(10,4); unit snapshot; overrideReason.
+- Unique (revisionItemId, ageGroupId).
+- MealPlanRevisionAgeGroup.plannedServings là số suất chuẩn. Chỉ tạo override khi món có khẩu phần thực tế khác; nếu không thì kế thừa servings và hệ số mặc định.
+- Không lưu đồng thời portionFactor và plannedQuantity nếu có thể gây mâu thuẫn. Khuyến nghị lưu portionFactor + unit snapshot, tính tổng nguyên liệu bằng Decimal ở service.
+
+**MealPlanApprovalEvent (mới)**
+- id; revisionId; eventType SUBMITTED/APPROVED/RETURNED/REJECTED/SUPERSEDED; actorId; actorRole snapshot; note; occurredAt.
+- Append-only, phục vụ audit.
+
+### 20.4. M3 — API contract đề xuất
+
+Prefix /meal-plans và /dishes. JWT hiện hữu; Role guard kiểm tra role; service bắt buộc kiểm tra scope từ user đã được JwtStrategy nạp lại DB.
+
+**CENTRAL_KITCHEN**
+- GET /dishes — chỉ Dish thuộc user.kitchenId.
+- POST /dishes — kitchenId lấy từ user.kitchenId; reject hoặc bỏ qua kitchenId client gửi.
+- GET /dishes/:dishId/versions — chỉ trong kitchen scope.
+- POST /dishes/:dishId/versions — tạo version mới.
+- POST /dishes/:dishId/versions/:versionId/submit — gửi version để School đích duyệt.
+- GET /meal-plans?schoolId=&from=&to= — chỉ các trường có assignment hiệu lực trong khoảng serviceDate.
+- POST /meal-plans — tạo/tìm identity theo schoolId + serviceDate + mealType; kitchenId lấy từ JWT; xác thực assignment tại serviceDate.
+- POST /meal-plans/:id/revisions — tạo revision draft mới.
+- PUT /meal-plans/:id/revisions/:revisionId — chỉ sửa DRAFT thuộc kitchen hiện tại.
+- POST /meal-plans/:id/revisions/:revisionId/submit — kiểm tra và submit trong transaction.
+
+**SCHOOL_ADMIN**
+- GET /meal-plans?from=&to= — tự động giới hạn schoolId = user.schoolId; không nhận schoolId tùy ý để mở rộng scope.
+- GET /meal-plans/:id và GET revision — chỉ trả nếu plan.schoolId = user.schoolId.
+- POST /meal-plans/:id/revisions/:revisionId/approve — chỉ SCHOOL_ADMIN đúng schoolId, không phải proposer, revision SUBMITTED.
+- POST /meal-plans/:id/revisions/:revisionId/return — cùng điều kiện; bắt buộc decision note.
+- GET /dishes/approvals — chỉ approval thuộc user.schoolId.
+- POST /dishes/:dishVersionId/approve và /return — quyết định approval tại đúng School, không áp dụng toàn hệ thống.
+
+Response cần có source SYSTEM, school, kitchen, serviceDate, mealType, revisionNo, revisionStatus, currentApproved, servings theo nhóm tuổi và trạng thái duyệt từng món. Khi chưa có record thật, trả collection rỗng và trạng thái “Chưa có dữ liệu hệ thống”; production không fallback localStorage DEMO.
+
+### 20.5. Authorization matrix
+
+| Hành động | CENTRAL_KITCHEN | SCHOOL_ADMIN | SCHOOL_KITCHEN receiver |
+|---|---|---|---|
+| Tạo/sửa Dish và version DRAFT | Kitchen của mình | Không | Không |
+| Gửi DishVersion duyệt | Có | Không | Không |
+| Duyệt DishVersion | Không tự duyệt | School của mình | Không |
+| Tạo/sửa MealPlanRevision DRAFT | Assignment hợp lệ | Không | Không |
+| Submit MealPlanRevision | Assignment hợp lệ | Không | Không |
+| Xem MealPlan | Các trường được phân công | School của mình | Không mặc định |
+| Approve/return revision | Không | School của mình, không phải proposer | Không |
+| Xem lịch sử quyết định | Kitchen/assignment scope | School scope | Không mặc định |
+
+SUPER_ADMIN có quyền quản trị toàn hệ thống theo policy hiện hữu nhưng không thay thế actor nghiệp vụ khi duyệt. UBND_ADMIN chỉ read scope theo wardId, không duyệt thực đơn. Không thêm role/workspace thứ sáu.
+
+### 20.6. State transitions và transaction
+
+**DishVersion:** DRAFT → SUBMITTED → PUBLISHED hoặc WITHDRAWN. Một version có nhiều DishApproval theo nhiều School; mỗi School có trạng thái độc lập. Một School trả lại không ảnh hưởng School khác.
+
+**MealPlanRevision:** DRAFT → SUBMITTED → APPROVED hoặc RETURNED/REJECTED. RETURNED/REJECTED tạo revision tiếp theo, không sửa revision cũ. APPROVED cũ chỉ thành SUPERSEDED khi revision mới được duyệt.
+
+Submit transaction:
+1. Xác minh KitchenSchoolAssignment hiệu lực tại serviceDate (hoặc Kitchen.type=SCHOOL và schoolId trùng).
+2. Xác minh mọi DishVersion đã APPROVED cho đúng School.
+3. Xác minh age groups, servings, portion factors và item không trùng.
+4. Chụp snapshot bất biến, tạo SUBMITTED event, cập nhật status cùng transaction.
+5. Không nhận proposedById, kitchenId, schoolId hoặc status từ client để quyết định scope.
+
+Approve transaction:
+1. Khóa MealPlan/revision; xác nhận revision SUBMITTED.
+2. Xác nhận approver thuộc schoolId, có quyền approve và khác proposer.
+3. Chuyển revision hiệu lực cũ thành SUPERSEDED.
+4. Chuyển revision mới thành APPROVED, cập nhật current pointer và ghi event.
+5. Commit nguyên tử; idempotency key hoặc kiểm tra trạng thái chống double submit/approve.
+
+### 20.7. Các quyết định còn mở trước migration
+
+1. Chạy lại read-only profiling ngay trước migration; baseline 17/11/2026 không đại diện dữ liệu hiện tại.
+2. Chốt danh mục nhóm tuổi và mapping khối lớp của TH Phạm Hùng; không tự đặt tuổi/khẩu phần.
+3. Chốt cấu trúc recipe hiện tại trong UI: nguyên liệu, định lượng, quy trình, nutrition/allergen; xác định parser JSON legacy.
+4. Chốt chia sẻ DishVersion: đề xuất Kitchen chọn một hoặc nhiều School trong danh sách assignment hiệu lực; tạo DishApproval PENDING riêng cho từng School đích.
+5. Draft MealPlan có thể lưu trước khi món được duyệt; nhưng submit bắt buộc mọi DishVersion đã APPROVED tại School đích.
+6. Chốt idempotency cho submit/approve để retry không tạo event trùng.
+7. Chốt timezone nghiệp vụ khi so assignment startsAt/endsAt với serviceDate.
+8. Viết integration tests cho giả mạo schoolId/kitchenId, proposer tự duyệt, assignment hết hạn, approval ở trường khác và race condition hai approver.
+
+### 20.8. Tiêu chí nghiệm thu M1–M3
+
+- CENTRAL_KITCHEN chỉ tạo/sửa món thuộc kitchenId của mình.
+- DishVersion được duyệt tại School A không tự động duyệt tại School B.
+- MealPlan duy nhất theo School + serviceDate + mealType; mỗi lần gửi tạo revision mới.
+- Không submit khi assignment không hiệu lực tại serviceDate.
+- Không submit khi có DishVersion chưa được School đích duyệt.
+- SCHOOL_ADMIN chỉ xem/duyệt schoolId của mình; đổi ID URL/body phải bị từ chối.
+- Proposer không tự approve; người ngoài School không approve.
+- Revision đã submit/approved không bị sửa nội dung; revision mới giữ lịch sử.
+- Duyệt revision mới supersede revision hiện hành trong cùng transaction.
+- SCHOOL_KITCHEN receiver không gọi được API tạo món, submit hoặc duyệt thực đơn.
+- API không fallback localStorage DEMO; UI báo trạng thái trống khi chưa có dữ liệu hệ thống.
+- Không ảnh hưởng 5 workspace, không thêm role/workspace.
+
+**Kết luận mục 20:** M1–M3 đã có thiết kế dữ liệu, API contract, state transitions, authorization matrix và acceptance criteria ở mức review. Đây chưa phải Prisma schema đã triển khai. Sau khi chốt các quyết định tại 20.7 mới chuyển thành Prisma models và migration additive; không tạo migration trước khi xác nhận các quyết định còn mở.
