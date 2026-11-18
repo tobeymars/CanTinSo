@@ -2313,3 +2313,26 @@ Prisma schema không biểu diễn được partial unique index, exclusion cons
 - [ ] Xác nhận có cho phép một MealPlan có nhiều revision DRAFT song song; khuyến nghị chỉ một DRAFT đang chỉnh sửa để giảm xung đột.
 - [ ] Xác nhận quyết định trả lại có bắt buộc note; đề xuất bắt buộc.
 - [ ] Chạy `npx prisma format` và `npx prisma validate` trên schema đã áp dụng, nhưng chưa chạy migrate cho đến khi review SQL constraints và data backfill.
+
+
+### 21.8. Quyết định đã được chủ dự án chấp thuận và áp dụng vào schema
+
+Ngày 18/11/2026, chủ dự án đồng ý các mặc định sau:
+
+1. **Một bản nháp đang chỉnh sửa:** mỗi MealPlan chỉ có tối đa một revision ở trạng thái DRAFT tại một thời điểm. Enforce bằng PostgreSQL partial unique index trong migration, không chỉ bằng UI.
+2. **Một nguyên liệu một dòng trong công thức:** `DishIngredient` unique theo `[dishVersionId, ingredientId]`. Thông tin sơ chế ghi ở `preparationNote`; không tạo nhiều dòng cùng nguyên liệu trong một version ở v1.
+3. **Bắt buộc lý do khi trả lại:** API/service phải reject thao tác RETURNED nếu note rỗng sau trim; lưu lý do vào decisionNote và event tương ứng. DB CHECK/trigger sẽ được cân nhắc khi viết migration.
+
+### 21.9. Trạng thái áp dụng vào `prisma/schema.prisma`
+
+Commit `0b8a32665e850710a4763256e0780e008a8bca57` đã thêm 6 enum và 11 model mới vào schema chính, đồng thời bổ sung relation arrays cho User, School, Kitchen và Ingredient.
+
+Đây là **expand-stage schema**, có chủ ý giữ tương thích trong khi chưa có migration:
+
+- `Dish.kitchenId` và `MealPlan.kitchenId` đang nullable để không tự gán chủ sở hữu cho dữ liệu cũ. Chỉ chuyển NOT NULL sau khi backfill có chứng cứ.
+- Giữ `Dish.code @unique` toàn cục ở giai đoạn này; chỉ chuyển sang unique theo Kitchen trong migration cutover sau khi kiểm tra trùng.
+- Giữ `Dish.recipe`, `MealPlan.servings`, `MealPlan.status` và model `MealPlanItem` legacy để không làm mất đường tương thích của API hiện hành.
+- Các bảng mới chưa được tạo trong PostgreSQL. Chưa có migration, chưa có dữ liệu seed nhóm tuổi và chưa chuyển API/UI sang các model mới.
+- `mealSlot` tiếp tục là String ở v1; chưa seed danh mục hay tự suy diễn từ dữ liệu giao diện.
+
+Schema đã được cập nhật trên GitHub nhưng cần chạy Prisma CLI trong môi trường local của dự án để xác nhận `prisma format` và `prisma validate`. Chưa được chạy `migrate dev`, `migrate deploy`, `db push` hoặc bất kỳ lệnh thay đổi database nào ở bước này.
