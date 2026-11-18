@@ -5,6 +5,7 @@ import CountUp from './components/react-bits/CountUp'
 import ClickSpark from './components/react-bits/ClickSpark'
 import type { School } from './lib/data'
 import type { ViewRole } from './lib/store'
+import { getStoredUser } from './lib/authApi'
 import { useUI } from './lib/store'
 import { dishImage } from './lib/dishImages'
 import { gradeForSchool, kitchenDishProposalsRepository, KITCHEN_DISH_PROPOSALS_KEY, mealTypeOptions, kitchenDirectoryRepository } from './lib/boardingMenu'
@@ -30,7 +31,9 @@ export default function KitchenDishCatalog({ school, role }: { school: School; r
   const isKitchen = role === 'central_kitchen' || role === 'school_kitchen'
   const correctKitchen = role === 'central_kitchen' ? school.mode === 'CENTRAL_KITCHEN' : school.mode === 'ON_SITE'
   const kitchens = useMemo(() => kitchenDirectoryRepository.load().filter(item => item.active && item.assignedSchoolIds.includes(school.id) && item.type === (role === 'central_kitchen' ? 'CENTRAL_KITCHEN' : 'ON_SITE')), [school.id, role])
-  const canManage = isKitchen && correctKitchen && kitchens.length > 0
+  const storedUser = getStoredUser()
+  const hasKitchenScope = !storedUser || role !== 'school_kitchen' || !!storedUser.kitchenId
+  const canManage = isKitchen && correctKitchen && kitchens.length > 0 && hasKitchenScope
   const [proposals, setProposals] = useState<KitchenDishProposal[]>(() => { try { return kitchenDishProposalsRepository.load() } catch { return [] } })
   const [editor, setEditor] = useState<{ key: string; value: KitchenDishProposal | null } | null>(null)
   const [detail, setDetail] = useState<string | null>(null)
