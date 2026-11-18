@@ -72,7 +72,6 @@ enum TraceEventType {
   REJECTED
 }
 
-
 enum DishStatus {
   DRAFT
   ACTIVE
@@ -127,19 +126,19 @@ model User {
   isActive     Boolean  @default(true) @map("is_active")
   schoolId     String?  @map("school_id") @db.Uuid
   wardId       String?  @map("ward_id") @db.Uuid
-  school       School?  @relation(fields: [schoolId], references: [id])
+  school       School?  @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   ward         Ward?    @relation(fields: [wardId], references: [id])
   kitchenId    String?  @map("kitchen_id") @db.Uuid
   kitchen      Kitchen? @relation(fields: [kitchenId], references: [id])
 
-  createdDishVersions       DishVersion[]             @relation("DishVersionCreatedBy")
-  decidedDishApprovals     DishApproval[]            @relation("DishApprovalDecidedBy")
-  dishApprovalEvents       DishApprovalEvent[]       @relation("DishApprovalEventActor")
-  proposedMealPlanRevisions MealPlanRevision[]        @relation("MealPlanRevisionProposedBy")
-  decidedMealPlanRevisions MealPlanRevision[]         @relation("MealPlanRevisionDecidedBy")
-  mealPlanApprovalEvents   MealPlanApprovalEvent[]   @relation("MealPlanApprovalEventActor")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  createdDishVersions       DishVersion[]           @relation("DishVersionCreatedBy")
+  decidedDishApprovals      DishApproval[]          @relation("DishApprovalDecidedBy")
+  dishApprovalEvents        DishApprovalEvent[]     @relation("DishApprovalEventActor")
+  proposedMealPlanRevisions MealPlanRevision[]      @relation("MealPlanRevisionProposedBy")
+  decidedMealPlanRevisions  MealPlanRevision[]      @relation("MealPlanRevisionDecidedBy")
+  mealPlanApprovalEvents    MealPlanApprovalEvent[] @relation("MealPlanApprovalEventActor")
+  createdAt                 DateTime                @default(now()) @map("created_at")
+  updatedAt                 DateTime                @updatedAt @map("updated_at")
 
   @@index([schoolId, role])
   @@index([kitchenId, role])
@@ -147,14 +146,14 @@ model User {
 }
 
 model Ward {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
   name      String
-  code      String?  @unique
+  code      String?   @unique
   schools   School[]
   users     User[]
   kitchens  Kitchen[]
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("wards")
 }
@@ -185,25 +184,25 @@ model School {
 }
 
 model Kitchen {
-  id          String          @id @default(uuid()) @db.Uuid
-  code        String          @unique
+  id          String                    @id @default(uuid()) @db.Uuid
+  code        String                    @unique
   name        String
-  type        KitchenType     @default(CENTRAL)
-  schoolId    String?         @unique @map("school_id") @db.Uuid
-  school      School?         @relation("SchoolOnSiteKitchen", fields: [schoolId], references: [id], onDelete: Restrict)
-  wardId      String?         @map("ward_id") @db.Uuid
-  ward        Ward?           @relation(fields: [wardId], references: [id], onDelete: Restrict)
+  type        KitchenType               @default(CENTRAL)
+  schoolId    String?                   @unique @map("school_id") @db.Uuid
+  school      School?                   @relation("SchoolOnSiteKitchen", fields: [schoolId], references: [id], onDelete: Restrict)
+  wardId      String?                   @map("ward_id") @db.Uuid
+  ward        Ward?                     @relation(fields: [wardId], references: [id], onDelete: Restrict)
   address     String?
-  contactName String?         @map("contact_name")
+  contactName String?                   @map("contact_name")
   phone       String?
   capacity    Int?
-  isActive    Boolean         @default(true) @map("is_active")
+  isActive    Boolean                   @default(true) @map("is_active")
   users       User[]
   dishes      Dish[]
   mealPlans   MealPlan[]
   schools     KitchenSchoolAssignment[]
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @updatedAt @map("updated_at")
 
   @@index([wardId, type, isActive])
   @@map("kitchens")
@@ -241,22 +240,22 @@ model Classroom {
 }
 
 model Student {
-  school             School                     @relation(fields: [schoolId], references: [id])
-  id               String            @id @default(uuid()) @db.Uuid
-  code             String
-  name             String
-  classroomId      String?           @map("classroom_id") @db.Uuid
-  gender           Gender?
-  birthDate        DateTime?         @map("birth_date") @db.Date
-  guardian         String?
-  phone            String?
-  status           StudentStatus     @default(ACTIVE)
-  schoolId         String            @map("school_id") @db.Uuid
-  notes            String?
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
-  classroom        Classroom?        @relation(fields: [classroomId], references: [id], onDelete: SetNull)
-  attendanceEvents AttendanceEvent[]
+  school               School                       @relation(fields: [schoolId], references: [id])
+  id                   String                       @id @default(uuid()) @db.Uuid
+  code                 String
+  name                 String
+  classroomId          String?                      @map("classroom_id") @db.Uuid
+  gender               Gender?
+  birthDate            DateTime?                    @map("birth_date") @db.Date
+  guardian             String?
+  phone                String?
+  status               StudentStatus                @default(ACTIVE)
+  schoolId             String                       @map("school_id") @db.Uuid
+  notes                String?
+  createdAt            DateTime                     @default(now()) @map("created_at")
+  updatedAt            DateTime                     @updatedAt @map("updated_at")
+  classroom            Classroom?                   @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  attendanceEvents     AttendanceEvent[]
   hikvisionEnrollments HikvisionStudentEnrollment[]
 
   @@unique([schoolId, code])
@@ -311,14 +310,14 @@ model Supplier {
 }
 
 model Ingredient {
-  id        String         @id @default(uuid()) @db.Uuid
-  code      String         @unique
-  name      String
-  unit      String
-  category  String?
-  lots      InventoryLot[]
+  id              String           @id @default(uuid()) @db.Uuid
+  code            String           @unique
+  name            String
+  unit            String
+  category        String?
+  lots            InventoryLot[]
   dishIngredients DishIngredient[]
-  createdAt DateTime       @default(now()) @map("created_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
 
   @@map("ingredients")
 }
@@ -354,7 +353,7 @@ model Dish {
   name          String
   category      String?
   status        DishStatus     @default(DRAFT)
-  recipe        Json?          // legacy snapshot; remove only after API/UI cutover
+  recipe        Json? // legacy snapshot; remove only after API/UI cutover
   kitchen       Kitchen?       @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
   versions      DishVersion[]
   mealPlanItems MealPlanItem[] // legacy relation retained for compatibility
@@ -365,19 +364,19 @@ model Dish {
 }
 
 model MealPlan {
-  school      School       @relation(fields: [schoolId], references: [id])
-  id          String       @id @default(uuid()) @db.Uuid
-  schoolId    String       @map("school_id") @db.Uuid
+  school      School             @relation(fields: [schoolId], references: [id])
+  id          String             @id @default(uuid()) @db.Uuid
+  schoolId    String             @map("school_id") @db.Uuid
   // Nullable during expand/backfill; required after kitchen ownership is verified.
-  kitchenId   String?      @map("kitchen_id") @db.Uuid
-  kitchen     Kitchen?     @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
-  serviceDate DateTime     @map("service_date") @db.Date
-  mealType    MealType     @map("meal_type")
-  servings    Int          // legacy aggregate; remove after revision cutover
-  status      String       @default("DRAFT") // legacy status; revision is target workflow source
+  kitchenId   String?            @map("kitchen_id") @db.Uuid
+  kitchen     Kitchen?           @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  serviceDate DateTime           @map("service_date") @db.Date
+  mealType    MealType           @map("meal_type")
+  servings    Int // legacy aggregate; remove after revision cutover
+  status      String             @default("DRAFT") // legacy status; revision is target workflow source
   items       MealPlanItem[] // legacy relation retained for compatibility
   revisions   MealPlanRevision[]
-  createdAt   DateTime     @default(now()) @map("created_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
 
   @@unique([schoolId, serviceDate, mealType])
   @@index([kitchenId, serviceDate])
@@ -427,20 +426,19 @@ model TraceEvent {
   @@map("trace_events")
 }
 
-
 model HikvisionStudentEnrollment {
-  school        School   @relation(fields: [schoolId], references: [id])
-  id            String   @id @default(uuid()) @db.Uuid
-  schoolId      String   @map("school_id") @db.Uuid
-  studentId     String   @map("student_id") @db.Uuid
-  deviceId      String   @map("device_id")
-  employeeNo    String   @map("employee_no")
-  userCreatedAt DateTime? @map("user_created_at")
+  school         School    @relation(fields: [schoolId], references: [id])
+  id             String    @id @default(uuid()) @db.Uuid
+  schoolId       String    @map("school_id") @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  deviceId       String    @map("device_id")
+  employeeNo     String    @map("employee_no")
+  userCreatedAt  DateTime? @map("user_created_at")
   faceUploadedAt DateTime? @map("face_uploaded_at")
-  lastError     String?  @map("last_error")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([deviceId, employeeNo])
   @@unique([deviceId, studentId])
@@ -448,20 +446,19 @@ model HikvisionStudentEnrollment {
   @@map("hikvision_student_enrollments")
 }
 
-
 model DishVersion {
-  id                String             @id @default(uuid()) @db.Uuid
-  dishId            String             @map("dish_id") @db.Uuid
-  versionNo         Int                @map("version_no")
-  status            DishVersionStatus  @default(DRAFT)
-  recipeSnapshot    Json               @map("recipe_snapshot")
-  nutritionSnapshot Json?              @map("nutrition_snapshot")
-  allergenSnapshot  Json?              @map("allergen_snapshot")
-  createdById       String             @map("created_by_id") @db.Uuid
-  submittedAt       DateTime?          @map("submitted_at")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  dish              Dish               @relation(fields: [dishId], references: [id], onDelete: Restrict)
-  createdBy         User               @relation("DishVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  id                String                 @id @default(uuid()) @db.Uuid
+  dishId            String                 @map("dish_id") @db.Uuid
+  versionNo         Int                    @map("version_no")
+  status            DishVersionStatus      @default(DRAFT)
+  recipeSnapshot    Json                   @map("recipe_snapshot")
+  nutritionSnapshot Json?                  @map("nutrition_snapshot")
+  allergenSnapshot  Json?                  @map("allergen_snapshot")
+  createdById       String                 @map("created_by_id") @db.Uuid
+  submittedAt       DateTime?              @map("submitted_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  dish              Dish                   @relation(fields: [dishId], references: [id], onDelete: Restrict)
+  createdBy         User                   @relation("DishVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   ingredients       DishIngredient[]
   approvals         DishApproval[]
   mealPlanItems     MealPlanRevisionItem[]
@@ -488,19 +485,19 @@ model DishIngredient {
 }
 
 model DishApproval {
-  id            String             @id @default(uuid()) @db.Uuid
-  schoolId      String             @map("school_id") @db.Uuid
-  dishVersionId String             @map("dish_version_id") @db.Uuid
-  status        DishApprovalStatus @default(PENDING)
-  submittedAt   DateTime           @default(now()) @map("submitted_at")
-  decidedAt     DateTime?          @map("decided_at")
-  decidedById   String?            @map("decided_by_id") @db.Uuid
-  decisionNote  String?            @map("decision_note")
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
-  school        School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  dishVersion   DishVersion        @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
-  decidedBy     User?              @relation("DishApprovalDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  id            String              @id @default(uuid()) @db.Uuid
+  schoolId      String              @map("school_id") @db.Uuid
+  dishVersionId String              @map("dish_version_id") @db.Uuid
+  status        DishApprovalStatus  @default(PENDING)
+  submittedAt   DateTime            @default(now()) @map("submitted_at")
+  decidedAt     DateTime?           @map("decided_at")
+  decidedById   String?             @map("decided_by_id") @db.Uuid
+  decisionNote  String?             @map("decision_note")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  school        School              @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  dishVersion   DishVersion         @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
+  decidedBy     User?               @relation("DishApprovalDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
   events        DishApprovalEvent[]
 
   @@unique([schoolId, dishVersionId])
@@ -525,20 +522,20 @@ model DishApprovalEvent {
 }
 
 model MealPlanRevision {
-  id           String                  @id @default(uuid()) @db.Uuid
-  mealPlanId   String                  @map("meal_plan_id") @db.Uuid
-  revisionNo   Int                     @map("revision_no")
-  status       MealPlanRevisionStatus  @default(DRAFT)
-  proposedById String                  @map("proposed_by_id") @db.Uuid
-  submittedAt  DateTime?               @map("submitted_at")
-  decidedAt    DateTime?               @map("decided_at")
-  decidedById  String?                 @map("decided_by_id") @db.Uuid
-  decisionNote String?                 @map("decision_note")
-  createdAt    DateTime                @default(now()) @map("created_at")
-  updatedAt    DateTime                @updatedAt @map("updated_at")
-  mealPlan     MealPlan                @relation(fields: [mealPlanId], references: [id], onDelete: Restrict)
-  proposedBy   User                    @relation("MealPlanRevisionProposedBy", fields: [proposedById], references: [id], onDelete: Restrict)
-  decidedBy    User?                   @relation("MealPlanRevisionDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  id           String                     @id @default(uuid()) @db.Uuid
+  mealPlanId   String                     @map("meal_plan_id") @db.Uuid
+  revisionNo   Int                        @map("revision_no")
+  status       MealPlanRevisionStatus     @default(DRAFT)
+  proposedById String                     @map("proposed_by_id") @db.Uuid
+  submittedAt  DateTime?                  @map("submitted_at")
+  decidedAt    DateTime?                  @map("decided_at")
+  decidedById  String?                    @map("decided_by_id") @db.Uuid
+  decisionNote String?                    @map("decision_note")
+  createdAt    DateTime                   @default(now()) @map("created_at")
+  updatedAt    DateTime                   @updatedAt @map("updated_at")
+  mealPlan     MealPlan                   @relation(fields: [mealPlanId], references: [id], onDelete: Restrict)
+  proposedBy   User                       @relation("MealPlanRevisionProposedBy", fields: [proposedById], references: [id], onDelete: Restrict)
+  decidedBy    User?                      @relation("MealPlanRevisionDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
   ageGroups    MealPlanRevisionAgeGroup[]
   items        MealPlanRevisionItem[]
   events       MealPlanApprovalEvent[]
@@ -550,13 +547,13 @@ model MealPlanRevision {
 }
 
 model MealPlanAgeGroup {
-  id           String                     @id @default(uuid()) @db.Uuid
-  code         String                     @unique
+  id           String                        @id @default(uuid()) @db.Uuid
+  code         String                        @unique
   name         String
-  minAgeMonths Int?                       @map("min_age_months")
-  maxAgeMonths Int?                       @map("max_age_months")
-  sortOrder    Int                        @default(0) @map("sort_order")
-  isActive     Boolean                    @default(true) @map("is_active")
+  minAgeMonths Int?                          @map("min_age_months")
+  maxAgeMonths Int?                          @map("max_age_months")
+  sortOrder    Int                           @default(0) @map("sort_order")
+  isActive     Boolean                       @default(true) @map("is_active")
   revisionRows MealPlanRevisionAgeGroup[]
   portionRows  MealPlanItemAgeGroupPortion[]
 
@@ -578,15 +575,15 @@ model MealPlanRevisionAgeGroup {
 }
 
 model MealPlanRevisionItem {
-  id            String                         @id @default(uuid()) @db.Uuid
-  revisionId    String                         @map("revision_id") @db.Uuid
-  dishVersionId String                         @map("dish_version_id") @db.Uuid
-  mealSlot      String                         @map("meal_slot")
-  sequence      Int                            @default(0)
-  isDefault     Boolean                        @default(true) @map("is_default")
+  id            String                        @id @default(uuid()) @db.Uuid
+  revisionId    String                        @map("revision_id") @db.Uuid
+  dishVersionId String                        @map("dish_version_id") @db.Uuid
+  mealSlot      String                        @map("meal_slot")
+  sequence      Int                           @default(0)
+  isDefault     Boolean                       @default(true) @map("is_default")
   note          String?
-  revision      MealPlanRevision               @relation(fields: [revisionId], references: [id], onDelete: Restrict)
-  dishVersion   DishVersion                    @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
+  revision      MealPlanRevision              @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  dishVersion   DishVersion                   @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
   portions      MealPlanItemAgeGroupPortion[]
 
   @@unique([revisionId, mealSlot, dishVersionId])
@@ -595,14 +592,14 @@ model MealPlanRevisionItem {
 }
 
 model MealPlanItemAgeGroupPortion {
-  id             String                   @id @default(uuid()) @db.Uuid
-  revisionItemId String                   @map("revision_item_id") @db.Uuid
-  ageGroupId     String                   @map("age_group_id") @db.Uuid
-  portionFactor  Decimal                  @default(1) @map("portion_factor") @db.Decimal(10, 4)
-  unitCode       String                   @map("unit_code")
-  overrideReason String?                  @map("override_reason")
-  revisionItem   MealPlanRevisionItem     @relation(fields: [revisionItemId], references: [id], onDelete: Restrict)
-  ageGroup       MealPlanAgeGroup         @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+  id             String               @id @default(uuid()) @db.Uuid
+  revisionItemId String               @map("revision_item_id") @db.Uuid
+  ageGroupId     String               @map("age_group_id") @db.Uuid
+  portionFactor  Decimal              @default(1) @map("portion_factor") @db.Decimal(10, 4)
+  unitCode       String               @map("unit_code")
+  overrideReason String?              @map("override_reason")
+  revisionItem   MealPlanRevisionItem @relation(fields: [revisionItemId], references: [id], onDelete: Restrict)
+  ageGroup       MealPlanAgeGroup     @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
 
   @@unique([revisionItemId, ageGroupId])
   @@index([ageGroupId])
@@ -610,15 +607,15 @@ model MealPlanItemAgeGroupPortion {
 }
 
 model MealPlanApprovalEvent {
-  id         String                     @id @default(uuid()) @db.Uuid
-  revisionId String                     @map("revision_id") @db.Uuid
-  eventType  MealPlanApprovalEventType   @map("event_type")
-  actorId    String                     @map("actor_id") @db.Uuid
-  actorRole  UserRole                   @map("actor_role")
+  id         String                    @id @default(uuid()) @db.Uuid
+  revisionId String                    @map("revision_id") @db.Uuid
+  eventType  MealPlanApprovalEventType @map("event_type")
+  actorId    String                    @map("actor_id") @db.Uuid
+  actorRole  UserRole                  @map("actor_role")
   note       String?
-  occurredAt DateTime                   @default(now()) @map("occurred_at")
-  revision   MealPlanRevision           @relation(fields: [revisionId], references: [id], onDelete: Restrict)
-  actor      User                       @relation("MealPlanApprovalEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+  occurredAt DateTime                  @default(now()) @map("occurred_at")
+  revision   MealPlanRevision          @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  actor      User                      @relation("MealPlanApprovalEventActor", fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([revisionId, occurredAt])
   @@index([actorId, occurredAt])
