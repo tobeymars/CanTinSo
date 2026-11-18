@@ -1687,3 +1687,116 @@ Các enum trên là danh sách mục tiêu, cần rà soát tên và mapping tr�
 8. Sau migration: Prisma validate/generate, backend build, migration status, integration tests, đối chiếu row counts và ledger balance.
 
 **Trạng thái sau mục 18:** Physical Schema v1 được chốt ở mức đặc tả thiết kế. Chưa sửa `schema.prisma`, chưa tạo migration, chưa chạy DDL/DML và chưa thay đổi database hoặc dữ liệu. Các mục 18.1–18.11 là tiêu chí để bước tiếp theo đối chiếu model hiện hữu và thiết kế migration; không phải xác nhận rằng các invariant đã được triển khai.
+
+
+## 19. Đối chiếu Physical Schema v1 với Prisma hiện tại (18/11/2026)
+
+> Phạm vi: đọc `cantinso-backend/prisma/schema.prisma` trên nhánh `feature/ubnd-ward-school-access`. Đây là đánh giá thiết kế, không phải xác nhận schema DB đã đồng bộ với file Prisma. Không sửa Prisma, không tạo migration và không chạy DDL/DML trong bước này.
+
+### 19.1. Kết luận tổng quan
+
+Schema hiện tại mới có khung tổ chức, học sinh/điểm danh và một phần thử nghiệm món-kho-thực đơn. Nó chưa phải schema vận hành chuỗi cung ứng bữa ăn theo Physical Schema v1. Các khác biệt quan trọng là khác biệt về ownership và lịch sử, không chỉ thiếu bảng:
+
+- Supplier đang thuộc School; mục tiêu Supplier là danh mục dùng chung và quan hệ sử dụng theo Kitchen.
+- InventoryLot đang thuộc School; mục tiêu lot thuộc Kitchen + InventoryLocation và liên kết nhà cung cấp đã được Kitchen cho phép.
+- Dish hiện không có Kitchen owner; recipe nằm trong JSON và chưa có DishVersion/approval per School.
+- MealPlan hiện chỉ thuộc School; chưa lưu Kitchen đề xuất, revision, age group, DishVersion hoặc approval event.
+- Chưa có stock receipt/movement ledger, InventoryLocation, ProductionBatch, Delivery và DeliveryReceipt.
+- TraceEvent hiện cascade khi InventoryLot bị xóa, trái yêu cầu bảo toàn lịch sử.
+- KitchenSchoolAssignment có cascade khi xóa Kitchen và chưa có ràng buộc DB chống khoảng thời gian phân công chồng lấn.
+- User có thể có nhiều scope nullable cùng lúc; schema chưa có CHECK/DB policy bảo đảm tổ hợp scope hợp lệ theo role.
+
+### 19.2. Bảng đối chiếu model hiện tại
+
+| Model hiện tại | Hiện trạng trong Prisma | Mục tiêu Physical Schema v1 | Hướng xử lý |
+|---|---|---|---|
+| User | schoolId, wardId, kitchenId đều nullable; không có CHECK theo role | Giữ role hiện hữu; scope rõ, actor audit; kitchen staff và school receiver tách bằng scope/policy | Giữ model, bổ sung validation/policy; đánh giá CHECK DB sau khi rà soát tài khoản và luồng tạo user |
+| Ward | Quan hệ School/Kitchen/User | Giữ | Giữ, không cần thay đổi cốt lõi |
+| School | Có ward, on-site Kitchen, assignment, Supplier, InventoryLot, MealPlan | School là bên nhận/duyệt; không sở hữu kho bếp trung tâm hoặc supplier master | Gỡ quan hệ ownership cũ sau khi chuyển dữ liệu và cập nhật code |
+| Kitchen | type, schoolId unique nullable, wardId; chưa có inventory locations/dishes/stock | Tenant nghiệp vụ của bếp; CENTRAL hoặc SCHOOL; sở hữu recipe, stock, production | Giữ lõi; bổ sung quan hệ theo Kitchen; ràng buộc Kitchen.type=SCHOOL phải có School tương ứng và CENTRAL không được dùng schoolId nếu chính sách chốt như vậy |
+| KitchenSchoolAssignment | Unique kitchenId+schoolId+startsAt; kitchen FK CASCADE; chưa chống overlap | Lịch sử phân công, không cascade; khoảng hiệu lực [start,end), một trường không có assignment chồng thời gian | Đổi delete policy; thêm CHECK endsAt>startsAt và exclusion/trigger chống overlap |
+| Supplier | schoolId bắt buộc; code unique theo School; không có SupplierKitchen | Danh mục Supplier dùng chung; liên kết SupplierKitchen | Tạo SupplierKitchen; chuyển ownership và mã code theo quy tắc toàn cục; chỉ bỏ schoolId sau backfill và sửa API |
+| Ingredient | code unique, unit là String; thiếu Unit/Allergen/conversion | Ingredient chuẩn dùng chung, đơn vị chuẩn, quy đổi và allergen | Giữ Ingredient ID; chuẩn hóa Unit/IngredientUnitConversion/Allergen và liên kết sau khi thống kê giá trị unit hiện có |
+| InventoryLot | schoolId, supplierId, ingredientId; không có kitchenId/locationId; unique schoolId+lotCode; Decimal(12,3) | Lot thuộc Kitchen + location + ingredient; supplier phải được phép với Kitchen; unique kitchenId+ingredientId+lotCode; Decimal(14,3) mục tiêu | Backfill kitchen có kiểm chứng; tạo location; thêm composite FK; không suy owner chỉ từ assignment hiện tại |
+| Dish | code unique toàn cục; recipe Json?; không kitchenId/version | Kitchen-owned Dish + DishVersion snapshot + DishIngredient | Tạo cấu trúc phiên bản; chuyển recipe JSON bằng script có kiểm tra shape; không xóa JSON nguồn trước nghiệm thu |
+| MealPlan | schoolId, serviceDate, mealType, servings, status String; unique school/date/type | Thêm kitchenId, revision snapshot, status enum, age groups, approvals; giữ unique một plan/school/date/mealType | Giữ MealPlan identity; tạo MealPlanRevision và các bảng con; chuyển trạng thái sau khi mapping rõ |
+| MealPlanItem | dishId trực tiếp, servings, unique planId+dishId; CASCADE từ MealPlan | Item thuộc revision và DishVersion, age group/portion; lịch sử không cascade | Thêm revisionId/DishVersion/ageGroup; backfill mapping; bỏ quan hệ dish trực tiếp sau cutover |
+| FoodSafetyCheck | schoolId, checkedById là scalar optional, evidence Json | Gắn với đợt/Delivery/Production hoặc kiểm tra tại trường; actor và snapshot kiểm tra | Giữ lịch sử; bổ sung quan hệ theo nghiệp vụ sau khi chốt biểu mẫu kiểm thực; không ép mọi kiểm tra vào một loại resource |
+| TraceEvent | lotId bắt buộc; CASCADE từ InventoryLot; actorId scalar | Append-only event, giữ lot và liên kết movement/batch/delivery; RESTRICT | Đổi delete policy trước khi mở rộng module truy xuất; thêm quan hệ/actor snapshot và scope |
+| Classroom/Student/AttendanceEvent/HikvisionStudentEnrollment | Miền học sinh, điểm danh và thiết bị | Không thuộc chuỗi cung ứng; giữ nguyên trừ các FK lịch sử riêng | Không đưa vào migration chuỗi cung ứng, không đổi khóa hoặc scope trong đợt này |
+
+### 19.3. Đối chiếu enum, kiểu dữ liệu và constraint
+
+| Hạng mục | Prisma hiện tại | Đích/nhận xét |
+|---|---|---|
+| UserRole | Đã có SUPER_ADMIN, SCHOOL_ADMIN, SCHOOL_STAFF, KITCHEN_MANAGER, NUTRITIONIST, WAREHOUSE_STAFF, PARENT, UBND_ADMIN, CENTRAL_KITCHEN, SCHOOL_KITCHEN | Giữ nguyên; không đổi tên hoặc thêm role trong migration chuỗi cung ứng đầu tiên |
+| KitchenType | SCHOOL, CENTRAL | Giữ; cần DB CHECK/validation cho quan hệ schoolId theo loại bếp |
+| LotStatus | AVAILABLE, QUARANTINED, EXPIRED, DEPLETED | Có thể giữ mapping; cần quy tắc trạng thái theo expiry/balance, không tự suy trạng thái chỉ từ số lượng |
+| SupplierStatus | ACTIVE, INACTIVE | Có thể giữ SupplierStatus; SupplierKitchen cần status riêng |
+| MealType | BREAKFAST, LUNCH, DINNER, SNACK | Giữ |
+| TraceEventType | RECEIVED, INSPECTED, STORED, PREPARED, COOKED, SERVED, REJECTED | Giữ lịch sử giá trị; mở rộng theo migration additive nếu cần |
+| FoodCheckStatus | PASS, FAIL, NEEDS_REVIEW | Giữ |
+| MealPlan.status | String | Chuyển sang enum chỉ sau khi lập mapping đầy đủ mọi giá trị DB và API |
+| Quantity | Decimal(12,3) trên InventoryLot | Physical Schema đề xuất Decimal(14,3); cần kiểm tra max hiện tại và tính tương thích trước khi alter |
+| Dates/timestamps | DateTime mặc định Prisma; serviceDate/birthDate/expiryDate là @db.Date | Các ngày lịch giữ @db.Date; thời điểm audit/occurredAt cần xác nhận native type DB và chuẩn UTC/timestamptz trước khi đổi |
+| Recipe | Json? | Tạm giữ nguồn trong giai đoạn chuyển; cấu trúc đích là DishVersion + DishIngredient |
+| Delete rules | Assignment Kitchen CASCADE; MealPlanItem MealPlan CASCADE; TraceEvent Lot CASCADE | Ba quan hệ phải review; TraceEvent→Lot là ưu tiên cao nhất |
+
+### 19.4. Các sai lệch và rủi ro cần xử lý theo mức độ
+
+**P0 — phải giải quyết trước khi phát hành nghiệp vụ kho/truy xuất mới**
+1. `trace_events.lot_id ON DELETE CASCADE`: nguy cơ xóa lịch sử trace. Chuyển RESTRICT và dùng archive/reversal.
+2. InventoryLot đang gắn schoolId và Supplier.schoolId: không đáp ứng một kho trung tâm dùng chung cho nhiều trường. Không mở rộng nghiệp vụ tồn kho trên cấu trúc này.
+3. Dish không có kitchenId: không thể bảo đảm ownership và cô lập dữ liệu món giữa các bếp.
+4. MealPlan chưa có kitchenId/revision: chưa thể xác định bếp đề xuất và snapshot được duyệt dùng cho sản xuất.
+5. Không có stock ledger: remainingQty hiện là số dư trên lot, không có chứng từ nhập/xuất bất biến để tái lập số dư.
+
+**P1 — phải hoàn tất trước khi vận hành đa bếp/đa trường**
+1. Composite FK để ngăn lot/location/supplier/movement khác Kitchen.
+2. Assignment overlap và kiểm tra hiệu lực tại serviceDate.
+3. Delete policy của KitchenSchoolAssignment và MealPlanItem.
+4. Supplier master + SupplierKitchen.
+5. DishVersion, DishApproval per School, MealPlanRevision và approval events.
+6. ProductionBatch, Delivery, DeliveryReceipt, TraceEvent links.
+
+**P2 — hoàn thiện chất lượng dữ liệu và tối ưu**
+1. Unit, conversion, allergen và snapshot dinh dưỡng.
+2. Index theo truy vấn thực tế, idempotency và balance cache.
+3. CHECK precision/range/quantity và append-only enforcement.
+4. Chuẩn hóa timestamp native type sau khi xác minh dữ liệu và cấu hình timezone.
+
+### 19.5. Kế hoạch migration đề xuất — chưa tạo migration
+
+| Giai đoạn | Nội dung | Điều kiện chuyển giai đoạn |
+|---|---|---|
+| M0 — bảo vệ hiện trạng | Backup; xác nhận schema DB khớp migration history; test restore; lưu snapshot số lượng và FK | Có backup khôi phục được và baseline được ghi nhận |
+| M1 — danh mục và Kitchen ownership | Tạo SupplierKitchen, InventoryLocation; thêm kitchenId/locationId nullable vào lot; thêm Kitchen ownership vào Dish; tạo mapping Unit/Allergen | Mapping từng dòng được xác minh; không có lot/dish owner mơ hồ |
+| M2 — recipe và approval | Tạo DishVersion, DishIngredient, DishApproval, ApprovalEvent; chuyển recipe JSON thành version snapshot | Tất cả JSON có parser/mapping hoặc được đưa vào danh sách cách ly; không mất nội dung nguồn |
+| M3 — MealPlan revision | Thêm kitchenId, MealPlanRevision, revision items/age-group portions/approval events; chuyển MealPlanItem cũ sang revision đầu | Mọi plan có kitchen owner xác minh; status mapping không mất nghĩa |
+| M4 — stock ledger | Tạo StockReceipt, StockReceiptItem, StockMovement, StockMovementItem; chuẩn hóa lot theo Kitchen/Location; chuyển balance thành opening balance có chứng từ chuyển đổi | Tổng opening balance đối chiếu bằng số dư nguồn; composite FK và concurrency tests đạt |
+| M5 — production/delivery/trace | Tạo ProductionBatch, Delivery, DeliveryItem, DeliveryReceipt; gắn trace events với nguồn nghiệp vụ; sửa delete policy | Mỗi batch một trường; delivery cùng Kitchen/School; trace không bị cascade |
+| M6 — cutover và dọn legacy | Chuyển API/frontend; chạy dual-read hoặc kiểm chứng đối chiếu; ngừng cột legacy rồi mới drop ở migration riêng | Integration tests, permission tests, reconciliation và backup/rollback plan đạt |
+
+### 19.6. Quy tắc backfill dữ liệu hiện có
+
+Kết quả profiling ngày 17/11/2026 cho thấy các bảng suppliers, ingredients, inventory_lots, dishes, meal_plans, meal_plan_items, trace_events và food_safety_checks đều đang có 0 dòng; kitchens có 1, schools có 1, assignments có 1, users có 6. Vì vậy tại thời điểm profiling chưa có dữ liệu nghiệp vụ món/kho/thực đơn cần chuyển. Tuy nhiên đây là baseline theo thời điểm, phải chạy lại ngay trước migration vì dữ liệu có thể đã phát sinh sau đó.
+
+- Kitchen hiện tại Bếp Long Hoa là CENTRAL và đang được phân công phục vụ TH Phạm Hùng. Đây là assignment hiện tại, không phải quy tắc để suy owner của dữ liệu lịch sử tương lai.
+- Hai user SCHOOL_KITCHEN hiện hữu có school scope và được giữ là nhân viên tiếp nhận; không backfill họ sang kitchenId.
+- User CENTRAL_KITCHEN hiện có kitchen scope; giữ nguyên.
+- Supplier nếu đã phát sinh sau profiling: không tự gán Kitchen từ schoolId và assignment hiện tại. Phải xác minh hồ sơ hợp đồng/giao dịch; sau đó tạo SupplierKitchen tương ứng.
+- InventoryLot nếu đã phát sinh: xác minh chứng từ nhập, kho vật lý, nhà cung cấp và thời điểm. Không gán Kitchen chỉ bằng assignment đang active hôm nay.
+- Dish nếu đã phát sinh: xác định bếp tạo món từ audit/source nghiệp vụ; nếu không xác định được, đưa vào quarantine để người quản trị xác nhận.
+- MealPlan nếu đã phát sinh: xác định bếp đề xuất theo hồ sơ gửi/duyệt; không lấy Kitchen assignment hiện tại làm bằng chứng duy nhất.
+- Mọi backfill cần lưu mapping report (source id → target id), số dòng thành công/thất bại và reason; không xóa nguồn trước khi nghiệm thu.
+
+### 19.7. Thứ tự xử lý code sau khi thiết kế được duyệt
+
+1. Cập nhật Prisma schema theo từng miền, nhưng chưa deploy migration: Supplier/Ingredient/Inventory; Dish/approval; MealPlan/revision; production/delivery/trace.
+2. Tách service/repository và API contract theo Kitchen/School scope; thêm authorization tests trước khi mở endpoint.
+3. Viết SQL migration additive cho composite FK, CHECK, partial index, exclusion/trigger và delete policy.
+4. Chạy migration trên DB clone/staging; không thử migration phá hủy trên database đang dùng.
+5. Backfill theo batch có checkpoint; chạy reconciliation và giữ phương án rollback.
+6. Chỉ drop cột/quan hệ legacy sau khi code mới đã cutover và xác nhận không còn consumer.
+
+**Kết luận:** Schema Prisma hiện tại chưa đáp ứng Physical Schema v1. Có thể giữ nguyên miền học sinh/điểm danh và khung Kitchen/School/User, nhưng Supplier, InventoryLot, Dish, MealPlan, MealPlanItem và TraceEvent cần tái cấu trúc đáng kể. Lộ trình an toàn là additive migration theo miền, xác minh dữ liệu trước từng bước, giữ legacy đến khi cutover. Chưa có migration nào được tạo hoặc triển khai trong lần đối chiếu này.
