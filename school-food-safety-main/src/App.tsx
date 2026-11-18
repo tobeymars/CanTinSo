@@ -977,7 +977,10 @@ function Shell() {
   }, [queryClient]);
   const week = weekDates(date);
   const isWardWorkspace = role === "culture_social_office";
-  const isRealSchoolAdmin = getStoredUser()?.role === "SCHOOL_ADMIN";
+  const storedUser = getStoredUser();
+  const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
+  // SCHOOL_KITCHEN without kitchenId is school-side meal receiving staff, not a kitchen operator.
+  const isSchoolKitchenReceiver = storedUser?.role === "SCHOOL_KITCHEN" && !storedUser.kitchenId;
   const schoolQuery = useQuery({
     queryKey: ["schools", isWardWorkspace ? "ward-scoped" : isRealSchoolAdmin ? "school-account" : "demo", isRealSchoolAdmin ? date : ""],
     queryFn: async (): Promise<School[]> => {
@@ -1079,6 +1082,7 @@ function Shell() {
   const parentReadyPhoto = parentReadyEvent?.confirmed ? parentReadyEvent.photos[0] : undefined;
   const isWardAdminAccount = getStoredUser()?.role === "UBND_ADMIN";
   const adminNav = adminNavigation.filter((item) => {
+    if (isSchoolKitchenReceiver && !["/", "/thuc-don", "/giam-sat", "/ho-so-phap-ly", "/ma-qr-suat-an", "/phan-anh", "/bao-cao"].includes(item.path)) return false;
     if (item.path === "/quan-ly-hoc-sinh" && role !== "school_board") return false;
     if (item.path === "/quan-ly-tai-khoan" && role !== "school_board") return false;
     if (role !== "central_kitchen") return true;
@@ -1093,7 +1097,7 @@ function Shell() {
         ? [...adminNav, ...(isWardAdminAccount ? [{ path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])]
         : role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN"
           ? [...adminNav, { path: "/quan-ly-bep", label: "Quản lý bếp", icon: CookingPot }]
-        : role === "school_kitchen"
+        : role === "school_kitchen" && !isSchoolKitchenReceiver
           ? [...adminNav.slice(0, 2), { path: "/tao-mon", label: "Tạo món & dinh dưỡng", icon: CookingPot }, ...adminNav.slice(2)]
           : role === "central_kitchen" && centralKitchenRouteAccess[kitchenRole].includes("/tao-mon")
             ? [...adminNav.slice(0, 2), { path: "/tao-mon", label: "Tạo món & dinh dưỡng", icon: CookingPot }, ...adminNav.slice(2)]
