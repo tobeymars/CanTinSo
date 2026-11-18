@@ -298,14 +298,20 @@ export class DishesService {
       : DishApprovalEventType.RETURNED;
 
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.dishApproval.update({
-        where: { id: approvalId },
+      const claimed = await tx.dishApproval.updateMany({
+        where: { id: approvalId, schoolId, status: DishApprovalStatus.PENDING },
         data: {
           status,
           decidedAt: now,
           decidedById: user.sub,
           decisionNote: reason?.trim() || null,
         },
+      });
+      if (claimed.count !== 1) {
+        throw new BadRequestException('Yêu cầu đã được xử lý bởi một thao tác khác.');
+      }
+      const updated = await tx.dishApproval.findUniqueOrThrow({
+        where: { id: approvalId },
         include: {
           school: { select: { id: true, name: true } },
           dishVersion: {
