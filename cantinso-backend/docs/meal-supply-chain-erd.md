@@ -1982,3 +1982,334 @@ Approve transaction:
 - Không ảnh hưởng 5 workspace, không thêm role/workspace.
 
 **Kết luận mục 20:** M1–M3 đã có thiết kế dữ liệu, API contract, state transitions, authorization matrix và acceptance criteria ở mức review. Đây chưa phải Prisma schema đã triển khai. Sau khi chốt các quyết định tại 20.7 mới chuyển thành Prisma models và migration additive; không tạo migration trước khi xác nhận các quyết định còn mở.
+
+
+## 21. Prisma model design v1 — M1/M2 (18/11/2026)
+
+> Đây là Prisma design delta để review, không phải schema đang được Prisma load. Chưa sửa `prisma/schema.prisma`, chưa chạy `prisma validate`, chưa tạo migration. Các model hiện hữu ngoài phạm vi phải được giữ nguyên. Sau khi review và chốt mapping dữ liệu, mới áp dụng delta vào schema chính.
+
+### 21.1. Quyết định ánh xạ
+
+- Giữ nguyên `UserRole`, `KitchenType`, `MealType` và đúng 5 workspace. Không thêm role.
+- Dish ownership: thêm `Dish.kitchenId`; target NOT NULL. Trong migration thực tế phải add nullable → backfill có kiểm chứng → set NOT NULL. Không đoán owner bằng assignment hiện tại.
+- Dish.code đổi từ unique toàn cục sang unique theo Kitchen: `@@unique([kitchenId, code])`. Trước cutover phải kiểm tra code trùng trong cùng Kitchen.
+- Giữ `Dish.recipe Json?` trong giai đoạn tương thích; không còn là nguồn chuẩn sau cutover.
+- MealPlan giữ identity và unique `[schoolId, serviceDate, mealType]`; thêm `kitchenId`. Số suất chuyển sang `MealPlanRevisionAgeGroup.plannedServings`; trạng thái quy trình chuyển sang revision.
+- Không xóa `MealPlanItem` trong migration đầu tiên. Chỉ bỏ sau khi API/UI đã đọc revision và đối soát xong.
+- DishVersion global không mang trạng thái “được duyệt toàn hệ thống”. Trạng thái sử dụng tại từng trường nằm ở DishApproval. Một version có thể APPROVED tại trường A nhưng PENDING/RETURNED tại trường B.
+- Không tạo `currentApprovedRevisionId` ở v1. Dùng trạng thái revision + PostgreSQL partial unique index để bảo đảm một revision APPROVED cho mỗi MealPlan; tránh pointer kép và đồng bộ hai nguồn.
+- Event là append-only ở tầng service/database policy. Prisma không tự bảo đảm bất biến; cần trigger/privilege policy hoặc service transaction và test.
+
+### 21.2. Enum delta
+
+```prisma
+enum DishStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DishVersionStatus {
+  DRAFT
+  SUBMITTED
+  WITHDRAWN
+}
+
+enum DishApprovalStatus {
+  PENDING
+  APPROVED
+  RETURNED
+  REJECTED
+  WITHDRAWN
+}
+
+enum DishApprovalEventType {
+  SUBMITTED
+  APPROVED
+  RETURNED
+  REJECTED
+  WITHDRAWN
+}
+
+enum MealPlanRevisionStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+  REJECTED
+  SUPERSEDED
+}
+
+enum MealPlanApprovalEventType {
+  SUBMITTED
+  APPROVED
+  RETURNED
+  REJECTED
+  SUPERSEDED
+}
+```
+
+Không đổi `MealType` hiện hữu. Không chuyển `MealPlan.status String` thành enum trong cùng migration đầu tiên; trước hết phải inventory toàn bộ giá trị thực tế và xác định cutover. Ở target schema, trạng thái nghiệp vụ lấy từ revision, không lấy từ MealPlan.
+
+### 21.3. Model delta
+
+Các đoạn dưới đây là model definitions mục tiêu. Các relation arrays tương ứng phải được thêm vào model hiện hữu theo mục 21.4.
+
+```prisma
+model Dish {
+  id            String         @id @default(uuid()) @db.Uuid
+  kitchenId     String         @map("kitchen_id") @db.Uuid
+  code          String
+  name          String
+  category      String?
+  status        DishStatus     @default(DRAFT)
+  recipe        Json?          // legacy; remove only after cutover
+  kitchen       Kitchen        @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  versions      DishVersion[]
+  mealPlanItems MealPlanItem[] // legacy relation; remove after cutover
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@unique([kitchenId, code])
+  @@index([kitchenId, status, name])
+  @@map("dishes")
+}
+
+model DishVersion {
+  id                String             @id @default(uuid()) @db.Uuid
+  dishId            String             @map("dish_id") @db.Uuid
+  versionNo         Int                @map("version_no")
+  status            DishVersionStatus  @default(DRAFT)
+  recipeSnapshot    Json               @map("recipe_snapshot")
+  nutritionSnapshot Json?              @map("nutrition_snapshot")
+  allergenSnapshot  Json?              @map("allergen_snapshot")
+  createdById       String             @map("created_by_id") @db.Uuid
+  submittedAt       DateTime?          @map("submitted_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  dish              Dish               @relation(fields: [dishId], references: [id], onDelete: Restrict)
+  createdBy         User               @relation("DishVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  ingredients       DishIngredient[]
+  approvals         DishApproval[]
+  mealPlanItems     MealPlanRevisionItem[]
+
+  @@unique([dishId, versionNo])
+  @@index([dishId, status])
+  @@map("dish_versions")
+}
+
+model DishIngredient {
+  id               String      @id @default(uuid()) @db.Uuid
+  dishVersionId    String      @map("dish_version_id") @db.Uuid
+  ingredientId     String      @map("ingredient_id") @db.Uuid
+  quantity         Decimal     @db.Decimal(14, 3)
+  unitCode         String      @map("unit_code")
+  preparationNote  String?     @map("preparation_note")
+  dishVersion      DishVersion @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
+  ingredient       Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@unique([dishVersionId, ingredientId])
+  @@index([ingredientId])
+  @@map("dish_ingredients")
+}
+
+model DishApproval {
+  id             String             @id @default(uuid()) @db.Uuid
+  schoolId       String             @map("school_id") @db.Uuid
+  dishVersionId  String             @map("dish_version_id") @db.Uuid
+  status         DishApprovalStatus @default(PENDING)
+  submittedAt    DateTime           @default(now()) @map("submitted_at")
+  decidedAt      DateTime?          @map("decided_at")
+  decidedById    String?            @map("decided_by_id") @db.Uuid
+  decisionNote   String?            @map("decision_note")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  school         School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  dishVersion    DishVersion        @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
+  decidedBy      User?              @relation("DishApprovalDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  events         DishApprovalEvent[]
+
+  @@unique([schoolId, dishVersionId])
+  @@index([schoolId, status, updatedAt])
+  @@map("dish_approvals")
+}
+
+model DishApprovalEvent {
+  id              String                  @id @default(uuid()) @db.Uuid
+  dishApprovalId  String                  @map("dish_approval_id") @db.Uuid
+  eventType       DishApprovalEventType   @map("event_type")
+  actorId         String                  @map("actor_id") @db.Uuid
+  actorRole       UserRole                @map("actor_role")
+  note            String?
+  occurredAt      DateTime                @default(now()) @map("occurred_at")
+  dishApproval    DishApproval            @relation(fields: [dishApprovalId], references: [id], onDelete: Restrict)
+  actor           User                    @relation("DishApprovalEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([dishApprovalId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@map("dish_approval_events")
+}
+
+model MealPlan {
+  id          String                   @id @default(uuid()) @db.Uuid
+  schoolId    String                   @map("school_id") @db.Uuid
+  kitchenId   String                   @map("kitchen_id") @db.Uuid
+  serviceDate DateTime                 @map("service_date") @db.Date
+  mealType    MealType                 @map("meal_type")
+  school      School                   @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  kitchen     Kitchen                  @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  revisions   MealPlanRevision[]
+  createdAt   DateTime                 @default(now()) @map("created_at")
+  updatedAt   DateTime                 @updatedAt @map("updated_at")
+
+  @@unique([schoolId, serviceDate, mealType])
+  @@index([kitchenId, serviceDate])
+  @@map("meal_plans")
+}
+
+model MealPlanRevision {
+  id           String                   @id @default(uuid()) @db.Uuid
+  mealPlanId   String                   @map("meal_plan_id") @db.Uuid
+  revisionNo   Int                      @map("revision_no")
+  status       MealPlanRevisionStatus   @default(DRAFT)
+  proposedById String                   @map("proposed_by_id") @db.Uuid
+  submittedAt  DateTime?                @map("submitted_at")
+  decidedAt    DateTime?                @map("decided_at")
+  decidedById  String?                  @map("decided_by_id") @db.Uuid
+  decisionNote String?                  @map("decision_note")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  updatedAt    DateTime                 @updatedAt @map("updated_at")
+  mealPlan     MealPlan                 @relation(fields: [mealPlanId], references: [id], onDelete: Restrict)
+  proposedBy   User                     @relation("MealPlanRevisionProposedBy", fields: [proposedById], references: [id], onDelete: Restrict)
+  decidedBy    User?                    @relation("MealPlanRevisionDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  ageGroups    MealPlanRevisionAgeGroup[]
+  items        MealPlanRevisionItem[]
+  events       MealPlanApprovalEvent[]
+
+  @@unique([mealPlanId, revisionNo])
+  @@index([mealPlanId, status])
+  @@index([proposedById, createdAt])
+  @@map("meal_plan_revisions")
+}
+
+model MealPlanAgeGroup {
+  id            String                     @id @default(uuid()) @db.Uuid
+  code          String                     @unique
+  name          String
+  minAgeMonths  Int?                       @map("min_age_months")
+  maxAgeMonths  Int?                       @map("max_age_months")
+  sortOrder     Int                        @default(0) @map("sort_order")
+  isActive      Boolean                    @default(true) @map("is_active")
+  revisionRows  MealPlanRevisionAgeGroup[]
+  portionRows   MealPlanItemAgeGroupPortion[]
+
+  @@map("meal_plan_age_groups")
+}
+
+model MealPlanRevisionAgeGroup {
+  id           String           @id @default(uuid()) @db.Uuid
+  revisionId   String           @map("revision_id") @db.Uuid
+  ageGroupId   String           @map("age_group_id") @db.Uuid
+  plannedServings Int           @map("planned_servings")
+  notes        String?
+  revision     MealPlanRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  ageGroup     MealPlanAgeGroup @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+
+  @@unique([revisionId, ageGroupId])
+  @@index([ageGroupId])
+  @@map("meal_plan_revision_age_groups")
+}
+
+model MealPlanRevisionItem {
+  id             String                         @id @default(uuid()) @db.Uuid
+  revisionId     String                         @map("revision_id") @db.Uuid
+  dishVersionId  String                         @map("dish_version_id") @db.Uuid
+  mealSlot       String                         @map("meal_slot")
+  sequence       Int                            @default(0)
+  isDefault      Boolean                        @default(true) @map("is_default")
+  note           String?
+  revision       MealPlanRevision               @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  dishVersion    DishVersion                    @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
+  portions       MealPlanItemAgeGroupPortion[]
+
+  @@unique([revisionId, mealSlot, dishVersionId])
+  @@index([dishVersionId])
+  @@map("meal_plan_revision_items")
+}
+
+model MealPlanItemAgeGroupPortion {
+  id               String                 @id @default(uuid()) @db.Uuid
+  revisionItemId   String                 @map("revision_item_id") @db.Uuid
+  ageGroupId       String                 @map("age_group_id") @db.Uuid
+  portionFactor    Decimal                @default(1) @map("portion_factor") @db.Decimal(10, 4)
+  unitCode         String                 @map("unit_code")
+  overrideReason   String?                @map("override_reason")
+  revisionItem     MealPlanRevisionItem   @relation(fields: [revisionItemId], references: [id], onDelete: Restrict)
+  ageGroup         MealPlanAgeGroup       @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+
+  @@unique([revisionItemId, ageGroupId])
+  @@index([ageGroupId])
+  @@map("meal_plan_item_age_group_portions")
+}
+
+model MealPlanApprovalEvent {
+  id          String                        @id @default(uuid()) @db.Uuid
+  revisionId  String                        @map("revision_id") @db.Uuid
+  eventType   MealPlanApprovalEventType     @map("event_type")
+  actorId     String                        @map("actor_id") @db.Uuid
+  actorRole   UserRole                      @map("actor_role")
+  note        String?
+  occurredAt  DateTime                      @default(now()) @map("occurred_at")
+  revision    MealPlanRevision              @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  actor       User                          @relation("MealPlanApprovalEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([revisionId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@map("meal_plan_approval_events")
+}
+```
+
+### 21.4. Relation fields cần bổ sung vào model hiện hữu
+
+Đây là phần relation arrays, không thay thế các field hiện tại khác:
+
+- `Kitchen`: `dishes Dish[]`, `mealPlans MealPlan[]`.
+- `School`: `dishApprovals DishApproval[]`. Giữ `mealPlans MealPlan[]` hiện có.
+- `User`: `createdDishVersions DishVersion[] @relation("DishVersionCreatedBy")`; `decidedDishApprovals DishApproval[] @relation("DishApprovalDecidedBy")`; `dishApprovalEvents DishApprovalEvent[] @relation("DishApprovalEventActor")`; `proposedMealPlanRevisions MealPlanRevision[] @relation("MealPlanRevisionProposedBy")`; `decidedMealPlanRevisions MealPlanRevision[] @relation("MealPlanRevisionDecidedBy")`; `mealPlanApprovalEvents MealPlanApprovalEvent[] @relation("MealPlanApprovalEventActor")`.
+- `Ingredient`: `dishIngredients DishIngredient[]`.
+- `Dish`: giữ `mealPlanItems MealPlanItem[]` legacy cho đến cutover.
+- `School.mealPlans` và `Kitchen.users/schools` hiện hữu giữ nguyên.
+
+### 21.5. Các ràng buộc SQL bổ sung Prisma không mô tả đủ
+
+Migration sau này phải bổ sung SQL thủ công có kiểm soát:
+
+1. `CHECK (planned_servings > 0)`.
+2. `CHECK (portion_factor > 0)`.
+3. Partial unique index: mỗi MealPlan có tối đa một revision `status = 'APPROVED'`.
+4. CHECK/trigger đảm bảo DishApproval.schoolId và DishVersion.dishId → Dish.kitchenId không bị lệch phạm vi; MealPlanRevisionItem phải tham chiếu DishVersion được APPROVED tại đúng MealPlan.schoolId. Có thể dùng composite FK với unique keys bổ sung hoặc trigger/transaction guard.
+5. Bất biến snapshot: cấm UPDATE/DELETE DishVersion đã submit; cấm UPDATE/DELETE revision đã submit; cấm UPDATE/DELETE approval/event history ngoài luồng sửa có kiểm soát.
+6. Validate Dish.kitchenId và MealPlan.kitchenId phù hợp Kitchen.type; với CENTRAL phải có assignment hiệu lực tại serviceDate; với SCHOOL phải trùng schoolId của bếp tại trường.
+7. Kiểm soát đồng thời khi tạo revisionNo và approve: transaction có row lock trên MealPlan; không chỉ dựa vào kiểm tra ở application trước transaction.
+
+Prisma schema không biểu diễn được partial unique index, exclusion constraints hoặc mọi trigger. Không được giả định `prisma validate` thay thế các SQL constraints này.
+
+### 21.6. Migration sequencing (chưa thực hiện)
+
+- **M1a:** profiling read-only; kiểm tra Dish/MealPlan hiện có; xác minh owner Kitchen từ chứng từ/audit, không suy luận từ assignment mới nhất.
+- **M1b:** add enum/table và nullable ownership columns; backfill; xác minh orphan/duplicate; sau đó set NOT NULL và unique indexes. Nếu bảng còn dữ liệu không đủ chứng cứ owner, dừng cutover và xử lý thủ công.
+- **M1c:** chuyển UI/API sang DishVersion/DishApproval; giữ Dish.recipe và MealPlanItem legacy để rollback có kiểm soát.
+- **M2a:** tạo MealPlanRevision/age-group/item tables; xác minh mapping meal plan cũ thành revision đầu tiên. Chỉ tạo revision từ dữ liệu cũ khi có đủ bếp đề xuất, món/version và số suất theo nhóm tuổi; không tự gán dữ liệu thiếu.
+- **M2b:** chuyển read/write sang revision; bật partial unique index và transaction tests.
+- **M2c:** chỉ trong migration dọn legacy riêng sau cutover ổn định mới bỏ MealPlan.servings/status cũ, MealPlanItem và Dish.recipe.
+- Không gộp thay đổi kho, supplier, production, delivery vào M1/M2.
+
+### 21.7. Review checklist trước khi áp dụng schema chính
+
+- [ ] Xác nhận tên bảng/cột và enum mapping với PostgreSQL hiện tại.
+- [ ] Xác nhận `DishIngredient` có cho phép cùng Ingredient xuất hiện nhiều dòng trong một recipe hay cần `lineNo`.
+- [ ] Chốt `mealSlot` là enum hay String có danh mục chuẩn; không tự thêm enum khi UI hiện tại chưa xác nhận.
+- [ ] Chốt danh mục nhóm tuổi/mapping khối lớp; không seed tuổi hoặc khẩu phần giả định.
+- [ ] Xác nhận `recipeSnapshot` JSON shape và cách chuyển dữ liệu từ `Dish.recipe`.
+- [ ] Xác nhận có cho phép một MealPlan có nhiều revision DRAFT song song; khuyến nghị chỉ một DRAFT đang chỉnh sửa để giảm xung đột.
+- [ ] Xác nhận quyết định trả lại có bắt buộc note; đề xuất bắt buộc.
+- [ ] Chạy `npx prisma format` và `npx prisma validate` trên schema đã áp dụng, nhưng chưa chạy migrate cho đến khi review SQL constraints và data backfill.
