@@ -26,7 +26,7 @@ const bandFor = (proposal: KitchenDishProposal | null, school: School): SchoolAg
 const newIngredient = (): IngredientDraft => ({ key: uid(), inventoryItemId: '', name: '', amount: '', unit: 'g' })
 
 export default function KitchenDishEditor({ school, role, value, onClose, onSaved }: {
-  school: School; role: ViewRole; value: KitchenDishProposal | null; onClose: () => void; onSaved: (name: string, edited: boolean) => void
+  school: School; role: ViewRole; value: KitchenDishProposal | null; onClose: () => void; onSaved: (name: string, edited: boolean, submitted: boolean) => void
 }) {
   const [step, setStep] = useState<Step>(0)
   const [name, setName] = useState(value?.name ?? '')
@@ -126,7 +126,8 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
       imageUrl, expectedQuantity: Number(servings), portionWeightGrams: Number(weight), priority: Number(priority),
       safetyMonitoring, ingredients: rows.map(row => ({ name: row.name.trim(), quantity: Number(row.amount), unitCode: row.unit })),
       ingredientCatalog,
-    }).then(() => onSaved(name.trim(), !!value)).catch(reason => {
+      schoolIds: kitchenContext.kitchen.schools?.map(item => item.school.id) ?? (kitchenContext.kitchen.schoolId ? [kitchenContext.kitchen.schoolId] : []),
+    }).then(result => onSaved(name.trim(), !!value, result.submitted)).catch(reason => {
       setError(reason instanceof Error ? reason.message : 'Không thể lưu món vào cơ sở dữ liệu.')
       setSaving(false)
     })
