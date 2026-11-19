@@ -55,8 +55,8 @@ export default function DishDetailDialog({ dish, kitchen, linkedLots = [], opera
   )
   const canUseBackendNutrition = ['CENTRAL_KITCHEN', 'SCHOOL_KITCHEN'].includes(getStoredUser()?.role ?? '')
   const nutritionInput = useMemo(() => records
-    .filter(item => item.amountPerServing != null && Number.isFinite(item.amountPerServing) && item.amountPerServing > 0)
-    .map(item => ({ ingredientName: item.name, quantity: item.amountPerServing!, unitCode: item.unit })), [dish])
+    .filter(item => !!item.inventoryItemId && item.amountPerServing != null && Number.isFinite(item.amountPerServing) && item.amountPerServing > 0)
+    .map(item => ({ ingredientId: item.inventoryItemId!, ingredientName: item.name, quantity: item.amountPerServing!, unitCode: item.unit })), [dish])
   useEffect(() => {
     let active = true
     setBackendNutrition(null)
