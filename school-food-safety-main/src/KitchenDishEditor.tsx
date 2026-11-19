@@ -79,7 +79,7 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
   }, [])
   const localNutrition = useMemo(() => analyzeRecipe(rows.map(row => ({ name: row.name, amount: Number(row.amount), unit: row.unit })), ageBand, mealType), [rows, ageBand, mealType])
   useEffect(() => {
-    if (step !== 2 || !ingredientCatalog.length || !rows.length || rows.some(row => !row.name.trim() || !Number.isFinite(Number(row.amount)) || Number(row.amount) <= 0 || row.unit !== 'g')) {
+    if (step !== 2 || !ingredientCatalog.length || !rows.length || rows.some(row => !row.name.trim() || !Number.isFinite(Number(row.amount)) || Number(row.amount) <= 0)) {
       setBackendNutrition(null)
       setNutritionError('')
       return
