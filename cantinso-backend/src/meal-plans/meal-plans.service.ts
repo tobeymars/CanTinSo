@@ -65,7 +65,7 @@ export class MealPlansService {
         dishVersion: { include: { dish: { select: { id: true, code: true, name: true, kitchenId: true } },
           ingredients: { include: { ingredient: { select: { id: true, code: true, name: true, unit: true } } } },
           approvals: { select: { schoolId: true, status: true } } },
-      } },
+      } } },
       events: { orderBy: { occurredAt: 'asc' } },
     };
   }
