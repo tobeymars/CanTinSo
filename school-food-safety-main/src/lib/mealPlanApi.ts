@@ -1,5 +1,6 @@
 import { getAccessToken, getStoredUser } from './authApi';
 import { fetchMyKitchenContext } from './myKitchenApi';
+import { getManagedSchools } from './usersApi';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -35,7 +36,10 @@ export async function loadMealPlanWorkspace() {
     request<MealPlanRow[]>('/meal-plans'),
   ]);
   if (user?.role === 'UBND_ADMIN') {
-    const schools = [...new Map(plans.filter(plan => plan.school).map(plan => [plan.school!.id, { id: plan.school!.id, name: plan.school!.name }])).values()];
+    // Danh sách trường phải lấy từ hồ sơ trường, không suy ra từ thực đơn:
+    // trường mới tạo chưa có meal plan vẫn cần xuất hiện trong bộ lọc UBND.
+    const managedSchools = await getManagedSchools();
+    const schools = managedSchools.map(school => ({ id: school.id, name: school.name }));
     return { ageGroups, plans, schools, dishes: [] as ApprovedDishOption[] };
   }
   if (user?.role !== 'CENTRAL_KITCHEN' && user?.role !== 'SCHOOL_KITCHEN') return { ageGroups, plans, schools: [], dishes: [] as ApprovedDishOption[] };
