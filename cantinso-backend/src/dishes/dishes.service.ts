@@ -49,9 +49,17 @@ export class DishesService {
     const kitchenId = this.requireKitchenUser(user);
     const dish = await this.prisma.dish.findFirst({
       where: { id: dishId, kitchenId },
-      select: { id: true },
+      include: { _count: { select: { versions: true, mealPlanItems: true } } },
     });
     if (!dish) throw new NotFoundException('Không tìm thấy món ăn trong phạm vi bếp.');
+    // Once a recipe version exists, keep parent identity stable for audit history.
+    // The edited name and instructions are stored in the next immutable version snapshot.
+    if (dish._count.versions > 0 || dish._count.mealPlanItems > 0) {
+      return {
+        id: dish.id, code: dish.code, name: dish.name, category: dish.category,
+        status: dish.status, kitchenId: dish.kitchenId, createdAt: dish.createdAt,
+      };
+    }
     return this.prisma.dish.update({
       where: { id: dishId },
       data: { code: dto.code.trim(), name: dto.name.trim(), category: dto.category?.trim() || null },
