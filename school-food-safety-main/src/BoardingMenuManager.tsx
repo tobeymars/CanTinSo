@@ -579,6 +579,6 @@ function DemoBoardingMenuManager({ school, selectedDate, managementScope = 'ALL'
 
 export default function BoardingMenuManager(props: { school: School; selectedDate: string; managementScope?: BoardingMenuManagementScope; readOnly?: boolean; publicView?: boolean; publicEntries?: PublicBoardingMenuEntry[]; onSelectDate?: (date: string) => void }) {
  const user=getStoredUser();
- if(user&&(user.role==='SCHOOL_ADMIN'||(['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role)&&!!user.kitchenId))&&!props.publicView) return <RealBoardingMenuManager selectedDate={props.selectedDate} onSelectDate={props.onSelectDate}/>;
+ if(user&&(user.role==='SCHOOL_ADMIN'||user.role==='UBND_ADMIN'||(['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role)&&!!user.kitchenId))&&!props.publicView) return <RealBoardingMenuManager selectedDate={props.selectedDate} onSelectDate={props.onSelectDate} readOnly={user.role==='UBND_ADMIN'||!!props.readOnly}/>;
  return <DemoBoardingMenuManager {...props}/>;
 }
