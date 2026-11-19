@@ -295,6 +295,7 @@ export class DishesService {
         if (value === null) {
           complete[field] = false;
           contribution[field] = null;
+          warnings.push(`Phụ lục 7 không công bố chỉ tiêu ${field} cho nguyên liệu "${ingredient.name}".`);
         } else {
           const amount = Number(value) * edibleWeightG / 100;
           totals[field] += amount;
