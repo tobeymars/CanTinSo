@@ -9,7 +9,7 @@ export default function MealPlanWorkspace() {
   const isKitchen = user?.role === 'CENTRAL_KITCHEN' || user?.role === 'SCHOOL_KITCHEN';
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [ageGroups, setAgeGroups] = useState<MealAgeGroup[]>([]), [plans, setPlans] = useState<MealPlanRow[]>([]);
-  const [schools, setSchools] = useState<Array<{id:string;name:string}>>([]), [dishes, setDishes] = useState<Array<ApprovedDishOption & {schoolId:string}>>([]);
+  const [schools, setSchools] = useState<Array<{id:string;name:string}>>([]), [dishes, setDishes] = useState<ApprovedDishOption[]>([]);
   const [schoolId, setSchoolId] = useState(''), [serviceDate, setServiceDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [mealType, setMealType] = useState('LUNCH'), [ageGroupId, setAgeGroupId] = useState(''), [servings, setServings] = useState(''), [selected, setSelected] = useState<string[]>([]);
   const [decisionNote, setDecisionNote] = useState<Record<string,string>>({});
