@@ -90,6 +90,7 @@ const CanteenGallery = lazy(() => import("./CanteenGallery"));
 const PortionTracePage = lazy(() => import("./PortionTracePage"));
 const BoardingMenuManager = lazy(() => import("./BoardingMenuManager"));
 const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
+const DishApprovalInbox = lazy(() => import("./DishApprovalInbox"));
 const FeedbackForm = lazy(() => import("./FeedbackForm"));
 const CentralKitchenManagementPanel = lazy(() => import("./CentralKitchenManagement"));
 const KitchenManagementPanel = lazy(() => import("./KitchenManagement"));
@@ -114,6 +115,7 @@ const roleHomeHeadings: Record<Exclude<ViewRole, "parent">, string> = {
 const adminNavigation = [
   { path: "/", label: "Tổng quan điều hành", icon: House },
   { path: "/thuc-don", label: "Thực đơn & bữa ăn", icon: Utensils },
+  { path: "/duyet-mon", label: "Duyệt món từ bếp", icon: CookingPot },
   { path: "/giam-sat", label: "Giám sát & an toàn", icon: ShieldCheck },
   {
     path: "/ho-so-phap-ly",
@@ -1083,6 +1085,7 @@ function Shell() {
   const isWardAdminAccount = getStoredUser()?.role === "UBND_ADMIN";
   const adminNav = adminNavigation.filter((item) => {
     if (isSchoolKitchenReceiver && !["/", "/thuc-don", "/giam-sat", "/ho-so-phap-ly", "/ma-qr-suat-an", "/phan-anh", "/bao-cao"].includes(item.path)) return false;
+    if (item.path === "/duyet-mon" && role !== "school_board") return false;
     if (item.path === "/quan-ly-hoc-sinh" && role !== "school_board") return false;
     if (item.path === "/quan-ly-tai-khoan" && role !== "school_board") return false;
     if (role !== "central_kitchen") return true;
@@ -1472,6 +1475,11 @@ function Shell() {
                 </Suspense>
               )}
               {location.pathname === "/quan-ly-tai-khoan" && role === "school_board" && <UserManagement />}
+              {location.pathname === "/duyet-mon" && role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN" && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <DishApprovalInbox />
+                </Suspense>
+              )}
               {location.pathname === "/quan-ly-bep" && role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN" && (
                 <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
                   <KitchenManagementPanel />
