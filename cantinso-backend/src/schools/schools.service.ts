@@ -1,7 +1,8 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
 import { UserRole } from "@prisma/client";
 import { AuthUser } from "../common/current-user.decorator";
 import { PrismaService } from "../prisma/prisma.service";
+import { CreateSchoolDto } from "./dto/create-school.dto";
 
 @Injectable()
 export class SchoolsService {
@@ -63,6 +64,42 @@ export class SchoolsService {
     };
   }
 
+  async create(user: AuthUser, dto: CreateSchoolDto) {
+    if (user.role !== UserRole.UBND_ADMIN || !user.wardId) {
+      throw new ForbiddenException("Chỉ tài khoản UBND đã được gán phường mới được tạo trường.");
+    }
+
+    const name = dto.name.trim();
+    const code = dto.code?.trim() || null;
+    if (code && await this.prisma.school.findUnique({ where: { code }, select: { id: true } })) {
+      throw new ConflictException("Mã trường đã tồn tại trong hệ thống.");
+    }
+
+    return this.prisma.school.create({
+      data: {
+        name,
+        code,
+        address: dto.address?.trim() || null,
+        contactName: dto.contactName?.trim() || null,
+        phone: dto.phone?.trim() || null,
+        // Luôn lấy địa bàn từ JWT; không nhận wardId từ dữ liệu client.
+        wardId: user.wardId,
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        address: true,
+        contactName: true,
+        phone: true,
+        wardId: true,
+        ward: { select: { id: true, name: true, code: true } },
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async list(user: AuthUser) {
     if (user.role === UserRole.SUPER_ADMIN) {
       return this.prisma.school.findMany({
@@ -70,6 +107,9 @@ export class SchoolsService {
           id: true,
           name: true,
           code: true,
+          address: true,
+          contactName: true,
+          phone: true,
           wardId: true,
           ward: {
             select: {
