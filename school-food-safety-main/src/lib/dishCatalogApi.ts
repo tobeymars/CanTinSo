@@ -5,7 +5,7 @@ import { getAccessToken } from './authApi'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'
 
 export type IngredientCatalogItem = { id: string; code: string; name: string; unit: string; category: string | null }
-type ApiIngredient = { id: string; ingredientId?: string; quantity: string | number; unitCode: string; preparationNote?: string | null; ingredient?: { id: string; name: string; unit: string } }
+type ApiIngredient = { id: string; ingredientId?: string; quantity: string | number; unitCode: string; preparationNote?: string | null; ingredient?: { id: string; code: string; name: string; unit: string } }
 type ApiDish = {
   id: string; code: string; name: string; category: string | null; kitchenId: string; createdAt: string
   versions: Array<{
