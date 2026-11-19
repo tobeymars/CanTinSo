@@ -9,7 +9,6 @@ const emptyForm = { name: "", code: "", address: "", contactName: "", phone: "" 
 export default function WardSchoolManagement() {
   const cache = useQueryClient();
   const [form, setForm] = useState(emptyForm);
-  const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState("");
   const schools = useQuery({
     queryKey: ["schools", "ward-scoped"],
@@ -20,7 +19,6 @@ export default function WardSchoolManagement() {
     onSuccess: async (school) => {
       await cache.invalidateQueries({ queryKey: ["schools", "ward-scoped"] });
       setForm(emptyForm);
-      setShowForm(false);
       setNotice(`Đã thêm trường ${school.name} vào địa bàn phường.`);
     },
   });
@@ -36,17 +34,13 @@ export default function WardSchoolManagement() {
           <h2>Danh sách trường học</h2>
           <p>Quản lý các trường thuộc phường đang đăng nhập.</p>
         </div>
-        <button className="ward-schools-add" onClick={() => { setShowForm((v) => !v); setNotice(""); }}>
-          {showForm ? <X size={17} /> : <Plus size={17} />}
-          {showForm ? "Đóng biểu mẫu" : "Thêm trường"}
-        </button>
+        <span className="ward-schools-head-tag">Tạo hồ sơ trường mới</span>
       </header>
 
       {notice && <div className="ward-schools-notice" role="status"><CheckCircle2 size={17} />{notice}</div>}
       {create.isError && <div className="ward-schools-error" role="alert">{create.error.message}</div>}
 
-      {showForm && (
-        <form className="ward-school-form" onSubmit={(event) => {
+      <form className="ward-school-form" onSubmit={(event) => {
           event.preventDefault();
           create.mutate({
             name: form.name.trim(),
@@ -65,11 +59,10 @@ export default function WardSchoolManagement() {
             <label>Số điện thoại<input maxLength={30} value={form.phone} onChange={(e) => update("phone", e.target.value)} placeholder="Số điện thoại liên hệ" /></label>
           </div>
           <div className="ward-school-form-actions">
-            <button type="button" className="ward-school-cancel" onClick={() => { setShowForm(false); setForm(emptyForm); }}>Hủy</button>
+            <button type="button" className="ward-school-cancel" onClick={() => setForm(emptyForm)}>Xóa nội dung</button>
             <button type="submit" className="ward-schools-add" disabled={create.isPending || !form.name.trim()}>{create.isPending ? <RefreshCw className="spin" size={16} /> : <Plus size={16} />} Lưu trường mới</button>
           </div>
-        </form>
-      )}
+      </form>
 
       <div className="ward-schools-summary"><strong>{schools.data?.length ?? 0}</strong><span>Trường thuộc phường</span></div>
       {schools.isLoading ? <div className="ward-schools-loading"><RefreshCw className="spin" size={18} /> Đang tải danh sách trường...</div>
