@@ -15,6 +15,17 @@ export class MealPlansService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listAgeGroups() {
+    const groups = [
+      { code: 'KINDERGARTEN_UNSPECIFIED', name: 'Mầm non · cần quy chuẩn riêng', minAgeMonths: null, maxAgeMonths: null, sortOrder: 0 },
+      { code: 'GRADES_1_2', name: 'Tiểu học · Lớp 1–2', minAgeMonths: 72, maxAgeMonths: 95, sortOrder: 1 },
+      { code: 'GRADES_3_4', name: 'Tiểu học · Lớp 3–4', minAgeMonths: 96, maxAgeMonths: 119, sortOrder: 2 },
+      { code: 'GRADES_5', name: 'Tiểu học · Lớp 5', minAgeMonths: 120, maxAgeMonths: 131, sortOrder: 3 },
+      { code: 'GRADES_3_5', name: 'Nhóm dữ liệu cũ · Lớp 3–5', minAgeMonths: null, maxAgeMonths: null, sortOrder: 4 },
+      { code: 'AGES_10_11', name: 'THCS · 10–11 tuổi', minAgeMonths: 120, maxAgeMonths: 143, sortOrder: 5 },
+      { code: 'GRADES_6_9', name: 'THCS · 12–14 tuổi', minAgeMonths: 144, maxAgeMonths: 179, sortOrder: 6 },
+      { code: 'GRADES_10_12', name: 'THPT · 15–19 tuổi', minAgeMonths: 180, maxAgeMonths: 239, sortOrder: 7 },
+    ];
+    await this.prisma.mealPlanAgeGroup.createMany({ data: groups, skipDuplicates: true });
     return this.prisma.mealPlanAgeGroup.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
   }
 
