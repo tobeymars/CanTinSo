@@ -35,7 +35,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>
 }
 
-const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLocaleLowerCase('vi').trim()
 const asString = (value: unknown, fallback = '') => typeof value === 'string' ? value : fallback
 const asNumber = (value: unknown, fallback = 0) => typeof value === 'number' ? value : Number(value ?? fallback) || fallback
 
