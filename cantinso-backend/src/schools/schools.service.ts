@@ -138,6 +138,9 @@ export class SchoolsService {
           id: true,
           name: true,
           code: true,
+          address: true,
+          contactName: true,
+          phone: true,
           wardId: true,
           ward: {
             select: {
