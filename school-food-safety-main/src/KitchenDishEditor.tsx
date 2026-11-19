@@ -10,7 +10,7 @@ import { getAccessToken, getStoredUser } from './lib/authApi'
 import { fetchMyKitchenContext, type MyKitchenContext } from './lib/myKitchenApi'
 import { listIngredientCatalog, saveKitchenDish, type IngredientCatalogItem } from './lib/dishCatalogApi'
 import { compressDishPhoto, dishImage } from './lib/dishImages'
-import { gradeForSchool, kitchenDirectoryRepository, mealTypeOptions } from './lib/boardingMenu'
+import { gradeForSchool, mealTypeOptions } from './lib/boardingMenu'
 import type { BoardingMealType, KitchenDishProposal } from './lib/boardingMenu'
 import { AGE_BANDS, AGE_BAND_LABEL, ALLERGENS, ageBandsForGrade, defaultAgeBandForGrade, suggestMeals } from './lib/schoolNutrition'
 import type { NutritionGoal, SchoolAgeBand } from './lib/schoolNutrition'
@@ -18,7 +18,6 @@ import { analyzeOfficialRecipe as analyzeRecipe, findOfficialFood as findFood } 
 
 const pretty = (value: number) => value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })
 const uid = () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `dish-${Date.now()}-${Math.random().toString(36).slice(2)}`
-const todayIsoDate = () => new Date().toLocaleDateString('sv-SE')
 type IngredientDraft = { key: string; inventoryItemId: string; name: string; amount: string; unit: 'g' | 'ml' }
 type Step = 0 | 1 | 2 | 3
 type Allergen = (typeof ALLERGENS)[number]
@@ -47,7 +46,6 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
   const [supervisor, setSupervisor] = useState(value?.safetyMonitoring.supervisor ?? '')
   const [recordedAt, setRecordedAt] = useState(value?.safetyMonitoring.recordedAt.slice(0, 16) ?? '')
   const [safetyNote, setSafetyNote] = useState(value?.safetyMonitoring.note ?? '')
-  const [traceId, setTraceId] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [actualKitchenName, setActualKitchenName] = useState('')
@@ -74,23 +72,20 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
       .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Không tải được danh mục nguyên liệu.') })
     return () => { active = false }
   }, [])
-  const [today] = useState(todayIsoDate)
-  const eligible: typeof inventoryItems = []
-  const suppliers: ReturnType<typeof readSuppliers> = []
   const nutrition = useMemo(() => analyzeRecipe(rows.map(row => ({ name: row.name, amount: Number(row.amount), unit: row.unit })), ageBand, mealType), [rows, ageBand, mealType])
   const suggested = useMemo(() => grade === 'KINDERGARTEN' ? [] : suggestMeals(mealType, ageBand, goal, avoid), [mealType, ageBand, goal, avoid, grade])
   const starterSuggestions = useMemo(() => grade === 'KINDERGARTEN' ? [] : suggestMeals(mealType, ageBand, 'BALANCED', []).slice(0, 3), [mealType, ageBand, grade])
-  const linked = rows.filter(row => !!row.inventoryItemId).length
+  const linked = rows.filter(row => ingredientCatalog.some(item => item.name === row.name)).length
   const totalWeight = rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
   const dirty = useMemo(() => JSON.stringify({ name, description, mealType, ageBand, weight, servings, priority, imageUrl, rows: rows.map(row => ({ inventoryItemId: row.inventoryItemId, name: row.name, amount: row.amount, unit: row.unit })), threeStep, retainedSample, supervisor, recordedAt, safetyNote }) !== JSON.stringify({ name: value?.name ?? '', description: value?.description ?? '', mealType: value?.mealType ?? 'LUNCH', ageBand: bandFor(value, school), weight: String(value?.portionWeightGrams ?? 320), servings: String(value?.expectedQuantity ?? 485), priority: String(value?.priority ?? 1), imageUrl: value?.imageUrl ?? '', rows: value?.ingredientRecords.map(row => ({ inventoryItemId: row.inventoryItemId ?? '', name: row.name, amount: String(row.amountPerServing ?? ''), unit: row.unit })) ?? [{ inventoryItemId: '', name: '', amount: '', unit: 'g' }], threeStep: value?.safetyMonitoring.threeStep ?? 'NOT_RECORDED', retainedSample: value?.safetyMonitoring.retainedSample ?? 'NOT_RECORDED', supervisor: value?.safetyMonitoring.supervisor ?? '', recordedAt: value?.safetyMonitoring.recordedAt.slice(0, 16) ?? '', safetyNote: value?.safetyMonitoring.note ?? '' }), [name, description, mealType, ageBand, weight, servings, priority, imageUrl, rows, threeStep, retainedSample, supervisor, recordedAt, safetyNote, school, value])
   const close = () => { if (!dirty || window.confirm('Bạn có thay đổi chưa lưu. Bạn muốn thoát khỏi form?')) onClose() }
   useEffect(() => {
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const esc = (event: KeyboardEvent) => { if (event.key === 'Escape' && !traceId) { if (!dirty || window.confirm('Các thay đổi chưa lưu sẽ bị mất. Đóng form?')) onClose() } }
+    const esc = (event: KeyboardEvent) => { if (event.key === 'Escape') { if (!dirty || window.confirm('Các thay đổi chưa lưu sẽ bị mất. Đóng form?')) onClose() } }
     document.addEventListener('keydown', esc)
     return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', esc) }
-  }, [dirty, onClose, traceId])
+  }, [dirty, onClose])
   const updateRow = (key: string, patch: Partial<IngredientDraft>) => setRows(current => current.map(row => row.key === key ? { ...row, ...patch } : row))
   const validate = (target: Step): string => {
     if (target >= 1) {
@@ -111,7 +106,7 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
   const goTo = (next: Step) => { if (next < step) { setError(''); setStep(next) } else if (next === step) return; else { const reason = validate(next === 2 ? 1 : next === 3 ? 2 : next); if (reason) setError(reason); else { setError(''); setStep(next) } } }
   const applySuggestion = (recipe: typeof suggested[number]) => {
     setName(recipe.title); setDescription(recipe.description)
-    setRows(recipe.ingredients.map(food => { const item = eligible.find(stockItem => stockItem.ingredientName.toLocaleLowerCase('vi') === food.name.toLocaleLowerCase('vi')); return { key: uid(), inventoryItemId: item?.id ?? '', name: item?.ingredientName ?? food.name, amount: String(food.amount), unit: food.unit } }))
+    setRows(recipe.ingredients.map(food => { const item = ingredientCatalog.find(catalogItem => catalogItem.name.toLocaleLowerCase('vi') === food.name.toLocaleLowerCase('vi')); return { key: uid(), inventoryItemId: '', name: item?.name ?? food.name, amount: String(food.amount), unit: food.unit } }))
     setWeight(String(Math.round(recipe.ingredients.reduce((sum, ingredient) => sum + ingredient.amount, 0))))
     setError('')
     setStep(1) // Trở lại định lượng để bếp xác nhận và liên kết lô của công thức gợi ý.
@@ -153,8 +148,8 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
             <label className="dish-field wide">Mô tả và hướng dẫn chế biến <span>*</span><textarea maxLength={500} value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Nguyên liệu chính, chế biến, cách phục vụ, lưu ý dinh dưỡng..." /></label>
           </div></div>}
           {step === 1 && <div className="dish-editor-section"><div className="dish-section-intro dish-section-inline"><div><h3>Nguyên liệu & định lượng</h3><p>Định lượng trên một suất ăn. Nguyên liệu phải chọn từ danh mục chuẩn trong cơ sở dữ liệu CanTinSo.</p></div><div className="dish-section-buttons"><button className="dish-secondary" type="button" onClick={() => { setError(''); setStep(2) }}><Sparkles size={16}/> Gợi ý công thức</button><button className="dish-secondary" type="button" onClick={() => setRows(items => [...items, newIngredient()])}><Plus size={16}/> Thêm nguyên liệu</button></div></div>
-            <div className="dish-ingredient-list">{rows.map((row, index) => { const record = stock.find(item => item.id === row.inventoryItemId); const supplier = suppliers.find(item => item.id === record?.supplierId); return <div key={row.key} className="dish-ingredient-item"><div className="dish-ingredient-index"><strong>{String(index + 1).padStart(2, '0')}</strong><button aria-label={`Xóa nguyên liệu ${index + 1}`} type="button" onClick={() => setRows(items => items.filter(item => item.key !== row.key))}><Trash2 size={16}/></button></div><div className="dish-ingredient-content"><div className="dish-fields dish-ingredient-fields"><label className="dish-field">Thực phẩm <span>*</span><input list="dish-editor-food-list" value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })} placeholder="Chọn hoặc nhập tên thực phẩm" /></label><label className="dish-field">Định lượng / suất <span>*</span><div className="dish-inline-amount"><input type="number" min="0.01" step="any" value={row.amount} onChange={e => updateRow(row.key, { amount: e.target.value })}/><select aria-label={`Đơn vị của nguyên liệu ${index + 1}`} value={row.unit} onChange={e => updateRow(row.key, { unit: e.target.value as 'g' | 'ml' })}><option value="g">g</option><option value="ml">ml</option></select></div></label><label className="dish-field wide">Nguyên liệu trong danh mục chuẩn <span>*</span><select value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })}><option value="">Chọn nguyên liệu từ cơ sở dữ liệu</option>{ingredientCatalog.map(item => <option key={item.id} value={item.name}>{item.name} · {item.code} · {item.unit}</option>)}</select></label></div><div className="dish-source-info"><span>Mã nguyên liệu: <b>{ingredientCatalog.find(item => item.name === row.name)?.code ?? 'Chưa chọn danh mục'}</b></span><span>Đơn vị chuẩn: <b>{ingredientCatalog.find(item => item.name === row.name)?.unit ?? '—'}</b></span></div>{row.name.trim() && !findFood(row.name) && <p className="dish-inline-warning"><AlertTriangle size={14}/> Tên chưa khớp Phụ lục 7 QĐ 3958/QĐ-BYT. Vui lòng dùng đúng loại thực phẩm và số gam ăn được.</p>}</div></div> })}</div>
-            <datalist id="dish-editor-food-list">{ingredientCatalog.map(item => <option key={item.id} value={item.name}/>)}</datalist><div className="dish-ingredient-foot"><span><Scale size={16}/> Tổng định lượng đã nhập: <b>{pretty(totalWeight)}</b> <small>(g/ml, cần quy đổi từng nguyên liệu về gam ăn được)</small></span><span>{linked}/{rows.length} nguyên liệu đã đối chiếu lô</span></div>
+            <div className="dish-ingredient-list">{rows.map((row, index) => { return <div key={row.key} className="dish-ingredient-item"><div className="dish-ingredient-index"><strong>{String(index + 1).padStart(2, '0')}</strong><button aria-label={`Xóa nguyên liệu ${index + 1}`} type="button" onClick={() => setRows(items => items.filter(item => item.key !== row.key))}><Trash2 size={16}/></button></div><div className="dish-ingredient-content"><div className="dish-fields dish-ingredient-fields"><label className="dish-field">Thực phẩm <span>*</span><input list="dish-editor-food-list" value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })} placeholder="Chọn hoặc nhập tên thực phẩm" /></label><label className="dish-field">Định lượng / suất <span>*</span><div className="dish-inline-amount"><input type="number" min="0.01" step="any" value={row.amount} onChange={e => updateRow(row.key, { amount: e.target.value })}/><select aria-label={`Đơn vị của nguyên liệu ${index + 1}`} value={row.unit} onChange={e => updateRow(row.key, { unit: e.target.value as 'g' | 'ml' })}><option value="g">g</option><option value="ml">ml</option></select></div></label><label className="dish-field wide">Nguyên liệu trong danh mục chuẩn <span>*</span><select value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })}><option value="">Chọn nguyên liệu từ cơ sở dữ liệu</option>{ingredientCatalog.map(item => <option key={item.id} value={item.name}>{item.name} · {item.code} · {item.unit}</option>)}</select></label></div><div className="dish-source-info"><span>Mã nguyên liệu: <b>{ingredientCatalog.find(item => item.name === row.name)?.code ?? 'Chưa chọn danh mục'}</b></span><span>Đơn vị chuẩn: <b>{ingredientCatalog.find(item => item.name === row.name)?.unit ?? '—'}</b></span></div>{row.name.trim() && !findFood(row.name) && <p className="dish-inline-warning"><AlertTriangle size={14}/> Tên chưa khớp Phụ lục 7 QĐ 3958/QĐ-BYT. Vui lòng dùng đúng loại thực phẩm và số gam ăn được.</p>}</div></div> })}</div>
+            <datalist id="dish-editor-food-list">{ingredientCatalog.map(item => <option key={item.id} value={item.name}/>)}</datalist><div className="dish-ingredient-foot"><span><Scale size={16}/> Tổng định lượng đã nhập: <b>{pretty(totalWeight)}</b> <small>(g/ml, cần quy đổi từng nguyên liệu về gam ăn được)</small></span><span>{linked}/{rows.length} nguyên liệu thuộc danh mục chuẩn</span></div>
           </div>}
           {step === 2 && <div className="dish-editor-section"><div className="dish-assistant-hero"><Sparkles size={24}/><div><h3>Trợ lý dinh dưỡng học đường</h3><p>Gợi ý theo nhóm lớp và mục tiêu. Bộ tính theo quy tắc, dùng nguyên liệu đối chiếu đúng tên từ Phụ lục 7 Quyết định 3958/QĐ-BYT; không phải AI trực tuyến hay kết luận của chuyên gia.</p></div></div>
             <div className="dish-assistant-controls">
@@ -184,6 +179,6 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
         </div>
         <footer className="dish-editor-footer"><p><CheckCircle2 size={16}/> {value ? 'Chỉnh sửa món sẽ cập nhật danh mục đề xuất; thực đơn đã lập không tự thay đổi.' : 'Lưu món vào danh mục đề xuất; bếp đưa vào lịch và BGH duyệt thực đơn.'}</p><div><button type="button" className="dish-secondary" onClick={step ? () => { setError(''); setStep((step - 1) as Step) } : close}>{step ? <><ArrowLeft size={16}/> Quay lại</> : 'Hủy'}</button>{step < 3 ? <ClickSpark sparkColor="#2a9d89" sparkCount={6} sparkSize={5} duration={270}><button type="button" className="dish-primary" onClick={forward}>Tiếp tục <ArrowRight size={16}/></button></ClickSpark> : <button type="submit" className="dish-primary" disabled={saving || photoBusy}>{saving ? 'Đang lưu…' : <><Check size={17}/> {value ? 'Lưu thay đổi' : 'Lưu món đề xuất'}</>}</button>}</div></footer>
       </form>
-    </div>{traceId && <IngredientTraceDialog stockItem={inventoryItems.find(item => item.id === traceId)} onClose={() => setTraceId('')}/>}
+    </div>
   </div>
 }
