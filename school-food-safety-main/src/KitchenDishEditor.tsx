@@ -13,7 +13,7 @@ import { previewDishNutrition, type BackendNutritionSnapshot } from './lib/dishN
 import { compressDishPhoto, dishImage } from './lib/dishImages'
 import { gradeForSchool, mealTypeOptions } from './lib/boardingMenu'
 import type { BoardingMealType, KitchenDishProposal } from './lib/boardingMenu'
-import { AGE_BANDS, AGE_BAND_LABEL, ALLERGENS, ageBandsForGrade, defaultAgeBandForGrade, suggestMeals } from './lib/schoolNutrition'
+import { AGE_BANDS, AGE_BAND_LABEL, ALLERGENS, defaultAgeBandForGrade, suggestMeals } from './lib/schoolNutrition'
 import type { NutritionGoal, SchoolAgeBand } from './lib/schoolNutrition'
 import { analyzeOfficialRecipe as analyzeRecipe } from './lib/officialFoodNutrition'
 
@@ -25,6 +25,7 @@ type Step = 0 | 1 | 2 | 3
 type Allergen = (typeof ALLERGENS)[number]
 const steps = ['Thông tin món', 'Nguyên liệu', 'Phân tích & gợi ý', 'Hình ảnh & hoàn tất'] as const
 const bandFor = (proposal: KitchenDishProposal | null, school: School): SchoolAgeBand => proposal?.ageBand ?? defaultAgeBandForGrade(gradeForSchool(school.id))
+const gradeForAgeBand = (band: SchoolAgeBand): 'KINDERGARTEN' | 'PRIMARY' | 'SECONDARY' | 'HIGH_SCHOOL' => band === 'KINDERGARTEN_UNSPECIFIED' ? 'KINDERGARTEN' : ['GRADES_1_2', 'GRADES_3_4', 'GRADES_5', 'GRADES_3_5'].includes(band) ? 'PRIMARY' : ['AGES_10_11', 'GRADES_6_9'].includes(band) ? 'SECONDARY' : 'HIGH_SCHOOL'
 const newIngredient = (): IngredientDraft => ({ key: uid(), inventoryItemId: '', name: '', amount: '', unit: 'g' })
 
 export default function KitchenDishEditor({ school, role, value, onClose, onSaved }: {
@@ -56,7 +57,7 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
   const [backendNutrition, setBackendNutrition] = useState<BackendNutritionSnapshot | null>(null)
   const [nutritionLoading, setNutritionLoading] = useState(false)
   const [nutritionError, setNutritionError] = useState('')
-  const grade = gradeForSchool(school.id)
+  const grade = gradeForAgeBand(ageBand)
   useEffect(() => {
     const user = getStoredUser()
     if (!['central_kitchen', 'school_kitchen'].includes(role) || user?.role !== (role === 'central_kitchen' ? 'CENTRAL_KITCHEN' : 'SCHOOL_KITCHEN') || !getAccessToken()) {
@@ -154,7 +155,7 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
       if (!name.trim()) return 'Vui lòng nhập tên món.'
       if (!description.trim()) return 'Vui lòng nhập mô tả/cách chế biến.'
       if (!Number.isInteger(Number(servings)) || Number(servings) <= 0 || !Number.isFinite(Number(weight)) || Number(weight) <= 0 || !Number.isInteger(Number(priority)) || Number(priority) < 0) return 'Số suất, khối lượng hoặc thứ tự ưu tiên không hợp lệ.'
-      if (!ageBandsForGrade(grade).includes(ageBand)) return 'Nhóm lớp không phù hợp cấp học.'
+      if (!AGE_BANDS.some(item => item.id === ageBand)) return 'Vui lòng chọn nhóm tuổi áp dụng.'
     }
     if (target >= 2) {
       if (!rows.length) return 'Cần ít nhất một nguyên liệu.'
@@ -180,7 +181,6 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
     if (reason) { setError(reason); setStep(!name.trim() || !description.trim() ? 0 : 1); return }
     const user = getStoredUser()
     if (!kitchenContext || !getAccessToken() || user?.role !== (role === 'central_kitchen' ? 'CENTRAL_KITCHEN' : 'SCHOOL_KITCHEN') || useUI.getState().role !== role || photoBusy) { setError('Tài khoản chưa được gắn bếp thực tế hoặc phiên đăng nhập không hợp lệ.'); return }
-    if (grade === 'KINDERGARTEN') { setError('Bộ công thức đang hỗ trợ Tiểu học và THCS, chưa có tiêu chuẩn dành cho Mầm non.'); return }
     const safetyMonitoring = { threeStep, retainedSample, supervisor: supervisor.trim(), recordedAt: recordedAt ? new Date(recordedAt).toISOString() : '', note: safetyNote.trim() }
     setSaving(true)
     void saveKitchenDish({
@@ -203,7 +203,7 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
           {step === 0 && <div className="dish-editor-section">{starterSuggestions.length > 0 && <section className="dish-starter" aria-labelledby="dish-starter-title"><div className="dish-starter-heading"><div><span><Sparkles size={15}/> BẮT ĐẦU NHANH</span><h3 id="dish-starter-title">Gợi ý món ăn phù hợp</h3><p>Chọn một công thức tham khảo để tự điền thông tin và nguyên liệu. Bạn vẫn có thể chỉnh sửa toàn bộ trước khi lưu.</p></div><small>{AGE_BAND_LABEL(ageBand)} · {mealTypeOptions.find(item => item.value === mealType)?.label}</small></div><div className="dish-starter-list">{starterSuggestions.map(recipe => { const summary = analyzeRecipe(recipe.ingredients, ageBand, mealType); return <button key={recipe.id} className="dish-starter-card" type="button" aria-label={`Dùng công thức gợi ý ${recipe.title}`} onClick={() => applySuggestion(recipe)}><span className="dish-starter-card-label"><Leaf size={14}/> CÔNG THỨC THAM KHẢO</span><strong>{recipe.title}</strong><p>{recipe.description}</p><small>{recipe.ingredients.length} nguyên liệu · {pretty(summary.energy)} kcal đã đối chiếu{!summary.isComplete?" (chưa đủ)":""}/suất</small><span className="dish-starter-card-action">Dùng công thức <ArrowRight size={15}/></span></button> })}</div></section>}<div className="dish-section-intro"><h3>Thông tin cơ bản</h3><p>Những thông tin Ban Giám hiệu sẽ thấy khi lựa chọn món đưa vào thực đơn.</p></div><div className="dish-fields">
             <label className="dish-field wide">Tên món <span>*</span><input autoFocus value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="Ví dụ: Cơm gà rau củ, canh bí đỏ" /></label>
             <label className="dish-field">Bữa ăn <span>*</span><select value={mealType} onChange={e => setMealType(e.target.value as BoardingMealType)}>{mealTypeOptions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-            <label className="dish-field">Nhóm lớp <span>*</span><select value={ageBand} onChange={e => setAgeBand(e.target.value as SchoolAgeBand)}>{AGE_BANDS.filter(item => ageBandsForGrade(grade).includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+            <label className="dish-field">Nhóm lớp <span>*</span><select value={ageBand} onChange={e => setAgeBand(e.target.value as SchoolAgeBand)}>{AGE_BANDS.map(item => <option key={item.id} value={item.id}>{item.label}{item.id === 'GRADES_3_5' ? ' · dữ liệu cũ' : ''}</option>)}</select></label>
             <label className="dish-field">Khối lượng dự kiến (g/suất) <span>*</span><input type="number" min="0.01" step="any" value={weight} onChange={e => setWeight(e.target.value)}/></label>
             <label className="dish-field">Số suất dự kiến <span>*</span><input type="number" min="1" step="1" value={servings} onChange={e => setServings(e.target.value)}/></label>
             <label className="dish-field">Thứ tự ưu tiên<input type="number" min="0" step="1" value={priority} onChange={e => setPriority(e.target.value)}/></label>
