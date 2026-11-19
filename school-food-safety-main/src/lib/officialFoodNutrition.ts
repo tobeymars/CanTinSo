@@ -40,7 +40,6 @@ export const OFFICIAL_FOOD_REFERENCE: OfficialFoodEntry[] = [
   food('Dầu đậu tương',[],900,n(0,100,0,0,0,0.02),'fat',['Đậu nành'],102,13),
   food('Thịt bò, lưng, nạc',[],121,n(23.07,3.16,0.1,0,23,1.63),'protein',[],103,13),
   food('Thịt lợn nạc',['Thịt heo nạc'],139,n(19,7,0,0,7,0.96),'protein',[],107,13),
-  food('Thịt lợn mỡ',[],394,n(14.5,37.3,0,0,8,0.4),'protein',[],106,13),
   food('Thịt gà ta',[],199,n(20.3,13.1,0,0,12,1.5),'protein',[],105,13),
   food('Thịt gà công nghiệp, đùi',[],137,n(18,6.8,0.89,0,18,0.75),'protein',[],117,14),
   food('Cá basa, phi lê',[],67,n(9.7,0.8,5.32,0,34,0.2),'protein',['Cá'],131,14),
