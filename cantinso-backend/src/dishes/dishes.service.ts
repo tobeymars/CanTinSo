@@ -289,7 +289,7 @@ export class DishesService {
   async previewNutrition(user: AuthUser, dto: PreviewDishNutritionDto) {
     this.requireKitchenUser(user);
     const normalize = (value: string) => value.normalize('NFD')
-      .replace(/[\\u0300-\\u036f]/g, '')
+      .replace(/[\u0300-\u036f]/g, '')
       .toLocaleLowerCase('vi')
       .replace(/đ/g, 'd')
       .trim();
