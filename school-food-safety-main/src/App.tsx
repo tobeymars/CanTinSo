@@ -1101,7 +1101,7 @@ function Shell() {
     role === "parent"
       ? navigation
       : role === "culture_social_office"
-        ? [...adminNav, ...(isWardAdminAccount ? [{ path: "/mon-da-duyet", label: "Món ăn trường đã duyệt", icon: ShieldCheck }, { path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])]
+        ? [...adminNav, ...(role === "culture_social_office" ? [{ path: "/mon-da-duyet", label: "Món ăn trường đã duyệt", icon: ShieldCheck }, ...(isWardAdminAccount ? [{ path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])] : [])]
         : role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN"
           ? [...adminNav, { path: "/quan-ly-bep", label: "Quản lý bếp", icon: CookingPot }]
         : role === "school_kitchen" && !isSchoolKitchenReceiver
@@ -1495,7 +1495,7 @@ function Shell() {
                   <CentralKitchenManagementPanel />
                 </Suspense>
               )}
-              {location.pathname === "/mon-da-duyet" && isWardAdminAccount && (
+              {location.pathname === "/mon-da-duyet" && role === "culture_social_office" && (
                 <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
                   <WardApprovedDishes />
                 </Suspense>
