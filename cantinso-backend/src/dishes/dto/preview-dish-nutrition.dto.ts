@@ -14,6 +14,11 @@ import { Type } from 'class-transformer';
 class PreviewDishIngredientInput {
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
+  ingredientId: string;
+
+  @IsString()
+  @MinLength(1)
   @MaxLength(200)
   ingredientName: string;
 
