@@ -510,7 +510,7 @@ export class DishesService {
     }
 
     const version = await this.prisma.dishVersion.findFirst({
-      where: { id: versionId, dishId, dish: { kitchenId } },
+      where: { id: versionId, dishId, dish: { kitchenId, status: { not: 'ARCHIVED' } } },
       select: { id: true, status: true },
     });
     if (!version) throw new NotFoundException('Không tìm thấy phiên bản món trong phạm vi bếp.');
