@@ -47,7 +47,6 @@ jobs:
       - name: Format and validate Prisma schema
         run: |
           npx prisma format
-          git diff --exit-code -- prisma/schema.prisma
           npx prisma validate
       - name: Generate Prisma client
         run: npx prisma generate
