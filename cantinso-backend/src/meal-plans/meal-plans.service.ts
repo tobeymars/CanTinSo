@@ -42,7 +42,17 @@ export class MealPlansService {
       return this.prisma.mealPlan.findMany({
         where: { schoolId: user.schoolId },
         orderBy: [{ serviceDate: 'desc' }, { mealType: 'asc' }],
-        include: { kitchen: { select: { id: true, code: true, name: true } }, revisions: {
+        include: { school: { select: { id: true, name: true } }, kitchen: { select: { id: true, code: true, name: true } }, revisions: {
+          orderBy: { revisionNo: 'desc' }, take: 1, include: this.revisionInclude(),
+        } },
+      });
+    }
+    if (user.role === 'UBND_ADMIN') {
+      if (!user.wardId) throw new ForbiddenException('Tài khoản UBND chưa được gắn với phường quản lý.');
+      return this.prisma.mealPlan.findMany({
+        where: { school: { wardId: user.wardId } },
+        orderBy: [{ serviceDate: 'desc' }, { mealType: 'asc' }],
+        include: { school: { select: { id: true, name: true } }, kitchen: { select: { id: true, code: true, name: true } }, revisions: {
           orderBy: { revisionNo: 'desc' }, take: 1, include: this.revisionInclude(),
         } },
       });
