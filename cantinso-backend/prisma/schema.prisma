@@ -317,6 +317,7 @@ model Ingredient {
   category        String?
   lots            InventoryLot[]
   dishIngredients DishIngredient[]
+  nutritionProfiles IngredientNutritionProfile[]
   createdAt       DateTime         @default(now()) @map("created_at")
 
   @@map("ingredients")
@@ -620,4 +621,49 @@ model MealPlanApprovalEvent {
   @@index([revisionId, occurredAt])
   @@index([actorId, occurredAt])
   @@map("meal_plan_approval_events")
+}
+
+
+model NutritionReference {
+  id            String                      @id @default(uuid()) @db.Uuid
+  code          String                      @unique
+  title         String
+  issuingBody   String                      @map("issuing_body")
+  documentNo    String                      @map("document_no")
+  issuedAt      DateTime                    @map("issued_at") @db.Date
+  effectiveAt   DateTime                    @map("effective_at") @db.Date
+  appendix      String
+  sourceUrl     String                      @map("source_url")
+  version       Int                         @default(1)
+  profiles      IngredientNutritionProfile[]
+  createdAt     DateTime                    @default(now()) @map("created_at")
+
+  @@unique([documentNo, appendix, version])
+  @@map("nutrition_references")
+}
+
+model IngredientNutritionProfile {
+  id                   String            @id @default(uuid()) @db.Uuid
+  ingredientId         String            @map("ingredient_id") @db.Uuid
+  nutritionReferenceId String            @map("nutrition_reference_id") @db.Uuid
+  sourceRowNo          Int?              @map("source_row_no")
+  sourceCategory       String            @map("source_category")
+  edibleRatePercent    Decimal           @map("edible_rate_percent") @db.Decimal(6, 2)
+  energyKcal           Decimal?          @map("energy_kcal") @db.Decimal(12, 4)
+  proteinG             Decimal?          @map("protein_g") @db.Decimal(12, 4)
+  fatG                 Decimal?          @map("fat_g") @db.Decimal(12, 4)
+  carbohydrateG        Decimal?          @map("carbohydrate_g") @db.Decimal(12, 4)
+  fiberG               Decimal?          @map("fiber_g") @db.Decimal(12, 4)
+  calciumMg            Decimal?          @map("calcium_mg") @db.Decimal(12, 4)
+  ironMg               Decimal?          @map("iron_mg") @db.Decimal(12, 4)
+  zincMg               Decimal?          @map("zinc_mg") @db.Decimal(12, 4)
+  vitaminARaeMcg       Decimal?          @map("vitamin_a_rae_mcg") @db.Decimal(12, 4)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  ingredient           Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  nutritionReference   NutritionReference @relation(fields: [nutritionReferenceId], references: [id], onDelete: Restrict)
+
+  @@unique([ingredientId, nutritionReferenceId])
+  @@index([nutritionReferenceId, sourceCategory])
+  @@index([ingredientId])
+  @@map("ingredient_nutrition_profiles")
 }
