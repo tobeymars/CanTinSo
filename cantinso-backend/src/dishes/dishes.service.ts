@@ -508,6 +508,10 @@ export class DishesService {
     }
 
     const now = new Date();
+    const kitchen = await this.prisma.kitchen.findFirst({
+      where: { id: kitchenId, isActive: true },
+      select: { type: true, schoolId: true },
+    });
     const assignments = await this.prisma.kitchenSchoolAssignment.findMany({
       where: {
         kitchenId,
@@ -519,6 +523,7 @@ export class DishesService {
       select: { schoolId: true },
     });
     const assignedIds = new Set(assignments.map((item) => item.schoolId));
+    if (kitchen?.type === 'SCHOOL' && kitchen.schoolId) assignedIds.add(kitchen.schoolId);
     const invalidIds = uniqueSchoolIds.filter((id) => !assignedIds.has(id));
     if (invalidIds.length) {
       throw new ForbiddenException('Có trường không nằm trong phân công bếp còn hiệu lực.');
