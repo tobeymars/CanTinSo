@@ -17,7 +17,7 @@ import type { NutritionGoal, SchoolAgeBand } from './lib/schoolNutrition'
 import { analyzeOfficialRecipe as analyzeRecipe } from './lib/officialFoodNutrition'
 
 const pretty = (value: number) => value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })
-const normalizeCatalogName = (value: string) => value.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/đ/g, 'd').replace(/[\\s\\u00a0]+/g, ' ').trim().toLocaleLowerCase('vi')
+const normalizeCatalogName = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[\s\u00a0]+/g, ' ').trim().toLocaleLowerCase('vi')
 const uid = () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `dish-${Date.now()}-${Math.random().toString(36).slice(2)}`
 type IngredientDraft = { key: string; inventoryItemId: string; name: string; amount: string; unit: 'g' | 'ml' }
 type Step = 0 | 1 | 2 | 3
