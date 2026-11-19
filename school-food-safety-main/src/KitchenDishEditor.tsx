@@ -7,7 +7,8 @@ import type { School } from './lib/data'
 import type { ViewRole } from './lib/store'
 import { useUI } from './lib/store'
 import { getAccessToken, getStoredUser } from './lib/authApi'
-import { fetchMyKitchenContext } from './lib/myKitchenApi'
+import { fetchMyKitchenContext, type MyKitchenContext } from './lib/myKitchenApi'
+import { listIngredientCatalog, saveKitchenDish, type IngredientCatalogItem } from './lib/dishCatalogApi'
 import { inventoryItems } from './lib/inventory'
 import { readSuppliers } from './lib/suppliers'
 import { compressDishPhoto, dishImage } from './lib/dishImages'
@@ -54,6 +55,8 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [actualKitchenName, setActualKitchenName] = useState('')
+  const [kitchenContext, setKitchenContext] = useState<MyKitchenContext | null>(null)
+  const [ingredientCatalog, setIngredientCatalog] = useState<IngredientCatalogItem[]>([])
   const grade = gradeForSchool(school.id)
   const kitchen = useMemo(() => kitchenDirectoryRepository.load().find(item => item.active && item.assignedSchoolIds.includes(school.id) && item.type === (role === 'central_kitchen' ? 'CENTRAL_KITCHEN' : 'ON_SITE')),[school.id, role])
   useEffect(() => {
@@ -64,12 +67,18 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
     }
     let active = true
     fetchMyKitchenContext().then(context => {
-      if (active) setActualKitchenName(context.kitchen.name)
+      if (active) { setActualKitchenName(context.kitchen.name); setKitchenContext(context) }
     }).catch(() => {
-      if (active) setActualKitchenName('')
+      if (active) { setActualKitchenName(''); setKitchenContext(null) }
     })
     return () => { active = false }
   }, [role])
+  useEffect(() => {
+    let active = true
+    listIngredientCatalog().then(items => { if (active) setIngredientCatalog(items) })
+      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Không tải được danh mục nguyên liệu.') })
+    return () => { active = false }
+  }, [])
   const stock = useMemo(() => inventoryItems.filter(item => item.schoolId === school.id && item.kitchenId === kitchen?.id && item.unit !== 'chai'),[school.id, kitchen?.id])
   const [today] = useState(todayIsoDate)
   const eligible = stock.filter(item => item.expiresAt >= today)
@@ -100,7 +109,7 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
       if (!rows.length) return 'Cần ít nhất một nguyên liệu.'
       if (rows.some(row => !row.name.trim() || !Number.isFinite(Number(row.amount)) || Number(row.amount) <= 0)) return 'Nhập đủ tên và định lượng lớn hơn 0 cho từng nguyên liệu.'
       if (new Set(rows.map(row => row.name.trim().toLocaleLowerCase('vi'))).size !== rows.length) return 'Không được nhập trùng nguyên liệu trong cùng một món.'
-      if (rows.some(row => row.inventoryItemId && !eligible.some(item => item.id === row.inventoryItemId && item.ingredientName === row.name))) return 'Có lô nguyên liệu hết hạn, sai bếp hoặc không khớp thực phẩm.'
+      if (rows.some(row => !ingredientCatalog.some(item => item.name === row.name))) return 'Mỗi nguyên liệu phải được chọn từ danh mục chuẩn của hệ thống.'
     }
     return ''
   }
@@ -118,14 +127,20 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
     event.preventDefault()
     const reason = validate(2)
     if (reason) { setError(reason); setStep(!name.trim() || !description.trim() ? 0 : 1); return }
-    if (!kitchen || !['central_kitchen', 'school_kitchen'].includes(role) || useUI.getState().role !== role || useUI.getState().schoolId !== school.id || photoBusy) { setError('Không có quyền lưu món hoặc ảnh chưa xử lý xong.'); return }
+    const user = getStoredUser()
+    if (!kitchenContext || !getAccessToken() || user?.role !== (role === 'central_kitchen' ? 'CENTRAL_KITCHEN' : 'SCHOOL_KITCHEN') || useUI.getState().role !== role || photoBusy) { setError('Tài khoản chưa được gắn bếp thực tế hoặc phiên đăng nhập không hợp lệ.'); return }
     if (grade === 'KINDERGARTEN') { setError('Bộ công thức đang hỗ trợ Tiểu học và THCS, chưa có tiêu chuẩn dành cho Mầm non.'); return }
-    const ingredientRecords = rows.map(row => { const item = eligible.find(stockItem => stockItem.id === row.inventoryItemId); const supplier = item && suppliers.find(partner => partner.id === item.supplierId); return { inventoryItemId: item?.id, name: row.name.trim(), amountPerServing: Number(row.amount), unit: row.unit, supplier: supplier?.name ?? '', lotCode: item?.lotCode ?? '', origin: item?.origin ?? '' } })
-    const now = nowIso()
-    const proposal: KitchenDishProposal = { id: value?.id ?? uid(), schoolId: school.id, kitchenId: value?.kitchenId ?? kitchen.id, createdBy: role as 'central_kitchen' | 'school_kitchen', mealType, gradeLevel: grade, ageBand, name: name.trim(), description: description.trim(), imageUrl: imageUrl || undefined, expectedQuantity: Number(servings), portionWeightGrams: Number(weight), priority: Number(priority), ingredientRecords, safetyMonitoring: { threeStep, retainedSample, supervisor: supervisor.trim(), recordedAt: recordedAt ? new Date(recordedAt).toISOString() : '', note: safetyNote.trim() }, createdAt: value?.createdAt ?? now, updatedAt: now, demo: true }
+    const safetyMonitoring = { threeStep, retainedSample, supervisor: supervisor.trim(), recordedAt: recordedAt ? new Date(recordedAt).toISOString() : '', note: safetyNote.trim() }
     setSaving(true)
-    try { kitchenDishProposalsRepository.save(proposal); onSaved(proposal.name, !!value) }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Không thể lưu món.'); setSaving(false) }
+    void saveKitchenDish({
+      value, name: name.trim(), description: description.trim(), mealType, gradeLevel: grade, ageBand,
+      imageUrl, expectedQuantity: Number(servings), portionWeightGrams: Number(weight), priority: Number(priority),
+      safetyMonitoring, ingredients: rows.map(row => ({ name: row.name.trim(), quantity: Number(row.amount), unitCode: row.unit })),
+      ingredientCatalog,
+    }).then(() => onSaved(name.trim(), !!value)).catch(reason => {
+      setError(reason instanceof Error ? reason.message : 'Không thể lưu món vào cơ sở dữ liệu.')
+      setSaving(false)
+    })
   }
   return <div className="dish-editor-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close() }}>
     <div className="dish-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="dish-editor-title">
@@ -143,9 +158,9 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
             <label className="dish-field">Đơn vị chế biến<input disabled value={actualKitchenName || kitchen?.name || 'Chưa phân công bếp'} readOnly/></label>
             <label className="dish-field wide">Mô tả và hướng dẫn chế biến <span>*</span><textarea maxLength={500} value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Nguyên liệu chính, chế biến, cách phục vụ, lưu ý dinh dưỡng..." /></label>
           </div></div>}
-          {step === 1 && <div className="dish-editor-section"><div className="dish-section-intro dish-section-inline"><div><h3>Nguyên liệu & định lượng</h3><p>Định lượng trên một suất ăn. Chỉ được chọn mã lô thực tế từ kho được phân công.</p></div><div className="dish-section-buttons"><button className="dish-secondary" type="button" onClick={() => { setError(''); setStep(2) }}><Sparkles size={16}/> Gợi ý công thức</button><button className="dish-secondary" type="button" onClick={() => setRows(items => [...items, newIngredient()])}><Plus size={16}/> Thêm nguyên liệu</button></div></div>
-            <div className="dish-ingredient-list">{rows.map((row, index) => { const record = stock.find(item => item.id === row.inventoryItemId); const supplier = suppliers.find(item => item.id === record?.supplierId); return <div key={row.key} className="dish-ingredient-item"><div className="dish-ingredient-index"><strong>{String(index + 1).padStart(2, '0')}</strong><button aria-label={`Xóa nguyên liệu ${index + 1}`} type="button" onClick={() => setRows(items => items.filter(item => item.key !== row.key))}><Trash2 size={16}/></button></div><div className="dish-ingredient-content"><div className="dish-fields dish-ingredient-fields"><label className="dish-field">Thực phẩm <span>*</span><input list="dish-editor-food-list" value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })} placeholder="Chọn hoặc nhập tên thực phẩm" /></label><label className="dish-field">Định lượng / suất <span>*</span><div className="dish-inline-amount"><input type="number" min="0.01" step="any" value={row.amount} onChange={e => updateRow(row.key, { amount: e.target.value })}/><select aria-label={`Đơn vị của nguyên liệu ${index + 1}`} value={row.unit} onChange={e => updateRow(row.key, { unit: e.target.value as 'g' | 'ml' })}><option value="g">g</option><option value="ml">ml</option></select></div></label><label className="dish-field wide">Liên kết lô kho<select value={row.inventoryItemId} onChange={e => { const selected = stock.find(item => item.id === e.target.value); updateRow(row.key, { inventoryItemId: e.target.value, name: selected?.ingredientName ?? row.name, unit: selected?.unit === 'lít' ? 'ml' : 'g' }) }}><option value="">Chưa đối chiếu lô — công thức dự kiến</option>{stock.map(item => <option key={item.id} value={item.id} disabled={item.expiresAt < today}>{item.ingredientName} · {item.lotCode}{item.expiresAt < today ? ' (Hết hạn)' : ''}</option>)}</select></label></div><div className="dish-source-info"><span>Nhà cung cấp: <b>{supplier?.name ?? 'Chưa đối chiếu'}</b></span><span>Mã lô: <b>{record?.lotCode ?? 'Chưa có'}</b></span>{record && <button type="button" onClick={() => setTraceId(record.id)}><FileSearch size={14}/> Xem hồ sơ</button>}</div>{row.name.trim() && !findFood(row.name) && <p className="dish-inline-warning"><AlertTriangle size={14}/> Tên chưa khớp Phụ lục 7 QĐ 3958/QĐ-BYT. Vui lòng dùng đúng loại thực phẩm và số gam ăn được.</p>}</div></div> })}</div>
-            <datalist id="dish-editor-food-list">{FOOD_REFERENCE.map(item => <option key={item.name} value={item.name}/>)}</datalist><div className="dish-ingredient-foot"><span><Scale size={16}/> Tổng định lượng đã nhập: <b>{pretty(totalWeight)}</b> <small>(g/ml, cần quy đổi từng nguyên liệu về gam ăn được)</small></span><span>{linked}/{rows.length} nguyên liệu đã đối chiếu lô</span></div>
+          {step === 1 && <div className="dish-editor-section"><div className="dish-section-intro dish-section-inline"><div><h3>Nguyên liệu & định lượng</h3><p>Định lượng trên một suất ăn. Nguyên liệu phải chọn từ danh mục chuẩn trong cơ sở dữ liệu CanTinSo.</p></div><div className="dish-section-buttons"><button className="dish-secondary" type="button" onClick={() => { setError(''); setStep(2) }}><Sparkles size={16}/> Gợi ý công thức</button><button className="dish-secondary" type="button" onClick={() => setRows(items => [...items, newIngredient()])}><Plus size={16}/> Thêm nguyên liệu</button></div></div>
+            <div className="dish-ingredient-list">{rows.map((row, index) => { const record = stock.find(item => item.id === row.inventoryItemId); const supplier = suppliers.find(item => item.id === record?.supplierId); return <div key={row.key} className="dish-ingredient-item"><div className="dish-ingredient-index"><strong>{String(index + 1).padStart(2, '0')}</strong><button aria-label={`Xóa nguyên liệu ${index + 1}`} type="button" onClick={() => setRows(items => items.filter(item => item.key !== row.key))}><Trash2 size={16}/></button></div><div className="dish-ingredient-content"><div className="dish-fields dish-ingredient-fields"><label className="dish-field">Thực phẩm <span>*</span><input list="dish-editor-food-list" value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })} placeholder="Chọn hoặc nhập tên thực phẩm" /></label><label className="dish-field">Định lượng / suất <span>*</span><div className="dish-inline-amount"><input type="number" min="0.01" step="any" value={row.amount} onChange={e => updateRow(row.key, { amount: e.target.value })}/><select aria-label={`Đơn vị của nguyên liệu ${index + 1}`} value={row.unit} onChange={e => updateRow(row.key, { unit: e.target.value as 'g' | 'ml' })}><option value="g">g</option><option value="ml">ml</option></select></div></label><label className="dish-field wide">Nguyên liệu trong danh mục chuẩn <span>*</span><select value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })}><option value="">Chọn nguyên liệu từ cơ sở dữ liệu</option>{ingredientCatalog.map(item => <option key={item.id} value={item.name}>{item.name} · {item.code} · {item.unit}</option>)}</select></label></div><div className="dish-source-info"><span>Nhà cung cấp: <b>{supplier?.name ?? 'Chưa đối chiếu'}</b></span><span>Mã lô: <b>{record?.lotCode ?? 'Chưa có'}</b></span>{record && <button type="button" onClick={() => setTraceId(record.id)}><FileSearch size={14}/> Xem hồ sơ</button>}</div>{row.name.trim() && !findFood(row.name) && <p className="dish-inline-warning"><AlertTriangle size={14}/> Tên chưa khớp Phụ lục 7 QĐ 3958/QĐ-BYT. Vui lòng dùng đúng loại thực phẩm và số gam ăn được.</p>}</div></div> })}</div>
+            <datalist id="dish-editor-food-list">{ingredientCatalog.map(item => <option key={item.id} value={item.name}/>)}</datalist><div className="dish-ingredient-foot"><span><Scale size={16}/> Tổng định lượng đã nhập: <b>{pretty(totalWeight)}</b> <small>(g/ml, cần quy đổi từng nguyên liệu về gam ăn được)</small></span><span>{linked}/{rows.length} nguyên liệu đã đối chiếu lô</span></div>
           </div>}
           {step === 2 && <div className="dish-editor-section"><div className="dish-assistant-hero"><Sparkles size={24}/><div><h3>Trợ lý dinh dưỡng học đường</h3><p>Gợi ý theo nhóm lớp và mục tiêu. Bộ tính theo quy tắc, dùng nguyên liệu đối chiếu đúng tên từ Phụ lục 7 Quyết định 3958/QĐ-BYT; không phải AI trực tuyến hay kết luận của chuyên gia.</p></div></div>
             <div className="dish-assistant-controls">
