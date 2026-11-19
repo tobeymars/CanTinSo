@@ -43,7 +43,7 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: cantinso-backend/package-lock.json
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Format and validate Prisma schema
         run: |
           npx prisma format
