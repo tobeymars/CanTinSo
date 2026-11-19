@@ -11,11 +11,11 @@ export class MealPlansController {
   constructor(private readonly mealPlans: MealPlansService) {}
 
   @Get('age-groups')
-  @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN', 'SCHOOL_ADMIN')
+  @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN', 'SCHOOL_ADMIN', 'UBND_ADMIN')
   ageGroups() { return this.mealPlans.listAgeGroups(); }
 
   @Get()
-  @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN', 'SCHOOL_ADMIN')
+  @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN', 'SCHOOL_ADMIN', 'UBND_ADMIN')
   list(@CurrentUser() user: AuthUser) { return this.mealPlans.list(user); }
 
   @Post()
