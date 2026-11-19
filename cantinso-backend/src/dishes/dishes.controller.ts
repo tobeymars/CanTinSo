@@ -22,6 +22,12 @@ import { DishesService } from './dishes.service';
 export class DishesController {
   constructor(private readonly dishes: DishesService) {}
 
+  @Post('nutrition-preview')
+  @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
+  previewNutrition(@CurrentUser() user: AuthUser, @Body() dto: PreviewDishNutritionDto) {
+    return this.dishes.previewNutrition(user, dto);
+  }
+
   @Post()
   @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateDishDto) {
