@@ -1464,7 +1464,8 @@ function Shell() {
           )}
           {role !== "parent" ? (
             <>
-              {!["/giam-sat", "/ho-so-phap-ly", "/thuc-don", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam", "/quan-ly-bep", "/mon-da-duyet"].includes(location.pathname) && (
+              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam", "/quan-ly-bep", "/mon-da-duyet"].includes(location.pathname) &&
+                !(role === "culture_social_office" && location.pathname === "/thuc-don") && (
                 <Suspense
                   fallback={
                     <div className="loading-grid">
