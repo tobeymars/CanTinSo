@@ -102,6 +102,13 @@ export async function saveKitchenDish(input: {
   schoolIds: string[]
 }) {
   const { value } = input
+  const byName = new Map(input.ingredientCatalog.map(item => [normalize(item.name), item]))
+  const resolved = input.ingredients.map(item => {
+    const catalog = byName.get(normalize(item.name))
+    if (!catalog) throw new Error(`Nguyên liệu "${item.name}" chưa có trong danh mục chuẩn của hệ thống. Hãy chọn tên nguyên liệu trong danh mục.`)
+    return { ingredientId: catalog.id, quantity: item.quantity, unitCode: item.unitCode }
+  })
+  const schoolIds = [...new Set(input.schoolIds)]
   const code = value?.id ? value.code : `DISH-${Date.now()}`
   const metadata = {
     code: code ?? `DISH-${Date.now()}`,
@@ -115,12 +122,6 @@ export async function saveKitchenDish(input: {
   } else {
     await request(`/dishes/${dishId}`, { method: 'PATCH', body: JSON.stringify(metadata) })
   }
-  const byName = new Map(input.ingredientCatalog.map(item => [normalize(item.name), item]))
-  const resolved = input.ingredients.map(item => {
-    const catalog = byName.get(normalize(item.name))
-    if (!catalog) throw new Error(`Nguyên liệu "${item.name}" chưa có trong danh mục chuẩn của hệ thống. Hãy chọn tên nguyên liệu trong danh mục.`)
-    return { ingredientId: catalog.id, quantity: item.quantity, unitCode: item.unitCode }
-  })
   const recipeSnapshot = {
     name: input.name,
     description: input.description,
@@ -142,12 +143,16 @@ export async function saveKitchenDish(input: {
     }),
   })
   let submitted = false
-  if (input.schoolIds.length) {
-    await request(`/dishes/${dishId}/versions/${version.id}/submit`, {
-      method: 'POST',
-      body: JSON.stringify({ schoolIds: input.schoolIds }),
-    })
-    submitted = true
+  if (schoolIds.length) {
+    try {
+      await request(`/dishes/${dishId}/versions/${version.id}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({ schoolIds }),
+      })
+      submitted = true
+    } catch {
+      // Keep the successfully persisted version as a DRAFT if school routing is not ready.
+    }
   }
   return { dishId, submitted }
 }
