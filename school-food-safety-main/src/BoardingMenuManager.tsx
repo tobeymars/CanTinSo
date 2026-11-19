@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'\nimport { getStoredUser } from './lib/authApi'\nimport RealBoardingMenuManager from './RealBoardingMenuManager'
 import type { FormEvent, ReactNode } from 'react'
 import { Apple, Building2, CalendarDays, Check, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, CircleHelp, Coffee, Eye, RefreshCw, Plus, Trash2, Utensils, X, Sparkles, Send, ShieldCheck, RotateCcw }  from 'lucide-react'
 import ClickSpark from './components/react-bits/ClickSpark'
@@ -221,7 +221,7 @@ function MealEditor({ target, week, items, kitchens, managementScope, kitchenPro
   </Modal>
 }
 
-export default function BoardingMenuManager({ school, selectedDate, managementScope = 'ALL', readOnly = false, publicView = false, publicEntries = [], onSelectDate }: { school: School; selectedDate: string; managementScope?: BoardingMenuManagementScope; readOnly?: boolean; publicView?: boolean; publicEntries?: PublicBoardingMenuEntry[]; onSelectDate?: (date: string) => void }) {
+function DemoBoardingMenuManager({ school, selectedDate, managementScope = 'ALL', readOnly = false, publicView = false, publicEntries = [], onSelectDate }: { school: School; selectedDate: string; managementScope?: BoardingMenuManagementScope; readOnly?: boolean; publicView?: boolean; publicEntries?: PublicBoardingMenuEntry[]; onSelectDate?: (date: string) => void }) {
   const role = useUI(state => state.role)
   // Quyền lập lịch thuộc bếp; BGH chỉ duyệt. Đây là guard DEMO ở UI.
   const isKitchen = role === 'central_kitchen' || role === 'school_kitchen'
@@ -574,3 +574,4 @@ export default function BoardingMenuManager({ school, selectedDate, managementSc
     {previewDate && <Modal label="Xem trước thực đơn công khai" requestClose={() => setPreviewDate(null)}><div className="preview-dialog"><header><div><span className="section-kicker">XEM TRƯỚC BẢN CÔNG KHAI · DEMO</span><h2>Thực đơn {dateLabel(previewDate, { weekday: 'long', day: '2-digit', month: '2-digit' })}</h2></div><button className="icon-button" aria-label="Đóng" onClick={() => setPreviewDate(null)}><X /></button></header>{mealTypeOptions.map(meal => <section key={meal.value}><strong>{meal.label}</strong>{cellItems(previewDate, meal.value).length ? <ul>{cellItems(previewDate, meal.value).map(item => <li key={item.id}><button className="preview-dish-trigger" type="button" onClick={() => { setPreviewDate(null); setSelectedDish(item) }}><img className="preview-dialog-photo" src={dishImage(item.name, item.mealType, item.imageUrl)} alt={`Ảnh minh họa ${item.name}`} /><span>{item.name}{defaultMealDish(cellItems(previewDate, meal.value))?.id === item.id ? ' · Món mặc định' : ' · Món lựa chọn'}</span></button><small>{serviceModeLabel(item.serviceMode)} · {item.description || 'Chưa có mô tả.'}</small></li>)}</ul> : <p>Chưa cập nhật</p>}</section>)}</div></Modal>}
   </section>
 }
+\nexport default function BoardingMenuManager(props: { school: School; selectedDate: string; managementScope?: BoardingMenuManagementScope; readOnly?: boolean; publicView?: boolean; publicEntries?: PublicBoardingMenuEntry[]; onSelectDate?: (date: string) => void }) {\n const user=getStoredUser();\n if(user&&['CENTRAL_KITCHEN','SCHOOL_KITCHEN','SCHOOL_ADMIN'].includes(user.role)&&!props.publicView) return <RealBoardingMenuManager selectedDate={props.selectedDate} onSelectDate={props.onSelectDate}/>;\n return <DemoBoardingMenuManager {...props}/>;\n}\n
