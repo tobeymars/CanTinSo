@@ -47,6 +47,7 @@ export async function listKitchenDishes(schoolId: string, role: 'central_kitchen
     const ingredientRecords = (version?.ingredients ?? []).map(row => {
       const ingredient = row.ingredient
       return {
+        inventoryItemId: ingredient?.id ?? '',
         name: ingredient?.name ?? 'Nguyên liệu',
         ingredientCode: ingredient?.code ?? '',
         amountPerServing: asNumber(row.quantity),
@@ -98,16 +99,14 @@ export async function saveKitchenDish(input: {
   portionWeightGrams: number
   priority: number
   safetyMonitoring: KitchenDishProposal['safetyMonitoring']
-  ingredients: Array<{ name: string; quantity: number; unitCode: string }>
+  ingredients: Array<{ ingredientId: string; name: string; quantity: number; unitCode: string }>
   ingredientCatalog: IngredientCatalogItem[]
   schoolIds: string[]
 }) {
   const { value } = input
-  const byName = new Map(input.ingredientCatalog.map(item => [normalize(item.name), item]))
   const resolved = input.ingredients.map(item => {
-    const catalog = byName.get(normalize(item.name))
-    if (!catalog) throw new Error(`Nguyên liệu "${item.name}" chưa có trong danh mục chuẩn của hệ thống. Hãy chọn tên nguyên liệu trong danh mục.`)
-    return { ingredientId: catalog.id, quantity: item.quantity, unitCode: item.unitCode }
+    if (!item.ingredientId) throw new Error(`Nguyên liệu "${item.name}" chưa được liên kết với mã trong danh mục chuẩn.`)
+    return { ingredientId: item.ingredientId, quantity: item.quantity, unitCode: item.unitCode }
   })
   const schoolIds = [...new Set(input.schoolIds)]
   const code = value?.id ? value.code : `DISH-${Date.now()}`
