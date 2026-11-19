@@ -61,6 +61,7 @@ import type { DayData, PublicInspection, School } from "./lib/data";
 import { centralKitchenRouteAccess, useUI } from "./lib/store";
 import { getManagedSchools, getMySchoolOverview } from "./lib/usersApi";
 import { getStoredUser } from "./lib/authApi";
+import { fetchMyKitchenContext } from "./lib/myKitchenApi";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
 import AuthGate from "./AuthGate";
@@ -89,7 +90,6 @@ const AdminPanel = lazy(() => import("./Admin"));
 const CanteenGallery = lazy(() => import("./CanteenGallery"));
 const PortionTracePage = lazy(() => import("./PortionTracePage"));
 const BoardingMenuManager = lazy(() => import("./BoardingMenuManager"));
-const MealPlanWorkspace = lazy(() => import("./MealPlanWorkspace"));
 const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
 const DishApprovalInbox = lazy(() => import("./DishApprovalInbox"));
 const FeedbackForm = lazy(() => import("./FeedbackForm"));
@@ -982,6 +982,8 @@ function Shell() {
   const isWardWorkspace = role === "culture_social_office";
   const storedUser = getStoredUser();
   const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
+  const isRealKitchenAccount = (storedUser?.role === "CENTRAL_KITCHEN" || storedUser?.role === "SCHOOL_KITCHEN") && !!storedUser?.kitchenId;
+  const realKitchenQuery = useQuery({ queryKey: ["my-kitchen-context"], queryFn: fetchMyKitchenContext, enabled: isRealKitchenAccount });
   // SCHOOL_KITCHEN without kitchenId is school-side meal receiving staff, not a kitchen operator.
   const isSchoolKitchenReceiver = storedUser?.role === "SCHOOL_KITCHEN" && !storedUser.kitchenId;
   const schoolQuery = useQuery({
@@ -1389,16 +1391,17 @@ function Shell() {
             <div className="hero-content">
               <span className="hero-eyebrow">
                 <SchoolIcon size={15} />{" "}
-                {role === "parent"
-                  ? "NGÔI TRƯỜNG CỦA CON"
-                  : role === "culture_social_office"
-                    ? "TRƯỜNG ĐANG THEO DÕI"
-                    : "PHẠM VI NHÀ TRƯỜNG"}
+                {role === "parent" ? "NGÔI TRƯỜNG CỦA CON" : role === "culture_social_office" ? "TRƯỜNG ĐANG THEO DÕI" : isRealKitchenAccount ? "PHẠM VI BẾP ĐƯỢC PHÂN CÔNG" : "PHẠM VI NHÀ TRƯỜNG"}
               </span>
               {isRealSchoolAdmin ? (
                 <div className="school-picker school-picker-locked">
                   <strong>{school.name}</strong>
                   <span><ShieldCheck size={14} /> Trường được phân công</span>
+                </div>
+              ) : isRealKitchenAccount ? (
+                <div className="school-picker school-picker-locked">
+                  <strong>{realKitchenQuery.data?.kitchen.name ?? (realKitchenQuery.isLoading ? "Đang tải thông tin bếp…" : "Không tải được thông tin bếp")}</strong>
+                  <span><ShieldCheck size={14} /> Bếp theo tài khoản đăng nhập</span>
                 </div>
               ) : (
                 <div className="school-picker">
@@ -1415,11 +1418,11 @@ function Shell() {
                   />
                 </div>
               )}
-              <p className="hero-address">{school.address}</p>
+              <p className="hero-address">{isRealKitchenAccount ? (realKitchenQuery.data?.kitchen.address ?? "Đơn vị bếp được phân công") : school.address}</p>
               <div className="hero-bottom">
                 <span>
                   <span className="live-dot" />
-                  {isRealSchoolAdmin ? "Dữ liệu hệ thống" : demo ? "Dữ liệu minh họa" : "Thông tin công khai"}
+                  {isRealSchoolAdmin || isRealKitchenAccount ? "Dữ liệu hệ thống" : demo ? "Dữ liệu minh họa" : "Thông tin công khai"}
                 </span>
                 <span className="hero-separator" />
                 <span>
