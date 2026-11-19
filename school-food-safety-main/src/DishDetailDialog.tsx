@@ -8,6 +8,7 @@ import { dishImage } from './lib/dishImages'
 import { analyzeOfficialRecipe } from './lib/officialFoodNutrition'
 import { defaultAgeBandForGrade } from './lib/schoolNutrition'
 import { previewDishNutrition } from './lib/dishNutritionApi'
+import { getStoredUser } from './lib/authApi'
 import type { BackendNutritionSnapshot } from './lib/dishNutritionApi'
 import IngredientTraceDialog from './IngredientTraceDialog'
 import './DishDetailDialog.css'
@@ -59,7 +60,7 @@ export default function DishDetailDialog({ dish, kitchen, linkedLots = [], opera
     let active = true
     setBackendNutrition(null)
     setNutritionApiError('')
-    if (!nutritionInput.length) return () => { active = false }
+    if (!nutritionInput.length || !['CENTRAL_KITCHEN', 'SCHOOL_KITCHEN'].includes(getStoredUser()?.role ?? '')) return () => { active = false }
     previewDishNutrition(nutritionInput)
       .then(result => { if (active) setBackendNutrition(result) })
       .catch(error => { if (active) setNutritionApiError(error instanceof Error ? error.message : 'Không lấy được kết quả tính từ máy chủ.') })
