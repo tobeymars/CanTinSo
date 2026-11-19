@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, CheckCircle2, Plus, RefreshCw, School, X } from "lucide-react";
+import { Building2, CheckCircle2, Plus, RefreshCw, School } from "lucide-react";
 import { createManagedSchool, getManagedSchools } from "./lib/usersApi";
 import "./WardSchoolManagement.css";
 
