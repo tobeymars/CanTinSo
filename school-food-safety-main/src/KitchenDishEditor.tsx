@@ -107,18 +107,24 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
   const nutrition = useMemo(() => {
     const snapshot = backendNutrition
     if (!snapshot) return { ...localNutrition, energy: 0, totals: { protein: 0, fat: 0, carbohydrate: 0, fiber: 0, calcium: 0, iron: 0 }, matched: [], missing: [], coverage: 0, isComplete: false, ratios: null, allergens: [], notes: [] }
-    const total = snapshot.totals
-    const protein = Number(total.proteinG ?? 0), fat = Number(total.fatG ?? 0), carbohydrate = Number(total.carbohydrateG ?? 0)
+    // Derive the headline totals from the exact per-ingredient contributions shown in the table.
+    // This keeps the summary and detail rows consistent even if an API totals field is absent or stale.
+    const calculatedIngredients = snapshot.ingredients.filter(item => item.status === 'CALCULATED')
+    const contribution = (item: BackendNutritionSnapshot['ingredients'][number], field: string) => {
+      const value = item.contribution?.[field]
+      return typeof value === 'number' && Number.isFinite(value) ? value : 0
+    }
+    const sumContribution = (field: string) => calculatedIngredients.reduce((sum, item) => sum + contribution(item, field), 0)
+    const protein = sumContribution('proteinG'), fat = sumContribution('fatG'), carbohydrate = sumContribution('carbohydrateG')
     const macroEnergy = protein * 4 + fat * 9 + carbohydrate * 4
-    const contribution = (item: BackendNutritionSnapshot['ingredients'][number], field: string) => Number(item.contribution?.[field] ?? 0)
-    const matched = snapshot.ingredients.filter(item => item.status === 'CALCULATED').map(item => ({
+    const matched = calculatedIngredients.map(item => ({
       name: item.ingredientName, amount: Number(item.edibleWeightG ?? 0), energy: contribution(item, 'energyKcal'),
       protein: contribution(item, 'proteinG'), fat: contribution(item, 'fatG'), carbohydrate: contribution(item, 'carbohydrateG'),
     }))
     return {
       ...localNutrition,
-      energy: Number(total.energyKcal ?? 0),
-      totals: { protein, fat, carbohydrate, fiber: Number(total.fiberG ?? 0), calcium: Number(total.calciumMg ?? 0), iron: Number(total.ironMg ?? 0) },
+      energy: sumContribution('energyKcal'),
+      totals: { protein, fat, carbohydrate, fiber: sumContribution('fiberG'), calcium: sumContribution('calciumMg'), iron: sumContribution('ironMg') },
       matched,
       missing: snapshot.warnings,
       coverage: snapshot.coverage.ingredientCount ? Math.round(snapshot.coverage.calculatedCount / snapshot.coverage.ingredientCount * 100) : 0,
