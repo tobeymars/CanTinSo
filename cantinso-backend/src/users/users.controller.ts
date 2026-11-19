@@ -16,7 +16,7 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Get('my-kitchen')
-  @Roles('SCHOOL_ADMIN', 'CENTRAL_KITCHEN')
+  @Roles('SCHOOL_ADMIN', 'CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
   getMyKitchen(@CurrentUser() user: AuthUser) {
     return this.users.getMyKitchen(user);
   }
