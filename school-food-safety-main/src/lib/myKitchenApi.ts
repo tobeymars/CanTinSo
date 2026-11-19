@@ -15,6 +15,7 @@ export type MyKitchenContext = {
     contactName: string | null
     phone: string | null
     capacity: number | null
+    schoolId?: string | null
     schools?: Array<{
       id: string
       startsAt: string
