@@ -12,7 +12,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 export type MealAgeGroup = { id: string; code: string; name: string; sortOrder: number };
-export type ApprovedDishOption = { versionId: string; dishId: string; name: string; versionNo: number };
+export type ApprovedDishOption = { versionId: string; dishId: string; name: string; versionNo: number; schoolId?: string };
 export type MealPlanRow = {
   id: string; schoolId: string; serviceDate: string; mealType: string; servings: number; status: string;
   school?: { id: string; name: string }; kitchen?: { id: string; name: string; code: string };
