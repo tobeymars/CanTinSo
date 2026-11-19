@@ -160,13 +160,13 @@ export class UsersService {
 
 
   async getMyKitchen(actor: AuthUser) {
-    if (actor.role === UserRole.CENTRAL_KITCHEN) {
+    if (actor.role === UserRole.CENTRAL_KITCHEN || actor.role === UserRole.SCHOOL_KITCHEN) {
       if (!actor.kitchenId) {
         throw new ForbiddenException("Tài khoản bếp trung tâm chưa được gắn với hồ sơ bếp.");
       }
       const now = new Date();
       const kitchen = await this.prisma.kitchen.findFirst({
-        where: { id: actor.kitchenId, type: "CENTRAL", isActive: true },
+        where: { id: actor.kitchenId, type: actor.role === UserRole.CENTRAL_KITCHEN ? "CENTRAL" : "SCHOOL", isActive: true },
         select: {
           id: true,
           code: true,
@@ -194,7 +194,7 @@ export class UsersService {
         },
       });
       if (!kitchen) throw new NotFoundException("Không tìm thấy bếp trung tâm đang hoạt động được gắn với tài khoản.");
-      return { providerType: "CENTRAL" as const, assignmentId: null, startsAt: null, kitchen };
+      return { providerType: actor.role === UserRole.CENTRAL_KITCHEN ? "CENTRAL" as const : "SCHOOL" as const, assignmentId: null, startsAt: null, kitchen };
     }
 
     if (actor.role !== UserRole.SCHOOL_ADMIN || !actor.schoolId) {
