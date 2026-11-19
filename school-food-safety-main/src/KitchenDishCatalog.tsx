@@ -60,7 +60,7 @@ export default function KitchenDishCatalog({ school, role }: { school: School; r
     fetchMyKitchenContext().then(async context => {
       if (!active) return
       setKitchenContext(context)
-      const assignedSchoolId = context.kitchen.schools?.[0]?.school.id ?? context.kitchen.schoolId ?? ''
+      const assignedSchoolId = school.id
       const items = await listKitchenDishes(assignedSchoolId, role as 'central_kitchen' | 'school_kitchen')
       if (active) { setProposals(items); setError('') }
     }).catch(reason => {
@@ -85,7 +85,7 @@ export default function KitchenDishCatalog({ school, role }: { school: School; r
   const clearFilters = () => { setQuery(''); setMeal(''); setBand(''); setSource('all'); setSort('updated'); setPage(1) }
   const openCreate = () => { setError(''); setSuccess(''); if (canManage) setEditor({ key: `create-${Date.now()}`, value: null }) }
   const openEdit = (value: KitchenDishProposal) => { if (canManage && value.createdBy === role) { setDetail(null); setError(''); setEditor({ key: `${value.id}-${Date.now()}`, value }) } }
-  const saveFinished = (name: string, edited: boolean, submitted: boolean) => { setEditor(null); setDetail(null); setSuccess(`Đã ${edited ? 'tạo phiên bản mới cho' : 'lưu'} món “${name}” vào cơ sở dữ liệu${submitted ? ' và gửi duyệt đến trường được phân công' : ' ở trạng thái bản nháp vì bếp chưa có trường nhận duyệt'}.`); setError(''); void fetchMyKitchenContext().then(context => listKitchenDishes(context.kitchen.schools?.[0]?.school.id ?? context.kitchen.schoolId ?? '', role as 'central_kitchen' | 'school_kitchen')).then(setProposals).catch(reason => setError(reason instanceof Error ? reason.message : 'Không thể tải lại danh mục món.')) }
+  const saveFinished = (name: string, edited: boolean, submitted: boolean) => { setEditor(null); setDetail(null); setSuccess(`Đã ${edited ? 'tạo phiên bản mới cho' : 'lưu'} món “${name}” vào cơ sở dữ liệu${submitted ? ' và gửi duyệt đến trường được phân công' : ' ở trạng thái bản nháp vì bếp chưa có trường nhận duyệt'}.`); setError(''); void fetchMyKitchenContext().then(() => listKitchenDishes(school.id, role as 'central_kitchen' | 'school_kitchen')).then(setProposals).catch(reason => setError(reason instanceof Error ? reason.message : 'Không thể tải lại danh mục món.')) }
   const deleteDish = () => {
     if (!pendingDelete || !canManage || useUI.getState().role !== role || useUI.getState().schoolId !== school.id) { setError('Không có quyền xóa món này.'); setDeleting(null); return }
     void deleteKitchenDish(pendingDelete.id).then(() => { setProposals(items => items.filter(item => item.id !== pendingDelete.id)); setSuccess(`Đã lưu trữ món “${pendingDelete.name}”. Lịch sử công thức và duyệt món vẫn được bảo toàn.`); setError(''); setDeleting(null); setDetail(null) }).catch(reason => { setError(reason instanceof Error ? reason.message : 'Không thể xóa món.'); setDeleting(null) })
