@@ -27,6 +27,10 @@ export async function loadMealPlanWorkspace() {
     request<MealAgeGroup[]>('/meal-plans/age-groups'),
     request<MealPlanRow[]>('/meal-plans'),
   ]);
+  if (user?.role === 'UBND_ADMIN') {
+    const schools = [...new Map(plans.filter(plan => plan.school).map(plan => [plan.school!.id, { id: plan.school!.id, name: plan.school!.name }])).values()];
+    return { ageGroups, plans, schools, dishes: [] as ApprovedDishOption[] };
+  }
   if (user?.role !== 'CENTRAL_KITCHEN' && user?.role !== 'SCHOOL_KITCHEN') return { ageGroups, plans, schools: [], dishes: [] as ApprovedDishOption[] };
   const [context, rawDishes] = await Promise.all([
     fetchMyKitchenContext(),
