@@ -99,6 +99,7 @@ export async function saveKitchenDish(input: {
   safetyMonitoring: KitchenDishProposal['safetyMonitoring']
   ingredients: Array<{ name: string; quantity: number; unitCode: string }>
   ingredientCatalog: IngredientCatalogItem[]
+  schoolIds: string[]
 }) {
   const { value } = input
   const code = value?.id ? value.code : `DISH-${Date.now()}`
@@ -131,7 +132,7 @@ export async function saveKitchenDish(input: {
     priority: input.priority,
     safetyMonitoring: input.safetyMonitoring,
   }
-  await request(`/dishes/${dishId}/versions`, {
+  const version = await request<{ id: string }>(`/dishes/${dishId}/versions`, {
     method: 'POST',
     body: JSON.stringify({
       recipeSnapshot,
@@ -139,7 +140,15 @@ export async function saveKitchenDish(input: {
       ingredients: resolved,
     }),
   })
-  return dishId
+  let submitted = false
+  if (input.schoolIds.length) {
+    await request(`/dishes/${dishId}/versions/${version.id}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ schoolIds: input.schoolIds }),
+    })
+    submitted = true
+  }
+  return { dishId, submitted }
 }
 
 export async function deleteKitchenDish(id: string) {
