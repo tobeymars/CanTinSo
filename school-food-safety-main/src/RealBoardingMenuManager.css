@@ -160,3 +160,20 @@
 .real-picker>footer span{color:#6c8095;font-size:11px;font-weight:750}
 .real-picker>footer button{min-width:105px;background:linear-gradient(135deg,#167653,#0b8b68);border-color:#167653;color:#fff}
 @media(max-width:640px){.real-picker-backdrop{padding:10px;align-items:end}.real-picker{max-height:88dvh;border-radius:18px 18px 12px 12px}.real-picker>header{padding:17px}.real-picker-list{padding:4px 12px 12px}.real-picker-search{margin:12px 12px 8px}}
+
+/* Hover preview for dishes already placed in a meal card */
+.real-dish{position:relative;cursor:help;outline:none}
+.real-dish:focus-visible{border-color:#6da7d7;box-shadow:0 0 0 3px #dceeff}
+.real-dish-card-content{display:none;position:absolute;left:0;top:calc(100% + 7px);z-index:40;width:min(320px,calc(100vw - 48px));padding:14px;border:1px solid #cbdceb;border-radius:13px;background:#fff;box-shadow:0 14px 34px #183b5b2b;color:#29435f;white-space:normal}
+.real-dish:hover .real-dish-card-content,.real-dish:focus .real-dish-card-content,.real-dish:focus-within .real-dish-card-content{display:block}
+.real-dish-preview-title{display:block;color:#173f69;font-size:13px;font-weight:850;line-height:1.4}
+.real-dish-preview-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.real-dish-preview-meta span{padding:4px 7px;border-radius:6px;background:#eef5fb;color:#55718d;font-size:10px;font-weight:750}
+.real-dish-preview-heading{margin-top:12px;margin-bottom:6px;color:#71869b;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.04em}
+.real-dish-card-content ul{display:grid;gap:5px;margin:0;padding:0;list-style:none}
+.real-dish-card-content li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #edf2f7;font-size:11px;line-height:1.35}
+.real-dish-card-content li:last-child{border-bottom:0}
+.real-dish-card-content li span{min-width:0;overflow-wrap:anywhere}
+.real-dish-card-content li b{flex:none;color:#176b59;font-size:10px}
+.real-dish-preview-empty{display:block;color:#8393a4;font-size:10px;line-height:1.5}
+@media(hover:none){.real-dish-card-content{display:none!important}}
