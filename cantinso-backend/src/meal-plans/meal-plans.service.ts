@@ -76,10 +76,30 @@ export class MealPlansService {
           ingredients: { include: { ingredient: { select: { id: true, code: true, name: true, unit: true } } } },
           approvals: { select: { schoolId: true, status: true } } },
       } } },
-      events: { orderBy: { occurredAt: 'asc' } },
+      proposedBy: { select: { id: true, fullName: true, role: true } },
+      decidedBy: { select: { id: true, fullName: true, role: true } },
+      events: { orderBy: { occurredAt: 'asc' }, include: { actor: { select: { id: true, fullName: true, role: true } } } },
     };
   }
 
+  async history(user: AuthUser, mealPlanId: string) {
+    let where: Prisma.MealPlanWhereInput;
+    if (user.role === 'SCHOOL_ADMIN') {
+      if (!user.schoolId) throw new ForbiddenException('Tài khoản chưa được gắn với trường.');
+      where = { id: mealPlanId, schoolId: user.schoolId };
+    } else if (user.role === 'UBND_ADMIN') {
+      if (!user.wardId) throw new ForbiddenException('Tài khoản UBND chưa được gắn với phường quản lý.');
+      where = { id: mealPlanId, school: { wardId: user.wardId } };
+    } else {
+      throw new ForbiddenException('Chỉ tài khoản Nhà trường và UBND được xem lịch sử thực đơn.');
+    }
+    const plan = await this.prisma.mealPlan.findFirst({
+      where,
+      include: { school: { select: { id: true, name: true } }, revisions: { orderBy: { revisionNo: 'desc' }, include: this.revisionInclude() } },
+    });
+    if (!plan) throw new NotFoundException('Không tìm thấy thực đơn trong phạm vi được phép xem.');
+    return plan;
+  }
   async create(user: AuthUser, raw: unknown) {
     const kitchenId = this.kitchenId(user);
     const body = raw as PlanInput;
