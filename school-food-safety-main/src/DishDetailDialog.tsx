@@ -5,6 +5,8 @@ import SpotlightCard from './components/react-bits/SpotlightCard'
 import type { MealEvent, PublicInspection, PublicTraceLot } from './lib/data'
 import type { BoardingDish, DishIngredientRecord, KitchenProfile } from './lib/boardingMenu'
 import { dishImage } from './lib/dishImages'
+import { analyzeOfficialRecipe } from './lib/officialFoodNutrition'
+import { defaultAgeBandForGrade } from './lib/schoolNutrition'
 import IngredientTraceDialog from './IngredientTraceDialog'
 import './DishDetailDialog.css'
 
@@ -41,6 +43,11 @@ export default function DishDetailDialog({ dish, kitchen, linkedLots = [], opera
   const [activeIngredient, setActiveIngredient] = useState<DishIngredientRecord | null>(null)
   useEffect(() => { const node = dialog.current; node?.showModal(); return () => { if (node?.open) node.close() } }, [])
   const records = ingredientsFor(dish)
+  const nutrition = analyzeOfficialRecipe(
+    records.map(item => ({ name: item.name, amount: item.amountPerServing ?? Number.NaN, unit: item.unit })),
+    dish.ageBand ?? defaultAgeBandForGrade(dish.gradeLevel),
+    dish.mealType,
+  )
   const quantityCount = records.filter(item => item.amountPerServing != null).length
   const declaredSourceCount = records.filter(item => item.supplier.trim() && item.lotCode.trim()).length
   const safety = dish.safetyMonitoring
@@ -95,6 +102,21 @@ export default function DishDetailDialog({ dish, kitchen, linkedLots = [], opera
         {tab === 'portion' && <section className="dish-info-section" aria-labelledby="dish-portion-title">
           <div className="dish-info-section-head"><span className="dish-info-section-icon"><Scale size={19}/></span><div><h3 id="dish-portion-title">Bảng định lượng theo khẩu phần</h3><p>Khối lượng nguyên liệu dự kiến cho 1 học sinh và nhu cầu của toàn bộ suất ăn</p></div></div>
           <div className="dish-info-metrics"><div><span>Khối lượng món / suất</span><strong>{portionLabel}</strong></div><div><span>Nguyên liệu có định lượng</span><strong>{quantityCount}/{records.length}</strong></div></div>
+          <section className="dish-info-nutrition" aria-labelledby="dish-nutrition-title">
+            <header><div><span className="section-kicker">DINH DƯỠNG THAM KHẢO</span><h4 id="dish-nutrition-title">Ước tính thành phần dinh dưỡng / suất</h4><p>Đối chiếu đúng tên thực phẩm với dữ liệu Phụ lục 7 Quyết định 3958/QĐ-BYT.</p></div><span className={nutrition.isComplete ? 'dish-info-nutrition-status complete' : 'dish-info-nutrition-status partial'}>{nutrition.coverage}% đối chiếu</span></header>
+            <div className="dish-info-nutrition-values">
+              <div className="energy"><small>Năng lượng</small><strong>{fmt(nutrition.energy)} <em>kcal</em></strong></div>
+              <div><small>Đạm</small><strong>{fmt(nutrition.totals.protein)} <em>g</em></strong></div>
+              <div><small>Chất béo</small><strong>{fmt(nutrition.totals.fat)} <em>g</em></strong></div>
+              <div><small>Bột đường</small><strong>{fmt(nutrition.totals.carbohydrate)} <em>g</em></strong></div>
+              <div><small>Chất xơ</small><strong>{fmt(nutrition.totals.fiber)} <em>g</em></strong></div>
+              <div><small>Canxi</small><strong>{fmt(nutrition.totals.calcium)} <em>mg</em></strong></div>
+              <div><small>Sắt</small><strong>{fmt(nutrition.totals.iron)} <em>mg</em></strong></div>
+            </div>
+            {nutrition.matched.length > 0 && <div className="dish-info-nutrition-matched"><strong>Nguyên liệu đã đối chiếu ({nutrition.matched.length})</strong><ul>{nutrition.matched.map((item, index) => <li key={`${item.name}-${index}`}><span>{item.name}</span><span>{fmt(item.amount)} g · dòng {item.appendixRow}</span></li>)}</ul></div>}
+            {nutrition.missing.length > 0 && <div className="dish-info-nutrition-warning"><AlertCircle size={16}/><div><strong>Chưa tính đủ toàn bộ nguyên liệu</strong><ul>{nutrition.missing.map((item, index) => <li key={index}>{item}</li>)}</ul></div></div>}
+            <p className="dish-info-nutrition-note"><Info size={14}/>Đây là ước tính phía giao diện theo dữ liệu thực phẩm khớp tên và gam phần ăn được; chưa tính hao hụt, gia vị hoặc hệ số chế biến. Không coi dữ liệu thiếu là 0 và không dùng để kết luận dinh dưỡng của toàn bữa.</p>
+          </section>
           {records.length ? <div className="dish-info-table-scroll"><table className="dish-info-table"><thead><tr><th>Nguyên liệu</th><th>1 suất</th><th>{fmt(dish.expectedQuantity)} suất (dự kiến)</th></tr></thead><tbody>{records.map((item, index) => <tr key={`${item.name}-${index}`}><td><button type="button" className="dish-ingredient-link" onClick={() => setActiveIngredient(item)} title={`Xem nhà cung cấp và truy xuất nguồn gốc ${item.name}`}><FileSearch size={15}/>{item.name}<ChevronRight size={13}/></button></td><td>{item.amountPerServing != null ? `${fmt(item.amountPerServing)} ${item.unit}` : 'Chưa cập nhật'}</td><td>{item.amountPerServing != null ? `${fmt(item.amountPerServing * dish.expectedQuantity / 1000)} ${item.unit === 'g' ? 'kg' : 'lít'}` : '—'}</td></tr>)}</tbody></table></div> : <p className="dish-info-empty">Chưa có bảng nguyên liệu và định lượng.</p>}
           <p className="dish-info-hint"><Info size={14}/> Các số liệu là ước tính theo kế hoạch. Khối lượng món chín không nhất thiết bằng tổng khối lượng nguyên liệu đầu vào; chưa có định mức thì không tính tổng giả định.</p>
         </section>}
