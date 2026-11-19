@@ -48,7 +48,7 @@ export class DishesService {
   async updateMetadata(user: AuthUser, dishId: string, dto: CreateDishDto) {
     const kitchenId = this.requireKitchenUser(user);
     const dish = await this.prisma.dish.findFirst({
-      where: { id: dishId, kitchenId },
+      where: { id: dishId, kitchenId, status: { not: 'ARCHIVED' } },
       include: { _count: { select: { versions: true, mealPlanItems: true } } },
     });
     if (!dish) throw new NotFoundException('Không tìm thấy món ăn trong phạm vi bếp.');
@@ -71,14 +71,17 @@ export class DishesService {
     const kitchenId = this.requireKitchenUser(user);
     const dish = await this.prisma.dish.findFirst({
       where: { id: dishId, kitchenId },
-      include: { _count: { select: { versions: true, mealPlanItems: true } } },
+      select: { id: true, status: true },
     });
     if (!dish) throw new NotFoundException('Không tìm thấy món ăn trong phạm vi bếp.');
-    if (dish._count.versions > 0 || dish._count.mealPlanItems > 0) {
-      throw new BadRequestException('Món đã có phiên bản công thức hoặc được sử dụng trong thực đơn; không thể xóa để bảo toàn lịch sử.');
+    if (dish.status !== 'ARCHIVED') {
+      await this.prisma.dish.update({
+        where: { id: dishId },
+        data: { status: 'ARCHIVED' },
+      });
     }
-    await this.prisma.dish.delete({ where: { id: dishId } });
-    return { success: true, id: dishId };
+    // Archive instead of physical deletion so submitted versions and meal-plan history remain auditable.
+    return { success: true, id: dishId, archived: true };
   }
 
   async create(user: AuthUser, dto: CreateDishDto) {
@@ -111,7 +114,7 @@ export class DishesService {
   async listForKitchen(user: AuthUser) {
     const kitchenId = this.requireKitchenUser(user);
     return this.prisma.dish.findMany({
-      where: { kitchenId },
+      where: { kitchenId, status: { not: 'ARCHIVED' } },
       orderBy: [{ createdAt: 'desc' }],
       include: {
         versions: {
@@ -419,7 +422,7 @@ export class DishesService {
   async createVersion(user: AuthUser, dishId: string, dto: CreateDishVersionDto) {
     const kitchenId = this.requireKitchenUser(user);
     const dish = await this.prisma.dish.findFirst({
-      where: { id: dishId, kitchenId },
+      where: { id: dishId, kitchenId, status: { not: 'ARCHIVED' } },
       select: { id: true },
     });
     if (!dish) throw new NotFoundException('Không tìm thấy món ăn trong phạm vi bếp.');
