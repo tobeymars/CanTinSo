@@ -164,6 +164,9 @@ model School {
   code                 String?                      @unique
   wardId               String?                      @map("ward_id") @db.Uuid
   ward                 Ward?                        @relation(fields: [wardId], references: [id])
+  address              String?
+  contactName          String?                       @map("contact_name")
+  phone                String?
   users                User[]
   onSiteKitchen        Kitchen?                     @relation("SchoolOnSiteKitchen")
   kitchenAssignments   KitchenSchoolAssignment[]
