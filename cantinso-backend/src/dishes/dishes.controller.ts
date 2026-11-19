@@ -66,6 +66,12 @@ export class DishesController {
     return this.dishes.pendingApprovals(user);
   }
 
+  @Get('ward-approved')
+  @Roles('UBND_ADMIN')
+  wardApproved(@CurrentUser() user: AuthUser) {
+    return this.dishes.listWardApproved(user);
+  }
+
   @Get(':dishId')
   @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
   getOne(@CurrentUser() user: AuthUser, @Param('dishId') dishId: string) {
