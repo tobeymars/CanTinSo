@@ -984,6 +984,7 @@ function Shell() {
   const isWardWorkspace = role === "culture_social_office";
   const storedUser = getStoredUser();
   const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
+  const isRealCentralKitchen = storedUser?.role === "CENTRAL_KITCHEN" && !!storedUser?.kitchenId;
   const isRealKitchenAccount = (storedUser?.role === "CENTRAL_KITCHEN" || storedUser?.role === "SCHOOL_KITCHEN") && !!storedUser?.kitchenId;
   const realKitchenQuery = useQuery({ queryKey: ["my-kitchen-context"], queryFn: fetchMyKitchenContext, enabled: isRealKitchenAccount });
   // SCHOOL_KITCHEN without kitchenId is school-side meal receiving staff, not a kitchen operator.
@@ -1014,15 +1015,29 @@ function Shell() {
       return demoData.schools();
     },
   });
+  const centralKitchenSchools: School[] = (realKitchenQuery.data?.kitchen.schools ?? []).map((item) => ({
+    id: item.school.id,
+    name: item.school.name,
+    address: "Trường được phân công phục vụ",
+    mode: "ON_SITE",
+  }));
   const availableSchools = isWardWorkspace || isRealSchoolAdmin
     ? (schoolQuery.data ?? [])
-    : (schoolQuery.data ?? demoSchools);
+    : isRealCentralKitchen
+      ? centralKitchenSchools
+      : (schoolQuery.data ?? demoSchools);
   useEffect(() => {
+    if (isRealCentralKitchen) {
+      if (realKitchenQuery.isSuccess && !centralKitchenSchools.some((item) => item.id === schoolId) && centralKitchenSchools[0]) {
+        setSchool(centralKitchenSchools[0].id);
+      }
+      return;
+    }
     if ((!isWardWorkspace && !isRealSchoolAdmin) || !schoolQuery.data) return;
     if (!schoolQuery.data.some((item) => item.id === schoolId)) {
       if (schoolQuery.data[0]) setSchool(schoolQuery.data[0].id);
     }
-  }, [isWardWorkspace, isRealSchoolAdmin, schoolQuery.data, schoolId, setSchool]);
+  }, [isWardWorkspace, isRealSchoolAdmin, isRealCentralKitchen, schoolQuery.data, realKitchenQuery.isSuccess, centralKitchenSchools, schoolId, setSchool]);
   const school =
     availableSchools.find((s) => s.id === schoolId) ??
     availableSchools[0] ??
