@@ -97,6 +97,7 @@ const CentralKitchenManagementPanel = lazy(() => import("./CentralKitchenManagem
 const KitchenManagementPanel = lazy(() => import("./KitchenManagement"));
 const SchoolDashboard = lazy(() => import("./SchoolDashboard"));
 const WardApprovedDishes = lazy(() => import("./WardApprovedDishes"));
+const WardSchoolManagement = lazy(() => import("./WardSchoolManagement"));
 const roleLabels: Record<ViewRole, string> = {
   parent: "Phụ huynh",
   school_board: "Ban Giám hiệu",
@@ -1101,7 +1102,7 @@ function Shell() {
     role === "parent"
       ? navigation
       : role === "culture_social_office"
-        ? [...adminNav, ...(role === "culture_social_office" ? [{ path: "/mon-da-duyet", label: "Món ăn trường đã duyệt", icon: ShieldCheck }, ...(isWardAdminAccount ? [{ path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])] : [])]
+        ? [...adminNav, ...(role === "culture_social_office" ? [{ path: "/mon-da-duyet", label: "Món ăn trường đã duyệt", icon: ShieldCheck }, ...(isWardAdminAccount ? [{ path: "/quan-ly-truong", label: "Quản lý trường học", icon: SchoolIcon }, { path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])] : [])]
         : role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN"
           ? [...adminNav, { path: "/quan-ly-bep", label: "Quản lý bếp", icon: CookingPot }]
         : role === "school_kitchen" && !isSchoolKitchenReceiver
@@ -1464,7 +1465,7 @@ function Shell() {
           )}
           {role !== "parent" ? (
             <>
-              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam", "/quan-ly-bep", "/mon-da-duyet"].includes(location.pathname) &&
+              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam", "/quan-ly-truong", "/quan-ly-bep", "/mon-da-duyet"].includes(location.pathname) &&
                 !(role === "culture_social_office" && location.pathname === "/thuc-don") && (
                 <Suspense
                   fallback={
@@ -1489,6 +1490,11 @@ function Shell() {
               {location.pathname === "/quan-ly-bep" && role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN" && (
                 <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
                   <KitchenManagementPanel />
+                </Suspense>
+              )}
+              {location.pathname === "/quan-ly-truong" && isWardAdminAccount && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <WardSchoolManagement />
                 </Suspense>
               )}
               {location.pathname === "/quan-ly-bep-trung-tam" && isWardAdminAccount && (
