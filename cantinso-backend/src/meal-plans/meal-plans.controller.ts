@@ -18,6 +18,12 @@ export class MealPlansController {
   @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN', 'SCHOOL_ADMIN', 'UBND_ADMIN')
   list(@CurrentUser() user: AuthUser) { return this.mealPlans.list(user); }
 
+  @Get(':mealPlanId/history')
+  @Roles('SCHOOL_ADMIN', 'UBND_ADMIN')
+  history(@CurrentUser() user: AuthUser, @Param('mealPlanId') mealPlanId: string) {
+    return this.mealPlans.history(user, mealPlanId);
+  }
+
   @Post()
   @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
   create(@CurrentUser() user: AuthUser, @Body() body: unknown) {
