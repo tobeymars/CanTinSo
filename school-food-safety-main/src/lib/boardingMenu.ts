@@ -26,6 +26,7 @@ export type DishIngredientRecord = {
   /** Mã nguyên liệu/lô thực sự đã chọn trong kho DEMO; không suy đoán từ tên. */
   inventoryItemId?: string
   name: string
+  ingredientCode?: string
   amountPerServing: number | null
   unit: 'g' | 'ml'
   supplier: string
