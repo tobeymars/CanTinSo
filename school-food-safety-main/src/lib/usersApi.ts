@@ -17,7 +17,12 @@ export type ManagedUser = {
 export type ManagedSchool = {
   id: string;
   name: string;
+  code: string | null;
+  address: string | null;
+  contactName: string | null;
+  phone: string | null;
   wardId: string | null;
+  createdAt?: string;
   ward: { id: string; name: string; code: string | null } | null;
 };
 
@@ -42,6 +47,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const getManagedUsers = () => request<ManagedUser[]>("/users");
 export const getManagedSchools = () => request<ManagedSchool[]>("/schools");
+
+export type CreateManagedSchoolPayload = {
+  name: string;
+  code?: string;
+  address?: string;
+  contactName?: string;
+  phone?: string;
+};
+
+export const createManagedSchool = (payload: CreateManagedSchoolPayload) =>
+  request<ManagedSchool>("/schools", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
 export type MySchoolOverview = {
   school: {
