@@ -1543,12 +1543,7 @@ function Shell() {
                 </div>
               ) : (
                 <>
-                  {location.pathname === "/thuc-don" && ["CENTRAL_KITCHEN", "SCHOOL_KITCHEN", "SCHOOL_ADMIN"].includes(getStoredUser()?.role ?? "") && (
-                    <Suspense fallback={<div className="loading-grid"><div className="skeleton"/></div>}>
-                      <MealPlanWorkspace />
-                    </Suspense>
-                  )}
-                  {location.pathname === "/giam-sat" && (
+                 {location.pathname === "/giam-sat" && (
                     <SupervisionSection
                       school={school}
                       date={date}
