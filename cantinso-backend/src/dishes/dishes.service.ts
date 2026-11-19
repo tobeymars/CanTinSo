@@ -340,21 +340,15 @@ export class DishesService {
 
   async previewNutrition(user: AuthUser, dto: PreviewDishNutritionDto) {
     this.requireKitchenUser(user);
-    const normalize = (value: string) => value.normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLocaleLowerCase('vi')
-      .replace(/đ/g, 'd')
-      .trim();
+    const ingredientIds = [...new Set(dto.ingredients.map((item) => item.ingredientId))];
+    if (ingredientIds.length !== dto.ingredients.length) {
+      throw new BadRequestException('Mỗi nguyên liệu chỉ được chọn một lần trong công thức.');
+    }
+
+    // Resolve by canonical Ingredient.id, never by display-name matching.
+    // Include ingredients without profiles so the response can identify missing nutrition data explicitly.
     const catalogIngredients = await this.prisma.ingredient.findMany({
-      where: {
-        nutritionProfiles: {
-          some: {
-            nutritionReference: {
-              code: 'MOH-3958-QD-BYT-2025-APPENDIX-7-V1',
-            },
-          },
-        },
-      },
+      where: { id: { in: ingredientIds } },
       include: {
         nutritionProfiles: {
           where: {
@@ -377,46 +371,25 @@ export class DishesService {
         },
       },
     });
-    const byName = new Map(catalogIngredients.map((item) => [normalize(item.name), item]));
-    const resolved = dto.ingredients.flatMap((item) => {
-      const ingredient = byName.get(normalize(item.ingredientName));
-      return ingredient ? [{
-        ingredientId: ingredient.id,
+    if (catalogIngredients.length !== ingredientIds.length) {
+      throw new BadRequestException('Có nguyên liệu không tồn tại trong danh mục chuẩn. Vui lòng tải lại danh mục.');
+    }
+
+    const snapshot = this.buildNutritionSnapshot(
+      dto.ingredients.map((item) => ({
+        ingredientId: item.ingredientId,
         quantity: item.quantity,
         unitCode: item.unitCode,
-      }] : [];
-    });
-    const snapshot = this.buildNutritionSnapshot(resolved, catalogIngredients) as {
-      totals: Record<string, unknown>;
-      coverage: {
-        ingredientCount: number;
-        calculatedCount: number;
-        missingProfileCount: number;
-        unsupportedUnitCount: number;
-        complete: boolean;
-      };
-      ingredients: Array<Record<string, unknown>>;
-      warnings: string[];
+      })),
+      catalogIngredients,
+    );
+    return {
+      ...snapshot,
+      ingredients: (snapshot.ingredients as Array<Record<string, unknown>>).map((detail) => {
+        const ingredient = catalogIngredients.find((item) => item.id === detail.ingredientId);
+        return { ...detail, ingredientName: ingredient?.name ?? 'Nguyên liệu' };
+      }),
     };
-    const missing = dto.ingredients.filter((item) => !byName.has(normalize(item.ingredientName)));
-    if (missing.length) {
-      snapshot.coverage.ingredientCount = dto.ingredients.length;
-      snapshot.coverage.missingProfileCount += missing.length;
-      snapshot.coverage.complete = false;
-      for (const field of Object.keys(snapshot.totals)) snapshot.totals[field] = null;
-      for (const item of missing) {
-        snapshot.ingredients.push({
-          ingredientName: item.ingredientName,
-          quantity: item.quantity,
-          unitCode: item.unitCode,
-          status: 'MISSING_CATALOG_INGREDIENT',
-        });
-        snapshot.warnings.push(`Không tìm thấy "${item.ingredientName}" trong danh mục thực phẩm có dữ liệu Phụ lục 7.`);
-      }
-    } else {
-      snapshot.coverage.ingredientCount = dto.ingredients.length;
-    }
-    return snapshot;
   }
 
   async createVersion(user: AuthUser, dishId: string, dto: CreateDishVersionDto) {
