@@ -14,6 +14,7 @@ import { AuthUser } from '../common/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDishDto } from './dto/create-dish.dto';
 import { CreateDishVersionDto } from './dto/create-dish-version.dto';
+import { PreviewDishNutritionDto } from './dto/preview-dish-nutrition.dto';
 
 @Injectable()
 export class DishesService {
@@ -283,6 +284,87 @@ export class DishesService {
       ingredients: details,
       warnings,
     };
+  }
+
+  async previewNutrition(user: AuthUser, dto: PreviewDishNutritionDto) {
+    this.requireKitchenUser(user);
+    const normalize = (value: string) => value.normalize('NFD')
+      .replace(/[\\u0300-\\u036f]/g, '')
+      .toLocaleLowerCase('vi')
+      .replace(/đ/g, 'd')
+      .trim();
+    const catalogIngredients = await this.prisma.ingredient.findMany({
+      where: {
+        nutritionProfiles: {
+          some: {
+            nutritionReference: {
+              code: 'MOH-3958-QD-BYT-2025-APPENDIX-7-V1',
+            },
+          },
+        },
+      },
+      include: {
+        nutritionProfiles: {
+          where: {
+            nutritionReference: {
+              code: 'MOH-3958-QD-BYT-2025-APPENDIX-7-V1',
+            },
+          },
+          include: {
+            nutritionReference: {
+              select: {
+                code: true,
+                title: true,
+                documentNo: true,
+                appendix: true,
+                sourceUrl: true,
+                effectiveAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    const byName = new Map(catalogIngredients.map((item) => [normalize(item.name), item]));
+    const resolved = dto.ingredients.flatMap((item) => {
+      const ingredient = byName.get(normalize(item.ingredientName));
+      return ingredient ? [{
+        ingredientId: ingredient.id,
+        quantity: item.quantity,
+        unitCode: item.unitCode,
+      }] : [];
+    });
+    const snapshot = this.buildNutritionSnapshot(resolved, catalogIngredients) as {
+      totals: Record<string, unknown>;
+      coverage: {
+        ingredientCount: number;
+        calculatedCount: number;
+        missingProfileCount: number;
+        unsupportedUnitCount: number;
+        complete: boolean;
+      };
+      ingredients: Array<Record<string, unknown>>;
+      warnings: string[];
+    };
+    const missing = dto.ingredients.filter((item) => !byName.has(normalize(item.ingredientName)));
+    if (missing.length) {
+      snapshot.coverage.ingredientCount = dto.ingredients.length;
+      snapshot.coverage.missingProfileCount += missing.length;
+      snapshot.coverage.complete = false;
+      for (const field of Object.keys(snapshot.totals)) snapshot.totals[field] = null;
+      for (const item of missing) {
+        snapshot.ingredients.push({
+          ingredientName: item.ingredientName,
+          quantity: item.quantity,
+          unitCode: item.unitCode,
+          status: 'MISSING_CATALOG_INGREDIENT',
+        });
+        snapshot.warnings.push(`Không tìm thấy "${item.ingredientName}" trong danh mục thực phẩm có dữ liệu Phụ lục 7.`);
+      }
+    } else {
+      snapshot.coverage.ingredientCount = dto.ingredients.length;
+    }
+    return snapshot;
   }
 
   async createVersion(user: AuthUser, dishId: string, dto: CreateDishVersionDto) {
