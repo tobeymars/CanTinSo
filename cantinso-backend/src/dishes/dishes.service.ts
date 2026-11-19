@@ -547,6 +547,28 @@ export class DishesService {
     });
   }
 
+  async listWardApproved(user: AuthUser) {
+    if (user.role !== 'UBND_ADMIN' || !user.wardId) {
+      throw new ForbiddenException('Tài khoản UBND chưa được gắn với phường quản lý.');
+    }
+    return this.prisma.dishApproval.findMany({
+      where: {
+        status: DishApprovalStatus.APPROVED,
+        school: { wardId: user.wardId },
+      },
+      orderBy: [{ decidedAt: 'desc' }, { updatedAt: 'desc' }],
+      include: {
+        school: { select: { id: true, name: true, ward: { select: { name: true } } } },
+        dishVersion: {
+          include: {
+            dish: { select: { id: true, code: true, name: true, category: true, kitchen: { select: { id: true, name: true, code: true } } } },
+            ingredients: { include: { ingredient: { select: { id: true, code: true, name: true, unit: true } } } },
+          },
+        },
+      },
+    });
+  }
+
   async pendingApprovals(user: AuthUser) {
     const schoolId = this.requireSchoolApprover(user);
     return this.prisma.dishApproval.findMany({
