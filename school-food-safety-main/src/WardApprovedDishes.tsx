@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Filter, Search, ShieldCheck, Utensils } from 'lucide-react';
 import { getAccessToken } from './lib/authApi';
+import { getManagedSchools } from './lib/usersApi';
 import './WardApprovedDishes.css';
 
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
@@ -26,18 +27,24 @@ async function loadApproved(): Promise<ApprovedRow[]> {
 }
 export default function WardApprovedDishes() {
   const [rows, setRows] = useState<ApprovedRow[]>([]);
+  const [managedSchools, setManagedSchools] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [schoolId, setSchoolId] = useState('ALL');
   const [search, setSearch] = useState('');
   const refresh = async () => {
     setLoading(true); setError('');
-    try { setRows(await loadApproved()); }
+    try {
+      const [approvedRows, schoolRows] = await Promise.all([loadApproved(), getManagedSchools()]);
+      setRows(approvedRows);
+      setManagedSchools(schoolRows.map(school => ({ id: school.id, name: school.name })));
+    }
     catch (e) { setError(e instanceof Error ? e.message : 'Không tải được dữ liệu.'); }
     finally { setLoading(false); }
   };
   useEffect(() => { void refresh(); }, []);
-  const schools = useMemo(() => [...new Map(rows.map(row => [row.school.id, row.school])).values()].sort((a,b)=>a.name.localeCompare(b.name,'vi')), [rows]);
+  // Bộ lọc hiển thị toàn bộ trường thuộc phường, kể cả trường chưa có món được duyệt.
+  const schools = useMemo(() => managedSchools.slice().sort((a,b)=>a.name.localeCompare(b.name,'vi')), [managedSchools]);
   const visible = useMemo(() => rows.filter(row =>
     (schoolId === 'ALL' || row.school.id === schoolId) &&
     [row.dishVersion.dish.name, row.dishVersion.dish.code, row.school.name, row.dishVersion.dish.kitchen?.name ?? '', ...row.dishVersion.ingredients.map(x=>x.ingredient.name)].join(' ').toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi'))
