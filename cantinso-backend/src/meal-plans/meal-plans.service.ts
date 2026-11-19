@@ -114,7 +114,6 @@ export class MealPlansService {
             isDefault: x.isDefault ?? true, note: x.note?.trim() || null,
             portions: x.portions?.length ? { create: x.portions.map(p => ({ ageGroupId: p.ageGroupId, portionFactor: p.portionFactor ?? 1, unitCode: p.unitCode, overrideReason: p.overrideReason?.trim() || null })) } : undefined,
           })) },
-          events: { create: { eventType: 'SUBMITTED', actorId: user.sub, actorRole: user.role as any, note: 'Tạo bản dự thảo thực đơn.' } },
         },
         include: this.revisionInclude(),
       });
