@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, FileSearch, Leaf, Plus, Scale, ShieldAlert, Sparkles, Trash2, UploadCloud, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Leaf, Plus, Scale, ShieldAlert, Sparkles, Trash2, UploadCloud, X } from 'lucide-react'
 import SpotlightCard from './components/react-bits/SpotlightCard'
 import ClickSpark from './components/react-bits/ClickSpark'
 import type { School } from './lib/data'
@@ -9,20 +9,16 @@ import { useUI } from './lib/store'
 import { getAccessToken, getStoredUser } from './lib/authApi'
 import { fetchMyKitchenContext, type MyKitchenContext } from './lib/myKitchenApi'
 import { listIngredientCatalog, saveKitchenDish, type IngredientCatalogItem } from './lib/dishCatalogApi'
-import { inventoryItems } from './lib/inventory'
-import { readSuppliers } from './lib/suppliers'
 import { compressDishPhoto, dishImage } from './lib/dishImages'
-import { gradeForSchool, kitchenDishProposalsRepository, kitchenDirectoryRepository, mealTypeOptions } from './lib/boardingMenu'
+import { gradeForSchool, kitchenDirectoryRepository, mealTypeOptions } from './lib/boardingMenu'
 import type { BoardingMealType, KitchenDishProposal } from './lib/boardingMenu'
 import { AGE_BANDS, AGE_BAND_LABEL, ALLERGENS, ageBandsForGrade, defaultAgeBandForGrade, suggestMeals } from './lib/schoolNutrition'
 import type { NutritionGoal, SchoolAgeBand } from './lib/schoolNutrition'
-import { OFFICIAL_FOOD_REFERENCE as FOOD_REFERENCE, analyzeOfficialRecipe as analyzeRecipe, findOfficialFood as findFood } from './lib/officialFoodNutrition'
-import IngredientTraceDialog from './IngredientTraceDialog'
+import { analyzeOfficialRecipe as analyzeRecipe, findOfficialFood as findFood } from './lib/officialFoodNutrition'
 
 const pretty = (value: number) => value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })
 const uid = () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `dish-${Date.now()}-${Math.random().toString(36).slice(2)}`
 const todayIsoDate = () => new Date().toLocaleDateString('sv-SE')
-const nowIso = () => new Date().toISOString()
 type IngredientDraft = { key: string; inventoryItemId: string; name: string; amount: string; unit: 'g' | 'ml' }
 type Step = 0 | 1 | 2 | 3
 type Allergen = (typeof ALLERGENS)[number]
@@ -58,10 +54,9 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
   const [kitchenContext, setKitchenContext] = useState<MyKitchenContext | null>(null)
   const [ingredientCatalog, setIngredientCatalog] = useState<IngredientCatalogItem[]>([])
   const grade = gradeForSchool(school.id)
-  const kitchen = useMemo(() => kitchenDirectoryRepository.load().find(item => item.active && item.assignedSchoolIds.includes(school.id) && item.type === (role === 'central_kitchen' ? 'CENTRAL_KITCHEN' : 'ON_SITE')),[school.id, role])
   useEffect(() => {
     const user = getStoredUser()
-    if (role !== 'central_kitchen' || user?.role !== 'CENTRAL_KITCHEN' || !getAccessToken()) {
+    if (!['central_kitchen', 'school_kitchen'].includes(role) || user?.role !== (role === 'central_kitchen' ? 'CENTRAL_KITCHEN' : 'SCHOOL_KITCHEN') || !getAccessToken()) {
       setActualKitchenName('')
       return
     }
@@ -79,10 +74,9 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
       .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Không tải được danh mục nguyên liệu.') })
     return () => { active = false }
   }, [])
-  const stock = useMemo(() => inventoryItems.filter(item => item.schoolId === school.id && item.kitchenId === kitchen?.id && item.unit !== 'chai'),[school.id, kitchen?.id])
   const [today] = useState(todayIsoDate)
-  const eligible = stock.filter(item => item.expiresAt >= today)
-  const suppliers = useMemo(() => readSuppliers(), [])
+  const eligible: typeof inventoryItems = []
+  const suppliers: ReturnType<typeof readSuppliers> = []
   const nutrition = useMemo(() => analyzeRecipe(rows.map(row => ({ name: row.name, amount: Number(row.amount), unit: row.unit })), ageBand, mealType), [rows, ageBand, mealType])
   const suggested = useMemo(() => grade === 'KINDERGARTEN' ? [] : suggestMeals(mealType, ageBand, goal, avoid), [mealType, ageBand, goal, avoid, grade])
   const starterSuggestions = useMemo(() => grade === 'KINDERGARTEN' ? [] : suggestMeals(mealType, ageBand, 'BALANCED', []).slice(0, 3), [mealType, ageBand, grade])
@@ -159,7 +153,7 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
             <label className="dish-field wide">Mô tả và hướng dẫn chế biến <span>*</span><textarea maxLength={500} value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Nguyên liệu chính, chế biến, cách phục vụ, lưu ý dinh dưỡng..." /></label>
           </div></div>}
           {step === 1 && <div className="dish-editor-section"><div className="dish-section-intro dish-section-inline"><div><h3>Nguyên liệu & định lượng</h3><p>Định lượng trên một suất ăn. Nguyên liệu phải chọn từ danh mục chuẩn trong cơ sở dữ liệu CanTinSo.</p></div><div className="dish-section-buttons"><button className="dish-secondary" type="button" onClick={() => { setError(''); setStep(2) }}><Sparkles size={16}/> Gợi ý công thức</button><button className="dish-secondary" type="button" onClick={() => setRows(items => [...items, newIngredient()])}><Plus size={16}/> Thêm nguyên liệu</button></div></div>
-            <div className="dish-ingredient-list">{rows.map((row, index) => { const record = stock.find(item => item.id === row.inventoryItemId); const supplier = suppliers.find(item => item.id === record?.supplierId); return <div key={row.key} className="dish-ingredient-item"><div className="dish-ingredient-index"><strong>{String(index + 1).padStart(2, '0')}</strong><button aria-label={`Xóa nguyên liệu ${index + 1}`} type="button" onClick={() => setRows(items => items.filter(item => item.key !== row.key))}><Trash2 size={16}/></button></div><div className="dish-ingredient-content"><div className="dish-fields dish-ingredient-fields"><label className="dish-field">Thực phẩm <span>*</span><input list="dish-editor-food-list" value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })} placeholder="Chọn hoặc nhập tên thực phẩm" /></label><label className="dish-field">Định lượng / suất <span>*</span><div className="dish-inline-amount"><input type="number" min="0.01" step="any" value={row.amount} onChange={e => updateRow(row.key, { amount: e.target.value })}/><select aria-label={`Đơn vị của nguyên liệu ${index + 1}`} value={row.unit} onChange={e => updateRow(row.key, { unit: e.target.value as 'g' | 'ml' })}><option value="g">g</option><option value="ml">ml</option></select></div></label><label className="dish-field wide">Nguyên liệu trong danh mục chuẩn <span>*</span><select value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })}><option value="">Chọn nguyên liệu từ cơ sở dữ liệu</option>{ingredientCatalog.map(item => <option key={item.id} value={item.name}>{item.name} · {item.code} · {item.unit}</option>)}</select></label></div><div className="dish-source-info"><span>Nhà cung cấp: <b>{supplier?.name ?? 'Chưa đối chiếu'}</b></span><span>Mã lô: <b>{record?.lotCode ?? 'Chưa có'}</b></span>{record && <button type="button" onClick={() => setTraceId(record.id)}><FileSearch size={14}/> Xem hồ sơ</button>}</div>{row.name.trim() && !findFood(row.name) && <p className="dish-inline-warning"><AlertTriangle size={14}/> Tên chưa khớp Phụ lục 7 QĐ 3958/QĐ-BYT. Vui lòng dùng đúng loại thực phẩm và số gam ăn được.</p>}</div></div> })}</div>
+            <div className="dish-ingredient-list">{rows.map((row, index) => { const record = stock.find(item => item.id === row.inventoryItemId); const supplier = suppliers.find(item => item.id === record?.supplierId); return <div key={row.key} className="dish-ingredient-item"><div className="dish-ingredient-index"><strong>{String(index + 1).padStart(2, '0')}</strong><button aria-label={`Xóa nguyên liệu ${index + 1}`} type="button" onClick={() => setRows(items => items.filter(item => item.key !== row.key))}><Trash2 size={16}/></button></div><div className="dish-ingredient-content"><div className="dish-fields dish-ingredient-fields"><label className="dish-field">Thực phẩm <span>*</span><input list="dish-editor-food-list" value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })} placeholder="Chọn hoặc nhập tên thực phẩm" /></label><label className="dish-field">Định lượng / suất <span>*</span><div className="dish-inline-amount"><input type="number" min="0.01" step="any" value={row.amount} onChange={e => updateRow(row.key, { amount: e.target.value })}/><select aria-label={`Đơn vị của nguyên liệu ${index + 1}`} value={row.unit} onChange={e => updateRow(row.key, { unit: e.target.value as 'g' | 'ml' })}><option value="g">g</option><option value="ml">ml</option></select></div></label><label className="dish-field wide">Nguyên liệu trong danh mục chuẩn <span>*</span><select value={row.name} onChange={e => updateRow(row.key, { name: e.target.value, inventoryItemId: '' })}><option value="">Chọn nguyên liệu từ cơ sở dữ liệu</option>{ingredientCatalog.map(item => <option key={item.id} value={item.name}>{item.name} · {item.code} · {item.unit}</option>)}</select></label></div><div className="dish-source-info"><span>Mã nguyên liệu: <b>{ingredientCatalog.find(item => item.name === row.name)?.code ?? 'Chưa chọn danh mục'}</b></span><span>Đơn vị chuẩn: <b>{ingredientCatalog.find(item => item.name === row.name)?.unit ?? '—'}</b></span></div>{row.name.trim() && !findFood(row.name) && <p className="dish-inline-warning"><AlertTriangle size={14}/> Tên chưa khớp Phụ lục 7 QĐ 3958/QĐ-BYT. Vui lòng dùng đúng loại thực phẩm và số gam ăn được.</p>}</div></div> })}</div>
             <datalist id="dish-editor-food-list">{ingredientCatalog.map(item => <option key={item.id} value={item.name}/>)}</datalist><div className="dish-ingredient-foot"><span><Scale size={16}/> Tổng định lượng đã nhập: <b>{pretty(totalWeight)}</b> <small>(g/ml, cần quy đổi từng nguyên liệu về gam ăn được)</small></span><span>{linked}/{rows.length} nguyên liệu đã đối chiếu lô</span></div>
           </div>}
           {step === 2 && <div className="dish-editor-section"><div className="dish-assistant-hero"><Sparkles size={24}/><div><h3>Trợ lý dinh dưỡng học đường</h3><p>Gợi ý theo nhóm lớp và mục tiêu. Bộ tính theo quy tắc, dùng nguyên liệu đối chiếu đúng tên từ Phụ lục 7 Quyết định 3958/QĐ-BYT; không phải AI trực tuyến hay kết luận của chuyên gia.</p></div></div>
