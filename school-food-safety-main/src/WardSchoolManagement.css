@@ -25,3 +25,6 @@
 .ward-schools-loading{color:var(--muted,#64748b)}
 .ward-schools .spin{animation:ward-school-spin 1s linear infinite}@keyframes ward-school-spin{to{transform:rotate(360deg)}}
 @media(max-width:680px){.ward-schools-head{align-items:flex-start;flex-wrap:wrap}.ward-schools-head>div:nth-child(2){flex:1 1 calc(100% - 65px)}.ward-schools-head>.ward-schools-add{width:100%}.ward-school-form-grid{grid-template-columns:1fr}.ward-school-form-grid label.wide{grid-column:auto}.ward-school-form{padding:15px}}
+
+.ward-schools-head-tag{margin-left:auto;padding:7px 11px;border-radius:999px;background:#edf8f0;color:#236b43;font-size:11px;font-weight:750;white-space:nowrap}
+@media(max-width:680px){.ward-schools-head-tag{margin-left:0}}
