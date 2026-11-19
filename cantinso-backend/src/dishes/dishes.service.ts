@@ -319,7 +319,7 @@ export class DishesService {
 
     const result: Record<string, unknown> = {};
     for (const field of nutrientFields) {
-      result[field] = complete[field] ? Number(totals[field].toFixed(2)) : null;
+      // Keep the subtotal of ingredients with known values; coverage flags prevent presenting it as complete.\n      result[field] = Number(totals[field].toFixed(2));
     }
     return {
       calculationMethod: 'ANNEX_7_PER_100G_EDIBLE_PORTION',
