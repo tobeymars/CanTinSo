@@ -6,6 +6,8 @@ import ClickSpark from './components/react-bits/ClickSpark'
 import type { School } from './lib/data'
 import type { ViewRole } from './lib/store'
 import { useUI } from './lib/store'
+import { getAccessToken, getStoredUser } from './lib/authApi'
+import { fetchMyKitchenContext } from './lib/myKitchenApi'
 import { inventoryItems } from './lib/inventory'
 import { readSuppliers } from './lib/suppliers'
 import { compressDishPhoto, dishImage } from './lib/dishImages'
@@ -51,8 +53,23 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
   const [traceId, setTraceId] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [actualKitchenName, setActualKitchenName] = useState('')
   const grade = gradeForSchool(school.id)
   const kitchen = useMemo(() => kitchenDirectoryRepository.load().find(item => item.active && item.assignedSchoolIds.includes(school.id) && item.type === (role === 'central_kitchen' ? 'CENTRAL_KITCHEN' : 'ON_SITE')),[school.id, role])
+  useEffect(() => {
+    const user = getStoredUser()
+    if (role !== 'central_kitchen' || user?.role !== 'CENTRAL_KITCHEN' || !getAccessToken()) {
+      setActualKitchenName('')
+      return
+    }
+    let active = true
+    fetchMyKitchenContext().then(context => {
+      if (active) setActualKitchenName(context.kitchen.name)
+    }).catch(() => {
+      if (active) setActualKitchenName('')
+    })
+    return () => { active = false }
+  }, [role])
   const stock = useMemo(() => inventoryItems.filter(item => item.schoolId === school.id && item.kitchenId === kitchen?.id && item.unit !== 'chai'),[school.id, kitchen?.id])
   const [today] = useState(todayIsoDate)
   const eligible = stock.filter(item => item.expiresAt >= today)
@@ -123,7 +140,7 @@ export default function KitchenDishEditor({ school, role, value, onClose, onSave
             <label className="dish-field">Khối lượng dự kiến (g/suất) <span>*</span><input type="number" min="0.01" step="any" value={weight} onChange={e => setWeight(e.target.value)}/></label>
             <label className="dish-field">Số suất dự kiến <span>*</span><input type="number" min="1" step="1" value={servings} onChange={e => setServings(e.target.value)}/></label>
             <label className="dish-field">Thứ tự ưu tiên<input type="number" min="0" step="1" value={priority} onChange={e => setPriority(e.target.value)}/></label>
-            <label className="dish-field">Đơn vị chế biến<input disabled value={kitchen?.name ?? 'Chưa phân công bếp'} readOnly/></label>
+            <label className="dish-field">Đơn vị chế biến<input disabled value={actualKitchenName || kitchen?.name || 'Chưa phân công bếp'} readOnly/></label>
             <label className="dish-field wide">Mô tả và hướng dẫn chế biến <span>*</span><textarea maxLength={500} value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Nguyên liệu chính, chế biến, cách phục vụ, lưu ý dinh dưỡng..." /></label>
           </div></div>}
           {step === 1 && <div className="dish-editor-section"><div className="dish-section-intro dish-section-inline"><div><h3>Nguyên liệu & định lượng</h3><p>Định lượng trên một suất ăn. Chỉ được chọn mã lô thực tế từ kho được phân công.</p></div><div className="dish-section-buttons"><button className="dish-secondary" type="button" onClick={() => { setError(''); setStep(2) }}><Sparkles size={16}/> Gợi ý công thức</button><button className="dish-secondary" type="button" onClick={() => setRows(items => [...items, newIngredient()])}><Plus size={16}/> Thêm nguyên liệu</button></div></div>
