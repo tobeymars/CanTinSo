@@ -48,6 +48,7 @@ export async function listKitchenDishes(schoolId: string, role: 'central_kitchen
       const ingredient = row.ingredient
       return {
         name: ingredient?.name ?? 'Nguyên liệu',
+        ingredientCode: ingredient?.code ?? '',
         amountPerServing: asNumber(row.quantity),
         unit: row.unitCode === 'ml' ? 'ml' as const : 'g' as const,
         supplier: '',
