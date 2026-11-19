@@ -83,6 +83,7 @@ export type KitchenDishProposal = {
   /** Nhóm lớp áp dụng; dữ liệu cũ chưa có trường này vẫn tải được. */
   ageBand?: SchoolAgeBand
   id: string
+  code?: string
   schoolId: string
   kitchenId: string
   createdBy: 'central_kitchen' | 'school_kitchen'
