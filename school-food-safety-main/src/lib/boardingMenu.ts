@@ -98,7 +98,7 @@ export type KitchenDishProposal = {
   safetyMonitoring: DishSafetyMonitoring
   createdAt: string
   updatedAt: string
-  demo: true
+  demo: boolean
 }
 export const KITCHEN_DISH_PROPOSALS_KEY = 'demo-kitchen-dish-proposals-v1'
 
