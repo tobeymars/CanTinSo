@@ -997,7 +997,7 @@ function Shell() {
         return rows.map((item) => ({
           id: item.id,
           name: item.name,
-          address: item.ward?.name ?? "Chưa xác định phường",
+          address: item.address ?? item.ward?.name ?? "Chưa cập nhật địa chỉ",
           mode: "ON_SITE",
         }));
       }
