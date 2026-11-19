@@ -114,6 +114,11 @@ export class DishesService {
             versionNo: true,
             status: true,
             createdAt: true,
+            recipeSnapshot: true,
+            nutritionSnapshot: true,
+            ingredients: {
+              include: { ingredient: { select: { id: true, code: true, name: true, unit: true } } },
+            },
             approvals: {
               select: {
                 id: true,
