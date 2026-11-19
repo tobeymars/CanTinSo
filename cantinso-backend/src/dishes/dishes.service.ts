@@ -116,6 +116,175 @@ export class DishesService {
     return dish;
   }
 
+  private buildNutritionSnapshot(
+    recipeIngredients: CreateDishVersionDto['ingredients'],
+    catalogIngredients: Array<{
+      id: string;
+      code: string;
+      name: string;
+      unit: string;
+      nutritionProfiles: Array<{
+        sourceRowNo: number | null;
+        sourceCategory: string;
+        edibleRatePercent: Prisma.Decimal;
+        energyKcal: Prisma.Decimal | null;
+        proteinG: Prisma.Decimal | null;
+        fatG: Prisma.Decimal | null;
+        carbohydrateG: Prisma.Decimal | null;
+        fiberG: Prisma.Decimal | null;
+        calciumMg: Prisma.Decimal | null;
+        ironMg: Prisma.Decimal | null;
+        zincMg: Prisma.Decimal | null;
+        vitaminARaeMcg: Prisma.Decimal | null;
+        nutritionReference: {
+          code: string;
+          title: string;
+          documentNo: string;
+          appendix: string;
+          sourceUrl: string;
+          effectiveAt: Date;
+        };
+      }>;
+    }>,
+  ) {
+    const nutrientFields = [
+      'energyKcal',
+      'proteinG',
+      'fatG',
+      'carbohydrateG',
+      'fiberG',
+      'calciumMg',
+      'ironMg',
+      'zincMg',
+      'vitaminARaeMcg',
+    ] as const;
+    type NutrientField = (typeof nutrientFields)[number];
+    const totals: Record<NutrientField, number> = {
+      energyKcal: 0,
+      proteinG: 0,
+      fatG: 0,
+      carbohydrateG: 0,
+      fiberG: 0,
+      calciumMg: 0,
+      ironMg: 0,
+      zincMg: 0,
+      vitaminARaeMcg: 0,
+    };
+    const complete: Record<NutrientField, boolean> = {
+      energyKcal: true,
+      proteinG: true,
+      fatG: true,
+      carbohydrateG: true,
+      fiberG: true,
+      calciumMg: true,
+      ironMg: true,
+      zincMg: true,
+      vitaminARaeMcg: true,
+    };
+    const catalogById = new Map(catalogIngredients.map((item) => [item.id, item]));
+    const details: Array<Record<string, unknown>> = [];
+    const warnings: string[] = [];
+    let reference: Record<string, unknown> | null = null;
+
+    for (const recipeItem of recipeIngredients) {
+      const ingredient = catalogById.get(recipeItem.ingredientId);
+      const profile = ingredient?.nutritionProfiles[0];
+      if (!ingredient) continue;
+      if (!profile) {
+        warnings.push(`Chưa có hồ sơ dinh dưỡng Phụ lục 7 cho nguyên liệu "${ingredient.name}".`);
+        for (const field of nutrientFields) complete[field] = false;
+        details.push({
+          ingredientId: ingredient.id,
+          ingredientCode: ingredient.code,
+          ingredientName: ingredient.name,
+          quantity: recipeItem.quantity,
+          unitCode: recipeItem.unitCode,
+          status: 'MISSING_NUTRITION_PROFILE',
+        });
+        continue;
+      }
+
+      reference = {
+        code: profile.nutritionReference.code,
+        title: profile.nutritionReference.title,
+        documentNo: profile.nutritionReference.documentNo,
+        appendix: profile.nutritionReference.appendix,
+        sourceUrl: profile.nutritionReference.sourceUrl,
+        effectiveAt: profile.nutritionReference.effectiveAt.toISOString().slice(0, 10),
+      };
+
+      const unit = recipeItem.unitCode.trim().toLowerCase();
+      const gramsPerUnit: Record<string, number> = {
+        g: 1, gram: 1, grams: 1,
+        kg: 1000, kilogram: 1000, kilograms: 1000,
+        mg: 0.001,
+      };
+      const gramsFactor = gramsPerUnit[unit];
+      if (!gramsFactor) {
+        warnings.push(`Không thể quy đổi "${recipeItem.unitCode}" của nguyên liệu "${ingredient.name}" sang gam; cần nhập định lượng theo g, kg hoặc mg.`);
+        for (const field of nutrientFields) complete[field] = false;
+        details.push({
+          ingredientId: ingredient.id,
+          ingredientCode: ingredient.code,
+          ingredientName: ingredient.name,
+          quantity: recipeItem.quantity,
+          unitCode: recipeItem.unitCode,
+          status: 'UNSUPPORTED_UNIT',
+        });
+        continue;
+      }
+
+      const grossWeightG = recipeItem.quantity * gramsFactor;
+      const edibleWeightG = grossWeightG * Number(profile.edibleRatePercent) / 100;
+      const contribution: Record<string, number | null> = {};
+      for (const field of nutrientFields) {
+        const value = profile[field];
+        if (value === null) {
+          complete[field] = false;
+          contribution[field] = null;
+        } else {
+          const amount = Number(value) * edibleWeightG / 100;
+          totals[field] += amount;
+          contribution[field] = Number(amount.toFixed(4));
+        }
+      }
+      details.push({
+        ingredientId: ingredient.id,
+        ingredientCode: ingredient.code,
+        ingredientName: ingredient.name,
+        sourceRowNo: profile.sourceRowNo,
+        sourceCategory: profile.sourceCategory,
+        quantity: recipeItem.quantity,
+        unitCode: recipeItem.unitCode,
+        grossWeightG: Number(grossWeightG.toFixed(3)),
+        edibleRatePercent: Number(profile.edibleRatePercent),
+        edibleWeightG: Number(edibleWeightG.toFixed(3)),
+        contribution,
+        status: 'CALCULATED',
+      });
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const field of nutrientFields) {
+      result[field] = complete[field] ? Number(totals[field].toFixed(2)) : null;
+    }
+    return {
+      calculationMethod: 'ANNEX_7_PER_100G_EDIBLE_PORTION',
+      calculatedAt: new Date().toISOString(),
+      reference,
+      totals: result,
+      coverage: {
+        ingredientCount: recipeIngredients.length,
+        calculatedCount: details.filter((item) => item.status === 'CALCULATED').length,
+        missingProfileCount: details.filter((item) => item.status === 'MISSING_NUTRITION_PROFILE').length,
+        unsupportedUnitCount: details.filter((item) => item.status === 'UNSUPPORTED_UNIT').length,
+        complete: warnings.length === 0 && nutrientFields.every((field) => complete[field]),
+      },
+      ingredients: details,
+      warnings,
+    };
+  }
+
   async createVersion(user: AuthUser, dishId: string, dto: CreateDishVersionDto) {
     const kitchenId = this.requireKitchenUser(user);
     const dish = await this.prisma.dish.findFirst({
@@ -130,11 +299,33 @@ export class DishesService {
     }
     const foundIngredients = await this.prisma.ingredient.findMany({
       where: { id: { in: ingredientIds } },
-      select: { id: true },
+      include: {
+        nutritionProfiles: {
+          where: {
+            nutritionReference: {
+              code: 'MOH-3958-QD-BYT-2025-APPENDIX-7-V1',
+            },
+          },
+          include: {
+            nutritionReference: {
+              select: {
+                code: true,
+                title: true,
+                documentNo: true,
+                appendix: true,
+                sourceUrl: true,
+                effectiveAt: true,
+              },
+            },
+          },
+        },
+      },
     });
     if (foundIngredients.length !== ingredientIds.length) {
       throw new BadRequestException('Có nguyên liệu không tồn tại trong danh mục chuẩn.');
     }
+
+    const nutritionSnapshot = this.buildNutritionSnapshot(dto.ingredients, foundIngredients);
 
     return this.prisma.$transaction(async (tx) => {
       const latest = await tx.dishVersion.findFirst({
@@ -148,7 +339,7 @@ export class DishesService {
           versionNo: (latest?.versionNo ?? 0) + 1,
           createdById: user.sub,
           recipeSnapshot: dto.recipeSnapshot as Prisma.InputJsonValue,
-          nutritionSnapshot: dto.nutritionSnapshot as Prisma.InputJsonValue | undefined,
+          nutritionSnapshot: nutritionSnapshot as Prisma.InputJsonValue,
           allergenSnapshot: dto.allergenSnapshot as Prisma.InputJsonValue | undefined,
         },
       });
