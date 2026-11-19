@@ -13,6 +13,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 export type MealAgeGroup = { id: string; code: string; name: string; sortOrder: number };
 export type ApprovedDishOption = { versionId: string; dishId: string; name: string; versionNo: number; schoolId?: string; ageBand?: string; portionWeightGrams?: number };
+export type MealPlanRevisionHistory = {
+  id: string; revisionNo: number; status: string; createdAt: string; submittedAt?: string | null; decidedAt?: string | null; decisionNote?: string | null;
+  proposedBy?: { fullName: string; role: string }; decidedBy?: { fullName: string; role: string } | null;
+  events: Array<{ eventType: string; note?: string | null; occurredAt: string; actor: { fullName: string; role: string } }>;
+  ageGroups: Array<{ plannedServings: number; ageGroup: MealAgeGroup }>;
+  items: Array<{ mealSlot: string; isDefault?: boolean; dishVersion: { versionNo: number; dish: { name: string } } }>;
+};
 export type MealPlanRow = {
   id: string; schoolId: string; serviceDate: string; mealType: string; servings: number; status: string;
   school?: { id: string; name: string }; kitchen?: { id: string; name: string; code: string };
@@ -45,6 +52,7 @@ export async function loadMealPlanWorkspace() {
   }))).flatMap(item => item.approvedSchoolIds.map(schoolId => ({ ...item, schoolId })));
   return { ageGroups, plans, schools, dishes };
 }
+export async function loadMealPlanHistory(mealPlanId: string) { return request<{ id: string; serviceDate: string; mealType: string; school?: { name: string }; revisions: MealPlanRevisionHistory[] }>(`/meal-plans/${mealPlanId}/history`); }
 export async function createAndSubmitMealPlan(input: { schoolId: string; serviceDate: string; mealType: string; ageGroupId: string; servings: number; dishVersionIds: string[] }) {
   const revision = await request<{ id: string }>('/meal-plans', { method: 'POST', body: JSON.stringify({
     schoolId: input.schoolId, serviceDate: input.serviceDate, mealType: input.mealType,
