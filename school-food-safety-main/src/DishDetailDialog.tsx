@@ -60,12 +60,12 @@ export default function DishDetailDialog({ dish, kitchen, linkedLots = [], opera
     let active = true
     setBackendNutrition(null)
     setNutritionApiError('')
-    if (!nutritionInput.length || !['CENTRAL_KITCHEN', 'SCHOOL_KITCHEN'].includes(getStoredUser()?.role ?? '')) return () => { active = false }
+    if (!nutritionInput.length || nutritionInput.length !== records.length || !['CENTRAL_KITCHEN', 'SCHOOL_KITCHEN'].includes(getStoredUser()?.role ?? '')) return () => { active = false }
     previewDishNutrition(nutritionInput)
       .then(result => { if (active) setBackendNutrition(result) })
       .catch(error => { if (active) setNutritionApiError(error instanceof Error ? error.message : 'Không lấy được kết quả tính từ máy chủ.') })
     return () => { active = false }
-  }, [nutritionInput])
+  }, [nutritionInput, records.length])
   const backendCoverage = backendNutrition
     ? Math.round(backendNutrition.coverage.calculatedCount / Math.max(1, backendNutrition.coverage.ingredientCount) * 100)
     : null
