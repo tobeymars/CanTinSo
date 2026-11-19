@@ -176,6 +176,7 @@ export class UsersService {
           contactName: true,
           phone: true,
           capacity: true,
+          schoolId: true,
           ward: { select: { id: true, name: true, code: true } },
           schools: {
             where: {
