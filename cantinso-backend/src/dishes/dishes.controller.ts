@@ -4,6 +4,8 @@ import {
   Get,
   Param,
   Post,
+  Patch,
+  Delete,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -26,6 +28,24 @@ export class DishesController {
   @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
   previewNutrition(@CurrentUser() user: AuthUser, @Body() dto: PreviewDishNutritionDto) {
     return this.dishes.previewNutrition(user, dto);
+  }
+
+  @Get('ingredients')
+  @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
+  listIngredients(@CurrentUser() user: AuthUser) {
+    return this.dishes.listIngredientCatalog(user);
+  }
+
+  @Patch(':dishId')
+  @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
+  updateMetadata(@CurrentUser() user: AuthUser, @Param('dishId') dishId: string, @Body() dto: CreateDishDto) {
+    return this.dishes.updateMetadata(user, dishId, dto);
+  }
+
+  @Delete(':dishId')
+  @Roles('CENTRAL_KITCHEN', 'SCHOOL_KITCHEN')
+  remove(@CurrentUser() user: AuthUser, @Param('dishId') dishId: string) {
+    return this.dishes.removeDraft(user, dishId);
   }
 
   @Post()
