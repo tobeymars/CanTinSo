@@ -57,6 +57,7 @@ export async function listKitchenDishes(schoolId: string, role: 'central_kitchen
     })
     return {
       id: dish.id,
+      code: dish.code,
       schoolId,
       kitchenId: dish.kitchenId,
       createdBy: role,
@@ -75,7 +76,7 @@ export async function listKitchenDishes(schoolId: string, role: 'central_kitchen
       },
       createdAt: dish.createdAt,
       updatedAt: version?.createdAt ?? dish.createdAt,
-      demo: false as true,
+      demo: false,
     }
   })
 }
@@ -100,9 +101,9 @@ export async function saveKitchenDish(input: {
   ingredientCatalog: IngredientCatalogItem[]
 }) {
   const { value } = input
-  const code = value?.id ? undefined : `DISH-${Date.now()}`
+  const code = value?.id ? value.code : `DISH-${Date.now()}`
   const metadata = {
-    code: code ?? (value as KitchenDishProposal & { code?: string }).code ?? `DISH-${value?.id.slice(0, 8) ?? Date.now()}`,
+    code: code ?? `DISH-${Date.now()}`,
     name: input.name,
     category: input.description.slice(0, 100) || undefined,
   }
