@@ -160,6 +160,43 @@ export class UsersService {
 
 
   async getMyKitchen(actor: AuthUser) {
+    if (actor.role === UserRole.CENTRAL_KITCHEN) {
+      if (!actor.kitchenId) {
+        throw new ForbiddenException("Tài khoản bếp trung tâm chưa được gắn với hồ sơ bếp.");
+      }
+      const now = new Date();
+      const kitchen = await this.prisma.kitchen.findFirst({
+        where: { id: actor.kitchenId, type: "CENTRAL", isActive: true },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          type: true,
+          address: true,
+          contactName: true,
+          phone: true,
+          capacity: true,
+          ward: { select: { id: true, name: true, code: true } },
+          schools: {
+            where: {
+              isActive: true,
+              startsAt: { lte: now },
+              OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+            },
+            orderBy: { startsAt: "desc" },
+            select: {
+              id: true,
+              startsAt: true,
+              endsAt: true,
+              school: { select: { id: true, name: true, code: true } },
+            },
+          },
+        },
+      });
+      if (!kitchen) throw new NotFoundException("Không tìm thấy bếp trung tâm đang hoạt động được gắn với tài khoản.");
+      return { providerType: "CENTRAL" as const, assignmentId: null, startsAt: null, kitchen };
+    }
+
     if (actor.role !== UserRole.SCHOOL_ADMIN || !actor.schoolId) {
       throw new ForbiddenException("Chỉ tài khoản Ban Giám hiệu đã được gán trường mới xem được thông tin bếp.");
     }
