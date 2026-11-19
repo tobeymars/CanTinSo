@@ -12,7 +12,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 export type MealAgeGroup = { id: string; code: string; name: string; sortOrder: number };
-export type ApprovedDishOption = { versionId: string; dishId: string; name: string; versionNo: number; schoolId?: string };
+export type ApprovedDishOption = { versionId: string; dishId: string; name: string; versionNo: number; schoolId?: string; ageBand?: string; portionWeightGrams?: number };
 export type MealPlanRow = {
   id: string; schoolId: string; serviceDate: string; mealType: string; servings: number; status: string;
   school?: { id: string; name: string }; kitchen?: { id: string; name: string; code: string };
@@ -30,11 +30,13 @@ export async function loadMealPlanWorkspace() {
   if (user?.role !== 'CENTRAL_KITCHEN' && user?.role !== 'SCHOOL_KITCHEN') return { ageGroups, plans, schools: [], dishes: [] as ApprovedDishOption[] };
   const [context, rawDishes] = await Promise.all([
     fetchMyKitchenContext(),
-    request<Array<{ id: string; name: string; versions: Array<{ id: string; versionNo: number; status: string; approvals?: Array<{ schoolId: string; status: string }> }> }>>('/dishes'),
+    request<Array<{ id: string; name: string; versions: Array<{ id: string; versionNo: number; status: string; recipeSnapshot?: Record<string, unknown> | null; approvals?: Array<{ schoolId: string; status: string }> }> }>>('/dishes'),
   ]);
   const schools = (context.kitchen.schools ?? []).map(row => ({ id: row.school.id, name: row.school.name }));
   const dishes = rawDishes.flatMap(dish => (dish.versions ?? []).filter(version => version.approvals?.some(a => a.status === 'APPROVED')).map(version => ({
     versionId: version.id, dishId: dish.id, name: dish.name, versionNo: version.versionNo,
+    ageBand: typeof version.recipeSnapshot?.ageBand === 'string' ? version.recipeSnapshot.ageBand : undefined,
+    portionWeightGrams: typeof version.recipeSnapshot?.portionWeightGrams === 'number' ? version.recipeSnapshot.portionWeightGrams : undefined,
     approvedSchoolIds: version.approvals?.filter(a => a.status === 'APPROVED').map(a => a.schoolId) ?? [],
   }))).flatMap(item => item.approvedSchoolIds.map(schoolId => ({ ...item, schoolId })));
   return { ageGroups, plans, schools, dishes };
