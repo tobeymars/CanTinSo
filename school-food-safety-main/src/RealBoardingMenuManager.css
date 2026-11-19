@@ -177,3 +177,34 @@
 .real-dish-card-content li b{flex:none;color:#176b59;font-size:10px}
 .real-dish-preview-empty{display:block;color:#8393a4;font-size:10px;line-height:1.5}
 @media(hover:none){.real-dish-card-content{display:none!important}}
+
+/* Meal plan revision history */
+.real-card-tools{display:flex;align-items:center;gap:6px}
+.real-history-trigger{min-height:27px!important;padding:4px 7px!important;border-radius:8px!important;background:#f2f7fc!important;border-color:#dce7f1!important;color:#315d83!important;font-size:9px!important}
+.real-history-backdrop{position:fixed;inset:0;z-index:11000;display:grid;place-items:center;padding:18px;background:#10233c88;backdrop-filter:blur(4px)}
+.real-history-modal{display:flex;flex-direction:column;width:min(650px,100%);max-height:min(820px,90dvh);overflow:hidden;border:1px solid #dce6f0;border-radius:18px;background:#fff;box-shadow:0 24px 80px #10233c40}
+.real-history-modal>header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:20px 22px;border-bottom:1px solid #edf1f5}
+.real-history-modal>header>div>span{display:flex;align-items:center;gap:7px;color:#286c9b;font-size:10px;font-weight:850;letter-spacing:.08em}
+.real-history-modal>header h3{margin:8px 0 4px;color:#1d3c61;font-size:21px}
+.real-history-modal>header p{margin:0;color:#78899c;font-size:12px}
+.real-history-modal>header>button{width:36px;height:36px;padding:7px}
+.real-history-list{display:grid;gap:11px;overflow:auto;padding:15px 18px}
+.real-history-item{display:grid;gap:9px;padding:14px;border:1px solid #dfe8f0;border-radius:13px;background:#fbfdff}
+.real-history-item-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.real-history-item-head>strong{color:#21476b;font-size:14px}
+.real-history-meta{display:grid;gap:4px;color:#71849a;font-size:10px}
+.real-history-dishes{display:grid;gap:5px;padding-top:8px;border-top:1px solid #e8eef4}
+.real-history-dishes>strong,.real-history-events>strong{color:#526a84;font-size:10px}
+.real-history-dishes ul{display:grid;gap:4px;margin:0;padding-left:18px;color:#2c4561;font-size:11px}
+.real-history-dishes li small{color:#8494a5}
+.real-history-dishes>small{color:#6c8298;font-size:10px}
+.real-history-note{margin:0;padding:8px 10px;border-radius:8px;background:#fff6eb;color:#895b24;font-size:10px}
+.real-history-events{display:grid;gap:7px;padding-top:8px;border-top:1px solid #e8eef4}
+.real-history-events>div{display:grid;gap:3px}
+.real-history-events>div>span{color:#315a7e;font-size:10px;font-weight:800}
+.real-history-events>div>small{color:#8494a5;font-size:9px;line-height:1.5}
+.real-history-empty{display:flex;align-items:center;justify-content:center;gap:8px;min-height:130px;padding:20px;color:#8293a5;font-size:12px;text-align:center}
+.real-history-modal>footer{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #edf1f5;background:#fbfcfe}
+.real-history-modal>footer span{color:#6c8095;font-size:11px;font-weight:750}
+.real-history-modal>footer button{min-width:90px;background:#edf5ff;border-color:#c9dced;color:#205d98}
+@media(max-width:640px){.real-history-backdrop{padding:9px;align-items:end}.real-history-modal{max-height:88dvh;border-radius:17px 17px 11px 11px}.real-history-modal>header{padding:16px}.real-history-list{padding:11px}}
