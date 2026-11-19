@@ -12,6 +12,7 @@ import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { CreateDishDto } from './dto/create-dish.dto';
 import { CreateDishVersionDto } from './dto/create-dish-version.dto';
+import { PreviewDishNutritionDto } from './dto/preview-dish-nutrition.dto';
 import { DishDecisionDto } from './dto/dish-decision.dto';
 import { SubmitDishVersionDto } from './dto/submit-dish-version.dto';
 import { DishesService } from './dishes.service';
