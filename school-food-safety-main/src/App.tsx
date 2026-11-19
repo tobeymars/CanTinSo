@@ -89,6 +89,7 @@ const AdminPanel = lazy(() => import("./Admin"));
 const CanteenGallery = lazy(() => import("./CanteenGallery"));
 const PortionTracePage = lazy(() => import("./PortionTracePage"));
 const BoardingMenuManager = lazy(() => import("./BoardingMenuManager"));
+const MealPlanWorkspace = lazy(() => import("./MealPlanWorkspace"));
 const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
 const DishApprovalInbox = lazy(() => import("./DishApprovalInbox"));
 const FeedbackForm = lazy(() => import("./FeedbackForm"));
@@ -1542,6 +1543,11 @@ function Shell() {
                 </div>
               ) : (
                 <>
+                  {location.pathname === "/thuc-don" && ["CENTRAL_KITCHEN", "SCHOOL_KITCHEN", "SCHOOL_ADMIN"].includes(getStoredUser()?.role ?? "") && (
+                    <Suspense fallback={<div className="loading-grid"><div className="skeleton"/></div>}>
+                      <MealPlanWorkspace />
+                    </Suspense>
+                  )}
                   {location.pathname === "/giam-sat" && (
                     <SupervisionSection
                       school={school}
