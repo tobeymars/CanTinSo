@@ -18,7 +18,7 @@ export type MealPlanRow = {
   school?: { id: string; name: string }; kitchen?: { id: string; name: string; code: string };
   revisions: Array<{ id: string; revisionNo: number; status: string; decisionNote?: string | null;
     ageGroups: Array<{ plannedServings: number; ageGroup: MealAgeGroup }>;
-    items: Array<{ mealSlot: string; dishVersion: { versionNo: number; dish: { name: string } } }>;
+    items: Array<{ mealSlot: string; isDefault?: boolean; dishVersion: { versionNo: number; dish: { name: string } } }>;
   }>;
 };
 export async function loadMealPlanWorkspace() {
