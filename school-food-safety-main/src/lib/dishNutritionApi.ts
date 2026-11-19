@@ -3,6 +3,7 @@ import { getAccessToken } from './authApi'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'
 
 export type NutritionPreviewIngredient = {
+  ingredientId: string
   ingredientName: string
   quantity: number
   unitCode: string
@@ -38,9 +39,12 @@ export type BackendNutritionSnapshot = {
     complete: boolean
   }
   ingredients: Array<{
+    ingredientId?: string
+    ingredientCode?: string
     ingredientName: string
     edibleWeightG?: number
     sourceRowNo?: number | null
+    contribution?: Record<string, number | null>
     status: string
   }>
   warnings: string[]
