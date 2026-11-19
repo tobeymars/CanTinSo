@@ -1,0 +1,32 @@
+name: Frontend validation
+
+on:
+  push:
+    branches:
+      - feature/ubnd-ward-school-access
+    paths:
+      - 'school-food-safety-main/**'
+      - '.github/workflows/frontend-validation.yml'
+  pull_request:
+    branches:
+      - feature/ubnd-ward-school-access
+    paths:
+      - 'school-food-safety-main/**'
+      - '.github/workflows/frontend-validation.yml'
+
+jobs:
+  validate-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: school-food-safety-main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: school-food-safety-main/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Type-check and build frontend
+        run: npm run build
