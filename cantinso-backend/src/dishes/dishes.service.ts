@@ -37,6 +37,42 @@ export class DishesService {
     return user.schoolId;
   }
 
+  async listIngredientCatalog(user: AuthUser) {
+    this.requireKitchenUser(user);
+    return this.prisma.ingredient.findMany({
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      select: { id: true, code: true, name: true, unit: true, category: true },
+    });
+  }
+
+  async updateMetadata(user: AuthUser, dishId: string, dto: CreateDishDto) {
+    const kitchenId = this.requireKitchenUser(user);
+    const dish = await this.prisma.dish.findFirst({
+      where: { id: dishId, kitchenId },
+      select: { id: true },
+    });
+    if (!dish) throw new NotFoundException('Không tìm thấy món ăn trong phạm vi bếp.');
+    return this.prisma.dish.update({
+      where: { id: dishId },
+      data: { code: dto.code.trim(), name: dto.name.trim(), category: dto.category?.trim() || null },
+      select: { id: true, code: true, name: true, category: true, status: true, kitchenId: true, createdAt: true },
+    });
+  }
+
+  async removeDraft(user: AuthUser, dishId: string) {
+    const kitchenId = this.requireKitchenUser(user);
+    const dish = await this.prisma.dish.findFirst({
+      where: { id: dishId, kitchenId },
+      include: { _count: { select: { versions: true, mealPlanItems: true } } },
+    });
+    if (!dish) throw new NotFoundException('Không tìm thấy món ăn trong phạm vi bếp.');
+    if (dish._count.versions > 0 || dish._count.mealPlanItems > 0) {
+      throw new BadRequestException('Món đã có phiên bản công thức hoặc được sử dụng trong thực đơn; không thể xóa để bảo toàn lịch sử.');
+    }
+    await this.prisma.dish.delete({ where: { id: dishId } });
+    return { success: true, id: dishId };
+  }
+
   async create(user: AuthUser, dto: CreateDishDto) {
     const kitchenId = this.requireKitchenUser(user);
     const kitchen = await this.prisma.kitchen.findFirst({
