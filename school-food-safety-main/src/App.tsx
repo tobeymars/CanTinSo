@@ -96,6 +96,7 @@ const FeedbackForm = lazy(() => import("./FeedbackForm"));
 const CentralKitchenManagementPanel = lazy(() => import("./CentralKitchenManagement"));
 const KitchenManagementPanel = lazy(() => import("./KitchenManagement"));
 const SchoolDashboard = lazy(() => import("./SchoolDashboard"));
+const WardApprovedDishes = lazy(() => import("./WardApprovedDishes"));
 const roleLabels: Record<ViewRole, string> = {
   parent: "Phụ huynh",
   school_board: "Ban Giám hiệu",
@@ -1100,7 +1101,7 @@ function Shell() {
     role === "parent"
       ? navigation
       : role === "culture_social_office"
-        ? [...adminNav, ...(isWardAdminAccount ? [{ path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])]
+        ? [...adminNav, ...(isWardAdminAccount ? [{ path: "/mon-da-duyet", label: "Món ăn trường đã duyệt", icon: ShieldCheck }, { path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])]
         : role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN"
           ? [...adminNav, { path: "/quan-ly-bep", label: "Quản lý bếp", icon: CookingPot }]
         : role === "school_kitchen" && !isSchoolKitchenReceiver
@@ -1463,7 +1464,7 @@ function Shell() {
           )}
           {role !== "parent" ? (
             <>
-              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam", "/quan-ly-bep"].includes(location.pathname) && (
+              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam", "/quan-ly-bep", "/mon-da-duyet"].includes(location.pathname) && (
                 <Suspense
                   fallback={
                     <div className="loading-grid">
@@ -1492,6 +1493,11 @@ function Shell() {
               {location.pathname === "/quan-ly-bep-trung-tam" && isWardAdminAccount && (
                 <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
                   <CentralKitchenManagementPanel />
+                </Suspense>
+              )}
+              {location.pathname === "/mon-da-duyet" && isWardAdminAccount && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <WardApprovedDishes />
                 </Suspense>
               )}
               {sharedAdminArea && (
