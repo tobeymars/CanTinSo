@@ -64,7 +64,7 @@ export async function listKitchenDishes(schoolId: string, role: 'central_kitchen
       mealType: (snapshot.mealType as BoardingMealType) || 'LUNCH',
       gradeLevel: (snapshot.gradeLevel as GradeLevel) || 'PRIMARY',
       ageBand: snapshot.ageBand as SchoolAgeBand | undefined,
-      name: dish.name,
+      name: asString(snapshot.name, dish.name),
       description: asString(snapshot.description, dish.category ?? ''),
       imageUrl: asString(snapshot.imageUrl) || undefined,
       expectedQuantity: asNumber(snapshot.expectedQuantity),
@@ -122,6 +122,7 @@ export async function saveKitchenDish(input: {
     return { ingredientId: catalog.id, quantity: item.quantity, unitCode: item.unitCode }
   })
   const recipeSnapshot = {
+    name: input.name,
     description: input.description,
     mealType: input.mealType,
     gradeLevel: input.gradeLevel,
