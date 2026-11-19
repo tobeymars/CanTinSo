@@ -1,0 +1,27 @@
+.ward-schools{display:grid;gap:18px;margin:22px 0 34px}
+.ward-schools-head{display:flex;align-items:center;gap:14px;padding:22px;border:1px solid var(--line,#e5e7eb);border-radius:18px;background:var(--surface,#fff)}
+.ward-schools-heading-icon{display:grid;place-items:center;width:48px;height:48px;flex:0 0 48px;border-radius:14px;background:#edf5f0;color:#23734c}
+.ward-schools-head>div:nth-child(2){flex:1;min-width:0}
+.ward-schools-eyebrow{font-size:10px;letter-spacing:.13em;font-weight:800;color:#438363}
+.ward-schools-head h2{margin:4px 0;font-size:22px;color:var(--text,#17251e)}
+.ward-schools-head p{margin:0;color:var(--muted,#64748b);font-size:13px}
+.ward-schools-add{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;padding:11px 15px;background:#216b49;color:white;font-weight:700;cursor:pointer}
+.ward-schools-add:disabled{opacity:.55;cursor:not-allowed}
+.ward-schools-notice,.ward-schools-error,.ward-schools-loading,.ward-schools-foot{display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:11px;font-size:13px}
+.ward-schools-notice{background:#edf8f0;color:#236b43}.ward-schools-error{background:#fff1f0;color:#a83232}
+.ward-school-form{padding:20px;border:1px solid var(--line,#e5e7eb);border-radius:16px;background:var(--surface,#fff);display:grid;gap:18px}
+.ward-school-form-title{display:flex;align-items:center;gap:11px;color:#28714e}.ward-school-form-title div{display:grid;gap:3px}.ward-school-form-title strong{color:var(--text,#17251e)}.ward-school-form-title small{color:var(--muted,#64748b);font-size:12px}
+.ward-school-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ward-school-form-grid label{display:grid;gap:7px;font-size:12px;font-weight:700;color:var(--text,#334155)}
+.ward-school-form-grid label span{color:#c0392b}.ward-school-form-grid label.wide{grid-column:1/-1}
+.ward-school-form-grid input{width:100%;min-width:0;border:1px solid var(--line,#dbe2dc);border-radius:9px;padding:11px 12px;background:var(--surface,#fff);color:var(--text,#17251e);font:inherit;font-weight:400;outline:none}
+.ward-school-form-grid input:focus{border-color:#438363;box-shadow:0 0 0 3px #43836320}
+.ward-school-form-actions{display:flex;justify-content:flex-end;gap:10px}.ward-school-cancel{border:1px solid var(--line,#dbe2dc);border-radius:10px;padding:10px 15px;background:transparent;color:var(--text,#334155);font-weight:650;cursor:pointer}
+.ward-schools-summary{display:flex;align-items:baseline;gap:9px;padding:0 4px;color:var(--muted,#64748b);font-size:13px}.ward-schools-summary strong{font-size:26px;color:var(--text,#17251e)}
+.ward-schools-table-wrap{overflow:auto;border:1px solid var(--line,#e5e7eb);border-radius:15px;background:var(--surface,#fff)}
+.ward-schools-table{width:100%;border-collapse:collapse;min-width:650px;text-align:left}.ward-schools-table th{padding:12px 14px;background:var(--surface-muted,#f7f9f7);font-size:11px;color:var(--muted,#64748b);font-weight:800}.ward-schools-table td{padding:14px;border-top:1px solid var(--line,#edf0ed);font-size:13px;color:var(--text,#334155);vertical-align:top}.ward-schools-table td strong,.ward-schools-table td small{display:block}.ward-schools-table td small{margin-top:4px;color:var(--muted,#64748b);font-size:11px}
+.ward-schools-empty{display:grid;justify-items:center;gap:8px;padding:38px 18px;border:1px dashed var(--line,#dbe2dc);border-radius:14px;color:var(--muted,#64748b);text-align:center}.ward-schools-empty strong{color:var(--text,#334155)}.ward-schools-empty p{margin:0;font-size:13px}
+.ward-schools-foot{color:var(--muted,#64748b);background:var(--surface-muted,#f7f9f7)}
+.ward-schools-loading{color:var(--muted,#64748b)}
+.ward-schools .spin{animation:ward-school-spin 1s linear infinite}@keyframes ward-school-spin{to{transform:rotate(360deg)}}
+@media(max-width:680px){.ward-schools-head{align-items:flex-start;flex-wrap:wrap}.ward-schools-head>div:nth-child(2){flex:1 1 calc(100% - 65px)}.ward-schools-head>.ward-schools-add{width:100%}.ward-school-form-grid{grid-template-columns:1fr}.ward-school-form-grid label.wide{grid-column:auto}.ward-school-form{padding:15px}}
