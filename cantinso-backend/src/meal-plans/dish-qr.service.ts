@@ -9,11 +9,14 @@ export class DishQrService {
 
   private async scopedPlan(user: AuthUser, planId: string) {
     if (!['CENTRAL_KITCHEN', 'SCHOOL_KITCHEN', 'SCHOOL_ADMIN', 'UBND_ADMIN'].includes(user.role)) throw new ForbiddenException('Không có quyền xem QR.');
+    if (user.role === 'SCHOOL_ADMIN' && !user.schoolId) throw new ForbiddenException('Tài khoản chưa được gắn trường.');
+    if (user.role === 'UBND_ADMIN' && !user.wardId) throw new ForbiddenException('Tài khoản chưa được gắn phường.');
+    if (['CENTRAL_KITCHEN', 'SCHOOL_KITCHEN'].includes(user.role) && !user.kitchenId) throw new ForbiddenException('Tài khoản chưa được gắn bếp.');
     const plan = await this.prisma.mealPlan.findFirst({
       where: { id: planId,
-        ...(user.role === 'SCHOOL_ADMIN' ? { schoolId: user.schoolId ?? '__none__' } :
-          user.role === 'UBND_ADMIN' ? { school: { wardId: user.wardId ?? '__none__' } } :
-          { kitchenId: user.kitchenId ?? '__none__' }) },
+        ...(user.role === 'SCHOOL_ADMIN' ? { schoolId: user.schoolId! } :
+          user.role === 'UBND_ADMIN' ? { school: { wardId: user.wardId! } } :
+          { kitchenId: user.kitchenId! }) },
       include: { school: { select: { id: true, name: true, wardId: true } }, kitchen: { select: { id: true, name: true, isActive: true } },
         revisions: { orderBy: { revisionNo: 'desc' }, take: 1,
           include: { ageGroups: { include: { ageGroup: true } }, items: { include: { portions: true, dishVersion: { include: {
