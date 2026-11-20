@@ -11,7 +11,8 @@ import {
 } from './lib/supervisionApproval'
 import { SUPERVISION_STATUS_EVENT, SUPERVISION_STATUS_STORAGE_KEY } from './lib/supervisionStatus'
 import type { SupervisionMealType, SupervisionScope } from './lib/supervisionStatus'
-import { SUPERVISION_JOURNEY_EVENT } from './lib/supervisionJourney'
+import { CHECK_DEFINITIONS } from './lib/supervisionStatus'
+import { SUPERVISION_JOURNEY_EVENT, stageNames } from './lib/supervisionJourney'
 
 export default function SupervisionMealApproval({ school, date, mealType, role }: {
   school: School
@@ -57,6 +58,7 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
   const latestApproval = approvals.at(-1)
   const status = serverMode ? {confirmedChecks,requiredChecks:4,confirmedStages,requiredStages:requiredStages.length,pendingDetails,ready:pendingDetails.length===0,approved:!!latestApproval && serverQuery.data?.approvalCurrent === true && pendingDetails.length===0,stale:!!latestApproval && (serverQuery.data?.approvalCurrent !== true || pendingDetails.length>0),latest:latestApproval ? {actorLabel:'Ban Giám hiệu',confirmedAt:latestApproval.at,note:latestApproval.note}:undefined} : localStatus!
   const history = serverMode ? approvals.map((a,i)=>({id:String(i),actorLabel:'Ban Giám hiệu',confirmedAt:a.at,note:a.note})) : readMealApprovalHistory(scope)
+  const labelPending = (id:string) => CHECK_DEFINITIONS.find(check=>check.id===id)?.label ?? stageNames[id as keyof typeof stageNames] ?? id
   const isBoard = role === 'school_board'
   const label = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -91,7 +93,7 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
       <span>Kiểm thực và lưu mẫu: <strong>{status.confirmedChecks}/{status.requiredChecks}</strong></span>
       <span>Mốc vận hành: <strong>{status.confirmedStages}/{status.requiredStages}</strong></span>
     </div>
-    {!status.ready && <div className="supervision-approval-pending"><strong>Những nội dung cần hoàn thành:</strong><ul>{status.pendingDetails.map(detail => <li key={detail}>{detail}</li>)}</ul></div>}
+    {!status.ready && <div className="supervision-approval-pending"><strong>Những nội dung cần hoàn thành:</strong><ul>{status.pendingDetails.map(detail => <li key={detail}>{labelPending(detail)}</li>)}</ul></div>}
     {status.approved && status.latest && <p className="supervision-approval-confirmation"><CheckCircle2 size={17}/> {status.latest.actorLabel} đã xác nhận lúc {new Date(status.latest.confirmedAt).toLocaleString('vi-VN')}. Nội dung: {status.latest.note}</p>}
     {status.stale && <p className="supervision-approval-warning">Dữ liệu giám sát đã thay đổi hoặc chưa hoàn chỉnh so với lần xác nhận trước. Lần xác nhận cũ được lưu trong lịch sử nhưng không còn là trạng thái phê duyệt hiện tại.</p>}
     {role === 'culture_social_office' && <p className="supervision-approval-readonly">Phòng Văn hóa – Xã hội chỉ giám sát và xem xác nhận của Ban Giám hiệu; không có quyền xác nhận hoặc cập nhật.</p>}
@@ -109,7 +111,7 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
           <p className="supervision-edit-guidance">Tôi đã đối chiếu {status.requiredChecks} nội dung kiểm thực/lưu mẫu và {status.requiredStages} mốc vận hành được báo cáo cho bữa này. Đây là xác nhận tổng thể, độc lập với việc xác nhận từng mục.</p>
           <label>Ghi chú đối chiếu của Ban Giám hiệu <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Ghi rõ nội dung đã rà soát và kết quả đối chiếu…"/></label>
           {error && <p className="error" role="alert">{error}</p>}
-          <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setConfirming(false)}>Hủy</button><button type="submit" className="primary" disabled={!status.ready}>Xác nhận tổng thể (DEMO)</button></div>
+          <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setConfirming(false)}>Hủy</button><button type="submit" className="primary" disabled={!status.ready}>{serverMode ? 'Xác nhận tổng thể' : 'Xác nhận tổng thể (DEMO)'}</button></div>
         </form>
       </section>
     </div>}
