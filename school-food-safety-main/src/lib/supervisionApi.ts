@@ -30,6 +30,7 @@ export const writeServerSupervision = (scope: SupervisionScope, body: Record<str
 export type SupervisionContext = {
   schoolId:string;serviceDate:string;mealType:string
   kitchen:{id:string;name:string;type:'CENTRAL'|'SCHOOL'}|null
+  legalDocuments:{id:string;title:string;status:string;expiresAt:string|null}[]
   menu:{id:string;servings:number;status:string;dishes:{id:string;name:string}[]}|null
   lots:{itemId:string;ingredientName:string;lotCode:string;supplierName:string;supplierContact:string;expiresAt:string|null;quantityAvailable:number;unit:string;status:string;receivedAt:string}[]
 }
