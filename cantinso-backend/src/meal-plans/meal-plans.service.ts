@@ -43,7 +43,7 @@ export class MealPlansService {
         where: { schoolId: user.schoolId },
         orderBy: [{ serviceDate: 'desc' }, { mealType: 'asc' }],
         include: { school: { select: { id: true, name: true } }, kitchen: { select: { id: true, code: true, name: true } }, revisions: {
-          orderBy: { revisionNo: 'desc' }, take: 1, include: this.revisionInclude(),
+          orderBy: { revisionNo: 'desc' }, include: this.revisionInclude(),
         } },
       });
     }
@@ -53,7 +53,7 @@ export class MealPlansService {
         where: { school: { wardId: user.wardId }, revisions: { some: { status: 'APPROVED' } } },
         orderBy: [{ serviceDate: 'desc' }, { mealType: 'asc' }],
         include: { school: { select: { id: true, name: true } }, kitchen: { select: { id: true, code: true, name: true } }, revisions: {
-          where: { status: 'APPROVED' }, orderBy: { revisionNo: 'desc' }, take: 1, include: this.revisionInclude(),
+          where: { status: 'APPROVED' }, orderBy: { revisionNo: 'desc' }, include: this.revisionInclude(),
         } },
       });
     }
@@ -62,7 +62,7 @@ export class MealPlansService {
       where: { kitchenId },
       orderBy: [{ serviceDate: 'desc' }, { mealType: 'asc' }],
       include: { school: { select: { id: true, name: true } }, revisions: {
-        orderBy: { revisionNo: 'desc' }, take: 1, include: this.revisionInclude(),
+        orderBy: { revisionNo: 'desc' }, include: this.revisionInclude(),
       } },
     });
   }
