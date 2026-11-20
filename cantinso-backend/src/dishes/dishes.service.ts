@@ -339,6 +339,38 @@ export class DishesService {
     };
   }
 
+  /**
+   * Read-only nutrition preview for historical dish versions whose immutable snapshot
+   * predates Annex 7 calculations. Never overwrite the approved version.
+   */
+  async reconstructNutritionForVersion(versionId: string) {
+    const version = await this.prisma.dishVersion.findUnique({
+      where: { id: versionId },
+      select: { ingredients: { select: { ingredientId: true, quantity: true, unitCode: true } } },
+    });
+    if (!version || !version.ingredients.length) return null;
+    const ingredientIds = version.ingredients.map(item => item.ingredientId);
+    const catalogIngredients = await this.prisma.ingredient.findMany({
+      where: { id: { in: ingredientIds } },
+      include: { nutritionProfiles: {
+        where: { nutritionReference: { code: 'MOH-3958-QD-BYT-2025-APPENDIX-7-V1' } },
+        include: { nutritionReference: { select: {
+          code: true, title: true, documentNo: true, appendix: true, sourceUrl: true, effectiveAt: true,
+        } } },
+      } },
+    });
+    const snapshot = this.buildNutritionSnapshot(
+      version.ingredients.map(item => ({
+        ingredientId: item.ingredientId,
+        quantity: Number(item.quantity),
+        unitCode: item.unitCode,
+      })),
+      catalogIngredients,
+    );
+    return { ...snapshot, reconstructed: true,
+      reconstructionNotice: 'Số liệu tính lại từ hồ sơ dinh dưỡng hiện có; không phải dữ liệu dinh dưỡng đã lưu tại thời điểm duyệt món.' };
+  }
+
   async previewNutrition(user: AuthUser, dto: PreviewDishNutritionDto) {
     this.requireKitchenUser(user);
     const ingredientIds = [...new Set(dto.ingredients.map((item) => item.ingredientId))];
