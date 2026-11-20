@@ -156,6 +156,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
       </div>
       {serverMode && contextQuery.isError && <p className="error" role="alert">Không lấy được dữ liệu kho, thực đơn theo trường và bữa từ hệ thống.</p>}
       {serverMode && contextQuery.data?.menu && <p className="muted">Thực đơn: {contextQuery.data.menu.dishes.map(dish=>dish.name).join(', ') || 'Chưa có món được duyệt'} · {contextQuery.data.menu.servings} suất dự kiến</p>}
+      {serverMode && contextQuery.data && <p className="muted">Hồ sơ pháp lý bếp: {contextQuery.data.legalDocuments.length} hồ sơ · {contextQuery.data.legalDocuments.filter(doc=>doc.status==='valid').length} hồ sơ đánh dấu còn hiệu lực. Xem chi tiết tại Hồ sơ pháp lý & điều kiện bếp.</p>}
       {message && <div className="supervision-status-message" role="status"><CheckCircle2 size={16}/><span>{message}</span><button type="button" aria-label="Đóng thông báo" onClick={() => setMessage('')}><X size={15}/></button></div>}
       <div className="supervision-check-rows">
         {CHECK_DEFINITIONS.map(def => {
