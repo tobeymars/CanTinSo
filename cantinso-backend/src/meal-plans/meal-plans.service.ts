@@ -50,10 +50,10 @@ export class MealPlansService {
     if (user.role === 'UBND_ADMIN') {
       if (!user.wardId) throw new ForbiddenException('Tài khoản UBND chưa được gắn với phường quản lý.');
       return this.prisma.mealPlan.findMany({
-        where: { school: { wardId: user.wardId } },
+        where: { school: { wardId: user.wardId }, revisions: { some: { status: 'APPROVED' } } },
         orderBy: [{ serviceDate: 'desc' }, { mealType: 'asc' }],
         include: { school: { select: { id: true, name: true } }, kitchen: { select: { id: true, code: true, name: true } }, revisions: {
-          orderBy: { revisionNo: 'desc' }, take: 1, include: this.revisionInclude(),
+          where: { status: 'APPROVED' }, orderBy: { revisionNo: 'desc' }, take: 1, include: this.revisionInclude(),
         } },
       });
     }
@@ -89,13 +89,13 @@ export class MealPlansService {
       where = { id: mealPlanId, schoolId: user.schoolId };
     } else if (user.role === 'UBND_ADMIN') {
       if (!user.wardId) throw new ForbiddenException('Tài khoản UBND chưa được gắn với phường quản lý.');
-      where = { id: mealPlanId, school: { wardId: user.wardId } };
+      where = { id: mealPlanId, school: { wardId: user.wardId }, revisions: { some: { status: 'APPROVED' } } };
     } else {
       throw new ForbiddenException('Chỉ tài khoản Nhà trường và UBND được xem lịch sử thực đơn.');
     }
     const plan = await this.prisma.mealPlan.findFirst({
       where,
-      include: { school: { select: { id: true, name: true } }, revisions: { orderBy: { revisionNo: 'desc' }, include: this.revisionInclude() } },
+      include: { school: { select: { id: true, name: true } }, revisions: { ...(user.role === 'UBND_ADMIN' ? { where: { status: 'APPROVED' as const } } : {}), orderBy: { revisionNo: 'desc' }, include: this.revisionInclude() } },
     });
     if (!plan) throw new NotFoundException('Không tìm thấy thực đơn trong phạm vi được phép xem.');
     return plan;
