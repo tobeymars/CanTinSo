@@ -85,6 +85,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   }, [])
   // Recalculate after writes in this tab and cross-tab storage changes.
   void revision
+  const statusLabel = (status: CheckStatus) => serverMode && status === 'confirmed' ? 'Đã xác nhận' : labels[status]
   const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
   const ingredientCatalog = useMemo(() => supervisionIngredientCatalog(school.id), [school.id])
   const evidenceOptions = editing ? supervisionEvidenceCatalog(scope, editing.id) : []
@@ -161,7 +162,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
               {showHistory && (canReport || canConfirm) && item.history.length > 0 && <ol className="supervision-status-history">{item.history.map(entry => <li key={entry.id}><strong>{actionLabels[entry.action]}</strong> · {formatTimestamp(entry.recordedAt)} · {entry.note}</li>)}</ol>}
             </div>
             <div className="supervision-check-controls">
-              <span className={`supervision-check-pill ${item.status}`}>{item.status === 'confirmed' ? <CheckCircle2 size={13}/> : <Clock3 size={13}/>} {labels[item.status]}</span>
+              <span className={`supervision-check-pill ${item.status}`}>{item.status === 'confirmed' ? <CheckCircle2 size={13}/> : <Clock3 size={13}/>} {statusLabel(item.status)}</span>
               {canReport && (item.status === 'not_reported' || item.status === 'revision_requested') && <button className="outline" type="button" onClick={() => start(def.id, 'report')}>Cập nhật</button>}
               {canConfirm && item.status === 'reported' && <><button className="primary" type="button" onClick={() => start(def.id, 'confirm')}>Xác nhận</button><button className="outline" type="button" onClick={() => start(def.id, 'request_revision')}>Yêu cầu bổ sung</button></>}
             </div>
