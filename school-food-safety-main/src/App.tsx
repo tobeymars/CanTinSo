@@ -89,6 +89,7 @@ import "./components/react-bits/integration.css";
 const AdminPanel = lazy(() => import("./Admin"));
 const CanteenGallery = lazy(() => import("./CanteenGallery"));
 const PortionTracePage = lazy(() => import("./PortionTracePage"));
+const RealDishQrTracePage = lazy(() => import("./RealDishQrTracePage"));
 const BoardingMenuManager = lazy(() => import("./BoardingMenuManager"));
 const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
 const DishApprovalInbox = lazy(() => import("./DishApprovalInbox"));
@@ -1170,7 +1171,7 @@ function Shell() {
           </div>
         }
       >
-        <PortionTracePage token={portionToken} />
+        {/^[A-Za-z0-9_-]{32}$/.test(portionToken) ? <RealDishQrTracePage token={portionToken} /> : <PortionTracePage token={portionToken} />}
       </Suspense>
     );
   // Không cho mở màn hình đã bị loại bỏ bằng URL nhập trực tiếp.
