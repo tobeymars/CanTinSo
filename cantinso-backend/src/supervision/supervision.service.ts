@@ -8,6 +8,11 @@ const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sa
 const stages = ['DISPATCHED', 'ARRIVED', 'PLATED', 'READY'];
 const asObject = (v: unknown): Record<string, any> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, any> : {};
 const asArray = (v: unknown): any[] => Array.isArray(v) ? v : [];
+const canonical = (value: unknown): string => JSON.stringify(value, (_key, entry:unknown) =>
+  entry && typeof entry === 'object' && !Array.isArray(entry)
+    ? Object.fromEntries(Object.entries(entry).sort(([a],[b])=>a.localeCompare(b)))
+    : entry);
+
 @Injectable()
 export class SupervisionService {
   constructor(private readonly prisma: PrismaService) {}
@@ -64,7 +69,10 @@ export class SupervisionService {
   async read(user: AuthUser, schoolId: string, date: string, mealType: string) {
     const s = await this.scope(user,schoolId,date,mealType);
     const record = await this.prisma.supervisionMeal.findUnique({where:this.key(s),include:{events:{orderBy:{createdAt:'asc'}}}});
-    return {checks:asObject(record?.checks),stages:asObject(record?.stages),approvals:asArray(record?.approvals),events:record?.events??[]};
+    const checks=asObject(record?.checks), stages=asObject(record?.stages), approvals=asArray(record?.approvals);
+    const snapshot=canonical({checks,journey:stages});
+    const latest=approvals.at(-1);
+    return {checks,stages,approvals,approvalCurrent:!!latest && latest.snapshot===snapshot,events:record?.events??[]};
   }
   async act(user: AuthUser, schoolId: string, date: string, mealType: string, body: any) {
     const s = await this.scope(user,schoolId,date,mealType);
@@ -131,7 +139,7 @@ export class SupervisionService {
         const kitchen = await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}});
         const required = kitchen?.type==='CENTRAL' ? stages : ['PLATED','READY'];
         if (checkIds.some(id=>checks[id]?.status!=='confirmed') || required.some(id=>!journey[id]?.confirmed)) throw new ConflictException('Chưa đủ điều kiện xác nhận tổng thể.');
-        const snapshot = JSON.stringify({checks,journey});
+        const snapshot = canonical({checks,journey});
         if (approvals.at(-1)?.snapshot===snapshot) throw new ConflictException('Đã xác nhận tổng thể.');
         approvals.push({...entry,snapshot});
       }
