@@ -115,8 +115,11 @@
 .real-qr-empty p{font-size:12px;line-height:1.6;max-width:440px;margin:0}
 .real-qr-revoke{border-color:color-mix(in srgb,var(--danger) 25%,var(--border));background:color-mix(in srgb,var(--danger-soft) 36%,var(--surface))}
 .real-qr-revoke>p{font-size:12px;line-height:1.6;color:var(--muted);margin:0 0 16px}
-.real-qr-revoke form{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
-.real-qr-revoke .real-qr-field{flex:1 1 260px}
+.real-qr-revoke form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;column-gap:14px;row-gap:12px}
+.real-qr-revoke .real-qr-field{min-width:0;display:grid;grid-template-rows:auto 48px;gap:8px}
+.real-qr-revoke .real-qr-field input{height:48px;min-height:48px;margin:0}
+.real-qr-revoke form>.real-qr-btn{height:48px;min-height:48px;align-self:end;margin:0;min-width:136px}
+@media(max-width:650px){.real-qr-revoke form{grid-template-columns:minmax(0,1fr)}.real-qr-revoke form>.real-qr-btn{width:100%}}
 .real-qr-alert{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:12px;font-size:13px;line-height:1.5}
 .real-qr-alert svg{flex:none}.real-qr-alert-error{color:var(--danger);background:var(--danger-soft);border:1px solid color-mix(in srgb,var(--danger) 25%,var(--border))}
 .real-qr-alert-success{color:var(--success);background:var(--success-soft);border:1px solid color-mix(in srgb,var(--success) 25%,var(--border))}
