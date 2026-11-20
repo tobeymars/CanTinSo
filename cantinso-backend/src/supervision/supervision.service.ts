@@ -39,7 +39,7 @@ export class SupervisionService {
   }
   async context(user: AuthUser, schoolId: string, date: string, mealType: string) {
     const scope = await this.scope(user, schoolId, date, mealType);
-    const [plan, lots, kitchen] = await Promise.all([
+    const [plan, lots, kitchen, legalDocuments] = await Promise.all([
       this.prisma.mealPlan.findUnique({
         where: {schoolId_serviceDate_mealType: {schoolId:scope.schoolId,serviceDate:scope.serviceDate,mealType:scope.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
         include: {revisions: {where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,include:{items:{include:{dishVersion:{include:{dish:true}}}}}}}},
@@ -51,9 +51,11 @@ export class SupervisionService {
         take:200,
       }),
       this.prisma.kitchen.findUnique({where:{id:scope.kitchenId},select:{id:true,name:true,type:true}}),
+      this.prisma.kitchenLegalDocument.findMany({where:{kitchenId:scope.kitchenId},select:{id:true,title:true,status:true,expiresAt:true},orderBy:{updatedAt:'desc'}}),
     ]);
     return {
       schoolId:scope.schoolId,serviceDate:date,mealType,kitchen,
+      legalDocuments:legalDocuments.map(doc=>({...doc,expiresAt:doc.expiresAt?.toISOString().slice(0,10)??null})),
       menu:plan ? {id:plan.id,servings:plan.servings,status:plan.revisions[0]?.status ?? plan.status,
         dishes:plan.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name})) ?? []} : null,
       lots:lots.map(lot=>({
