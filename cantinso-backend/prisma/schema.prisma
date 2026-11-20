@@ -137,6 +137,8 @@ model User {
   proposedMealPlanRevisions MealPlanRevision[]      @relation("MealPlanRevisionProposedBy")
   decidedMealPlanRevisions  MealPlanRevision[]      @relation("MealPlanRevisionDecidedBy")
   mealPlanApprovalEvents    MealPlanApprovalEvent[] @relation("MealPlanApprovalEventActor")
+  issuedDishQrs             DishQr[] @relation("DishQrIssuedBy")
+  revokedDishQrs            DishQr[] @relation("DishQrRevokedBy")
   createdAt                 DateTime                @default(now()) @map("created_at")
   updatedAt                 DateTime                @updatedAt @map("updated_at")
 
@@ -176,6 +178,7 @@ model School {
   suppliers            Supplier[]
   inventoryLots        InventoryLot[]
   mealPlans            MealPlan[]
+  dishQrs              DishQr[]
   dishApprovals        DishApproval[]
   foodSafetyChecks     FoodSafetyCheck[]
   hikvisionEnrollments HikvisionStudentEnrollment[]
@@ -203,6 +206,7 @@ model Kitchen {
   users       User[]
   dishes      Dish[]
   mealPlans   MealPlan[]
+  dishQrs     DishQr[]
   schools     KitchenSchoolAssignment[]
   createdAt   DateTime                  @default(now()) @map("created_at")
   updatedAt   DateTime                  @updatedAt @map("updated_at")
@@ -380,6 +384,7 @@ model MealPlan {
   status      String             @default("DRAFT") // legacy status; revision is target workflow source
   items       MealPlanItem[] // legacy relation retained for compatibility
   revisions   MealPlanRevision[]
+  dishQrs     DishQr[]
   createdAt   DateTime           @default(now()) @map("created_at")
 
   @@unique([schoolId, serviceDate, mealType])
@@ -543,6 +548,7 @@ model MealPlanRevision {
   ageGroups    MealPlanRevisionAgeGroup[]
   items        MealPlanRevisionItem[]
   events       MealPlanApprovalEvent[]
+  dishQrs      DishQr[]
 
   @@unique([mealPlanId, revisionNo])
   @@index([mealPlanId, status])
@@ -560,6 +566,7 @@ model MealPlanAgeGroup {
   isActive     Boolean                       @default(true) @map("is_active")
   revisionRows MealPlanRevisionAgeGroup[]
   portionRows  MealPlanItemAgeGroupPortion[]
+  dishQrs      DishQr[]
 
   @@map("meal_plan_age_groups")
 }
@@ -589,6 +596,7 @@ model MealPlanRevisionItem {
   revision      MealPlanRevision              @relation(fields: [revisionId], references: [id], onDelete: Restrict)
   dishVersion   DishVersion                   @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
   portions      MealPlanItemAgeGroupPortion[]
+  dishQrs       DishQr[]
 
   @@unique([revisionId, mealSlot, dishVersionId])
   @@index([dishVersionId])
@@ -669,4 +677,33 @@ model IngredientNutritionProfile {
   @@index([nutritionReferenceId, sourceCategory])
   @@index([ingredientId])
   @@map("ingredient_nutrition_profiles")
+}
+
+model DishQr {
+  id             String    @id @default(uuid()) @db.Uuid
+  publicToken    String    @unique @map("public_token")
+  schoolId       String    @map("school_id") @db.Uuid
+  kitchenId      String    @map("kitchen_id") @db.Uuid
+  mealPlanId     String    @map("meal_plan_id") @db.Uuid
+  revisionId     String    @map("revision_id") @db.Uuid
+  revisionItemId String    @map("revision_item_id") @db.Uuid
+  ageGroupId     String    @map("age_group_id") @db.Uuid
+  issuedById     String    @map("issued_by_id") @db.Uuid
+  issuedAt       DateTime  @default(now()) @map("issued_at")
+  revokedAt      DateTime? @map("revoked_at")
+  revokedById    String?   @map("revoked_by_id") @db.Uuid
+  revokeReason   String?   @map("revoke_reason")
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  kitchen        Kitchen   @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  mealPlan       MealPlan  @relation(fields: [mealPlanId], references: [id], onDelete: Restrict)
+  revision       MealPlanRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  revisionItem   MealPlanRevisionItem @relation(fields: [revisionItemId], references: [id], onDelete: Restrict)
+  ageGroup       MealPlanAgeGroup @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+  issuedBy       User      @relation("DishQrIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  revokedBy      User?     @relation("DishQrRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@unique([revisionId, revisionItemId, ageGroupId])
+  @@index([schoolId, issuedAt])
+  @@index([kitchenId, issuedAt])
+  @@map("dish_qrs")
 }
