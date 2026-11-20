@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { CheckCircle2, ExternalLink, Printer, QrCode, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Printer, QrCode, RefreshCw, Search, ShieldAlert, CalendarDays, School, UtensilsCrossed } from 'lucide-react';
 import { getAccessToken, getStoredUser } from './lib/authApi';
 import type { MealPlanRow } from './lib/mealPlanApi';
 import './PortionQr.css';
@@ -68,57 +68,88 @@ export default function RealDishQrPanel() {
   const missingCount = typeof registry?.missingCount === 'number' ? registry.missingCount : null;
   const rows = (registry?.records ?? []).filter(row => (showRevoked || row.state === 'ACTIVE') && `${row.dishName} ${row.ageGroup}`.toLocaleLowerCase('vi').includes(filter.toLocaleLowerCase('vi')));
   const active = registry?.records.filter(row => row.state === 'ACTIVE') ?? [];
-  return <section className="portion-qr-page real-qr-workspace">
-    <div className="card portion-qr-card">
-      <div className="card-header"><div><span className="section-kicker">TRUY XUẤT MÓN ĂN · DỮ LIỆU HỆ THỐNG</span><h2>Quản lý mã QR món ăn</h2><p className="muted">Mỗi mã gắn với một món, nhóm tuổi và phiên bản thực đơn đã được BGH duyệt.</p></div><QrCode size={30}/></div>
-      <div className="portion-qr-filters" style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'end',margin:'18px 0'}}>
-        <label style={{flex:'1 1 300px'}}>Trường · Ngày · Bữa ăn
-          <select value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={loading || busy} style={{display:'block',width:'100%',marginTop:7,padding:11,borderRadius:9}}>
-            {!plans.length && <option value="">Chưa có thực đơn</option>}
-            {plans.map(plan => <option key={plan.id} value={plan.id}>{plan.school?.name ?? 'Trường học'} · {new Date(plan.serviceDate).toLocaleDateString('vi-VN')} · {mealName(plan.mealType)}</option>)}
-          </select>
-        </label>
-        <button type="button" className="outline" onClick={() => { void loadPlans(); if (selectedId) void loadRegistry(selectedId); }} disabled={busy}><RefreshCw size={16}/>Tải lại</button>
+  return <section className="real-qr-workspace">
+    <header className="real-qr-hero">
+      <div className="real-qr-hero-icon"><QrCode size={26}/></div>
+      <div className="real-qr-hero-copy">
+        <span className="real-qr-eyebrow">QUẢN LÝ TRUY XUẤT</span>
+        <h2>QR từng món ăn</h2>
+        <p>Phát hành, in và theo dõi mã truy xuất từ thực đơn đã được Ban Giám hiệu phê duyệt.</p>
       </div>
-      {error && <p className="error portion-error" role="alert">{error}</p>}
-      {notice && <p className="inventory-success" role="status"><CheckCircle2 size={17}/>{notice}</p>}
-      {selected && registry && <>
-        <div className="portion-privacy"><ShieldAlert size={19}/><p><strong>Phiên bản {selected.revisions[0]?.revisionNo ?? '—'} · {registry.plan.status === 'APPROVED' ? 'Đã duyệt' : 'Chưa được duyệt'}.</strong> QR chỉ có hiệu lực khi phiên bản thực đơn mới nhất được duyệt và mã chưa bị thu hồi. Thông tin lô nguyên liệu chưa được xác minh sẽ không hiển thị như dữ liệu thực tế.</p></div>
-        <p className="muted" style={{margin:'12px 0'}}>Món trong thực đơn đã duyệt: <strong>{approvedDishNames.join(', ') || 'Chưa có dữ liệu từ API'}</strong>. Dự kiến {expectedCount ?? '—'} mã QR; còn thiếu {missingCount ?? '—'} mã.</p>
-        {missingCount === null && <p role="status" className="muted" style={{margin:'8px 0 16px'}}>API QR chưa trả về số lượng mã cần phát hành. Hãy khởi động lại backend để nhận phiên bản mới.</p>}
-        <div className="portion-qr-summary">
-          <div className="card"><QrCode/><strong>{active.length}</strong><span>QR đang hiệu lực</span></div>
-          <div className="card"><CheckCircle2/><strong>{registry.records.length}</strong><span>Tổng mã đã phát hành</span></div>
-          <div className="card"><ShieldAlert/><strong>{registry.records.length - active.length}</strong><span>QR hết hiệu lực</span></div>
+      <button type="button" className="real-qr-btn real-qr-btn-light" onClick={() => { void loadPlans(); if (selectedId) void loadRegistry(selectedId); }} disabled={busy || loading}><RefreshCw size={16}/> Làm mới</button>
+    </header>
+
+    <section className="real-qr-surface real-qr-picker">
+      <div className="real-qr-section-title"><div><span className="real-qr-step">01</span><h3>Chọn thực đơn</h3></div><p>Chọn trường, ngày phục vụ và bữa ăn để xem mã QR tương ứng.</p></div>
+      <label className="real-qr-field"><span><CalendarDays size={16}/> Thực đơn cần quản lý</span>
+        <select value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={loading || busy}>
+          {!plans.length && <option value="">Chưa có thực đơn</option>}
+          {plans.map(plan => <option key={plan.id} value={plan.id}>{plan.school?.name ?? 'Trường học'} · {new Date(plan.serviceDate).toLocaleDateString('vi-VN')} · {mealName(plan.mealType)}</option>)}
+        </select>
+      </label>
+    </section>
+
+    {error && <div className="real-qr-alert real-qr-alert-error" role="alert"><AlertTriangle size={19}/><span>{error}</span></div>}
+    {notice && <div className="real-qr-alert real-qr-alert-success" role="status"><CheckCircle2 size={19}/><span>{notice}</span></div>}
+    {loading && <div className="real-qr-surface real-qr-empty" role="status">Đang tải thực đơn…</div>}
+    {!loading && !plans.length && <div className="real-qr-surface real-qr-empty"><UtensilsCrossed size={34}/><h3>Chưa có thực đơn</h3><p>Hãy lập thực đơn và gửi BGH phê duyệt trước khi phát hành QR.</p></div>}
+    {selected && !registry && !error && <div className="real-qr-surface real-qr-empty" role="status">Đang tải danh sách mã QR…</div>}
+
+    {selected && registry && <>
+      <div className="real-qr-metrics">
+        <div className="real-qr-metric"><span className="real-qr-metric-icon green"><CheckCircle2 size={21}/></span><div><strong>{active.length}</strong><span>Đang hiệu lực</span></div></div>
+        <div className="real-qr-metric"><span className="real-qr-metric-icon blue"><QrCode size={21}/></span><div><strong>{registry.records.length}</strong><span>Đã phát hành</span></div></div>
+        <div className="real-qr-metric"><span className="real-qr-metric-icon amber"><ShieldAlert size={21}/></span><div><strong>{registry.records.length - active.length}</strong><span>Hết hiệu lực</span></div></div>
+        <div className="real-qr-metric"><span className="real-qr-metric-icon violet"><UtensilsCrossed size={21}/></span><div><strong>{expectedCount ?? '—'}</strong><span>QR cần có</span></div></div>
+      </div>
+
+      <section className="real-qr-surface real-qr-overview">
+        <div className="real-qr-section-title"><div><span className="real-qr-step">02</span><h3>Thông tin phê duyệt</h3></div><span className={`real-qr-status ${registry.plan.status === 'APPROVED' ? 'approved' : 'pending'}`}>{registry.plan.status === 'APPROVED' ? <CheckCircle2 size={15}/> : <ShieldAlert size={15}/>} {registry.plan.status === 'APPROVED' ? 'Đã duyệt' : 'Chưa được duyệt'}</span></div>
+        <div className="real-qr-overview-grid">
+          <div><small><School size={15}/> Trường</small><strong>{registry.plan.schoolName}</strong></div>
+          <div><small><CalendarDays size={15}/> Ngày phục vụ</small><strong>{new Date(registry.plan.serviceDate).toLocaleDateString('vi-VN')}</strong></div>
+          <div><small><UtensilsCrossed size={15}/> Bữa ăn</small><strong>{mealName(registry.plan.mealType)}</strong></div>
+          <div><small>Phiên bản</small><strong>Lần {selected.revisions[0]?.revisionNo ?? '—'}</strong></div>
         </div>
-        {canIssue && <div className="portion-actions" style={{flexWrap:'wrap'}}>
-          <div><strong>Phát hành theo thực đơn được duyệt</strong><p>Không thể cấp lại mã đã thu hồi cho cùng phiên bản.</p></div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <button type="button" className="primary" disabled={busy || registry.plan.status !== 'APPROVED' || missingCount === null || missingCount === 0} onClick={() => void mutate('issue')}><QrCode size={16}/>{registry.records.length ? 'Bổ sung QR còn thiếu' : 'Phát hành QR'}</button>
-            <button type="button" className="outline" disabled={busy || !active.length} onClick={() => window.print()}><Printer size={16}/>In QR</button>
-          </div>
-        </div>}
-        {canIssue && active.length > 0 && <form className="portion-reissue" onSubmit={event => { event.preventDefault(); void mutate('revoke'); }}>
-          <label>Lý do thu hồi mã QR<input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={300} required placeholder="Nhập lý do thu hồi (tối thiểu 8 ký tự)"/></label>
-          <button type="submit" className="outline" disabled={busy || reason.trim().length < 8}>Thu hồi QR đang hiệu lực</button>
-        </form>}
-        <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',margin:'18px 0'}}>
-          <input aria-label="Tìm món hoặc nhóm tuổi" placeholder="Tìm món ăn hoặc nhóm tuổi…" value={filter} onChange={event => setFilter(event.target.value)} style={{flex:'1 1 230px',padding:11,borderRadius:9,border:'1px solid var(--border)'}}/>
-          <label><input type="checkbox" checked={showRevoked} onChange={event => setShowRevoked(event.target.checked)}/> Hiện mã đã thu hồi</label>
+        <div className="real-qr-approved-dishes"><strong>Món trong thực đơn</strong><div>{approvedDishNames.length ? approvedDishNames.map((name,index)=><span key={index}>{name}</span>) : <em>Chưa có dữ liệu món từ API</em>}</div></div>
+        <div className="real-qr-note"><ShieldAlert size={18}/><p>QR chỉ có hiệu lực khi phiên bản mới nhất đã được BGH duyệt. Thông tin công thức không đồng nghĩa với việc đã xác minh lô nguyên liệu thực tế.</p></div>
+      </section>
+
+      {canIssue && <section className="real-qr-surface real-qr-issue">
+        <div className="real-qr-section-title"><div><span className="real-qr-step">03</span><h3>Phát hành mã QR</h3></div>{missingCount !== null && <span className="real-qr-missing">{missingCount > 0 ? `Còn thiếu ${missingCount} mã` : 'Đã đủ mã'}</span>}</div>
+        <div className="real-qr-issue-content"><p>Mã được tạo riêng cho từng món ăn và nhóm tuổi. Không phát hành trùng mã đã tồn tại.</p><div className="real-qr-issue-buttons">
+          <button type="button" className="real-qr-btn real-qr-btn-primary" disabled={busy || registry.plan.status !== 'APPROVED' || missingCount === null || missingCount === 0} onClick={() => void mutate('issue')}><QrCode size={17}/>{registry.records.length ? 'Bổ sung QR còn thiếu' : 'Phát hành QR'}</button>
+          <button type="button" className="real-qr-btn real-qr-btn-outline" disabled={busy || !active.length} onClick={() => window.print()}><Printer size={17}/> In mã QR</button>
+        </div></div>
+        {missingCount === null && <p className="real-qr-hint">Backend chưa trả về số lượng mã cần phát hành. Hãy khởi động lại backend phiên bản mới.</p>}
+      </section>}
+
+      <section className="real-qr-surface real-qr-registry">
+        <div className="real-qr-section-title"><div><span className="real-qr-step">{canIssue ? '04' : '03'}</span><h3>Danh sách mã QR</h3></div><span className="real-qr-count">{rows.length} mã hiển thị</span></div>
+        <div className="real-qr-tools">
+          <label className="real-qr-search"><Search size={18}/><input aria-label="Tìm món hoặc nhóm tuổi" placeholder="Tìm tên món ăn, nhóm tuổi…" value={filter} onChange={event => setFilter(event.target.value)}/></label>
+          <label className="real-qr-check"><input type="checkbox" checked={showRevoked} onChange={event => setShowRevoked(event.target.checked)}/><span>Hiện mã hết hiệu lực</span></label>
         </div>
-        <div className="real-qr-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))',gap:14}}>
-          {rows.map(row => { const url = `${window.location.origin}/truy-xuat-suat/${row.token}`; return <article className="card real-qr-print-card" key={row.id} style={{padding:18,textAlign:'center'}}>
-            <span className="section-kicker">{row.state === 'ACTIVE' ? 'ĐANG HIỆU LỰC' : 'ĐÃ HẾT HIỆU LỰC'}</span>
-            <h3 style={{fontSize:16,margin:'10px 0 4px'}}>{row.dishName}</h3><p className="muted" style={{marginBottom:14}}>{row.ageGroup}</p>
-            <QRCodeSVG value={url} size={170} level="M" marginSize={2}/>
-            <p style={{marginTop:12,fontSize:11,overflowWrap:'anywhere'}}>{registry.plan.schoolName} · {new Date(registry.plan.serviceDate).toLocaleDateString('vi-VN')}</p>
-            <a href={url} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',gap:6,alignItems:'center',marginTop:8}}><ExternalLink size={14}/>Xem trang truy xuất</a>
+        <div className="real-qr-grid">
+          {rows.map(row => { const url = `${window.location.origin}/truy-xuat-suat/${row.token}`; return <article className="real-qr-print-card" key={row.id}>
+            <div className="real-qr-card-head"><span className={`real-qr-status ${row.state === 'ACTIVE' ? 'approved' : 'pending'}`}>{row.state === 'ACTIVE' ? 'Đang hiệu lực' : 'Hết hiệu lực'}</span><small>{row.ageGroup}</small></div>
+            <h4>{row.dishName}</h4>
+            <div className="real-qr-code"><QRCodeSVG value={url} size={166} level="M" marginSize={2}/></div>
+            <div className="real-qr-card-foot"><p>{registry.plan.schoolName} · {new Date(registry.plan.serviceDate).toLocaleDateString('vi-VN')}</p><a href={url} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/> Xem trang truy xuất</a></div>
           </article>; })}
         </div>
-        {!rows.length && <p className="portion-empty">Chưa có mã QR phù hợp. {canIssue && registry.plan.status === 'APPROVED' && (missingCount ?? 0) > 0 ? 'Chọn Phát hành QR để tạo mã.' : ''}</p>}
-      </>}
-      {!loading && !plans.length && <div className="portion-empty"><QrCode size={36}/><h3>Chưa có thực đơn</h3><p>Cần lập thực đơn, gửi và được BGH duyệt trước khi phát hành QR.</p></div>}
-    </div>
+        {!rows.length && <div className="real-qr-empty"><QrCode size={32}/><h3>Chưa có mã QR phù hợp</h3><p>{canIssue && registry.plan.status === 'APPROVED' && (missingCount ?? 0) > 0 ? 'Hãy phát hành mã QR cho các món trong thực đơn đã duyệt.' : 'Thử thay đổi bộ lọc hoặc chọn thực đơn khác.'}</p></div>}
+      </section>
+
+      {canIssue && active.length > 0 && <section className="real-qr-surface real-qr-revoke">
+        <div className="real-qr-section-title"><div><span className="real-qr-step muted">!</span><h3>Thu hồi mã QR</h3></div></div>
+        <p>Chỉ sử dụng khi mã không còn phù hợp. Thao tác này sẽ thu hồi toàn bộ QR đang hiệu lực của phiên bản thực đơn đã chọn.</p>
+        <form onSubmit={event => { event.preventDefault(); if (window.confirm('Thu hồi toàn bộ mã QR đang hiệu lực của phiên bản này?')) void mutate('revoke'); }}>
+          <label className="real-qr-field"><span>Lý do thu hồi</span><input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={300} required placeholder="Nhập lý do cụ thể (ít nhất 8 ký tự)"/></label>
+          <button type="submit" className="real-qr-btn real-qr-btn-danger" disabled={busy || reason.trim().length < 8}>Thu hồi QR</button>
+        </form>
+      </section>}
+    </>}
     <style>{`@media print { body * { visibility:hidden!important } .real-qr-workspace .real-qr-print-card, .real-qr-workspace .real-qr-print-card * {visibility:visible!important} .real-qr-grid{position:absolute;left:0;top:0;display:grid!important;grid-template-columns:repeat(2,1fr)!important;width:100%;gap:15px} .real-qr-print-card{break-inside:avoid;border:1px solid #bbb!important} }`}</style>
   </section>;
 }
