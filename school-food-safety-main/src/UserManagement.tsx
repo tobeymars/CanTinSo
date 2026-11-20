@@ -13,17 +13,19 @@ import { getStoredUser } from "./lib/authApi";
 import "./UserManagement.css";
 import CentralKitchenManagement from "./CentralKitchenManagement";
 
-type Role = "UBND_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
-type FormState = { fullName: string; email: string; password: string; role: Role; wardId: string };
+type Role = "UBND_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
+type FormState = { fullName: string; email: string; password: string; role: Role; wardId: string; schoolId: string };
 const emptyForm = (isSuperAdmin: boolean): FormState => ({
   fullName: "",
   email: "",
   password: "",
   role: isSuperAdmin ? "UBND_ADMIN" : "SCHOOL_KITCHEN",
   wardId: "",
+  schoolId: "",
 });
 const roleLabel = (role: string) =>
   role === "UBND_ADMIN" ? "Cán bộ UBND phường" :
+  role === "SCHOOL_ADMIN" ? "Ban Giám hiệu" :
   role === "SCHOOL_KITCHEN" ? "Bếp tại trường" :
   role === "SCHOOL_STAFF" ? "Nhân viên trường" : role;
 
@@ -32,6 +34,7 @@ export default function UserManagement() {
   const isSuperAdmin = currentRole === "SUPER_ADMIN";
   const isWardAdmin = currentRole === "UBND_ADMIN";
   const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [schools, setSchools] = useState<ManagedSchool[]>([]);
   const [wards, setWards] = useState<ManagedSchool["ward"][]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -60,8 +63,9 @@ export default function UserManagement() {
         schoolRows.forEach(school => {
           if (school.ward) uniqueWards.set(school.ward.id, school.ward);
         });
+        setSchools(schoolRows.sort((a, b) => a.name.localeCompare(b.name, "vi")));
         setWards(Array.from(uniqueWards.values()).sort((a, b) => a.name.localeCompare(b.name, "vi")));
-        setUsers(userRows.filter(user => user.role === "UBND_ADMIN"));
+        setUsers(userRows.filter(user => user.role === "UBND_ADMIN" || user.role === "SCHOOL_ADMIN"));
       } else {
         setUsers(userRows.filter(user => user.role === "SCHOOL_KITCHEN" || user.role === "SCHOOL_STAFF"));
       }
@@ -91,6 +95,7 @@ export default function UserManagement() {
       password: "",
       role: user.role as Role,
       wardId: user.wardId ?? "",
+      schoolId: user.schoolId ?? "",
     });
     setShowForm(true);
     setError("");
@@ -115,10 +120,11 @@ export default function UserManagement() {
           email: form.email.trim(),
           password: form.password,
           role: form.role,
-          ...(isSuperAdmin ? { wardId: form.wardId } : {}),
+          ...(isSuperAdmin && form.role === "UBND_ADMIN" ? { wardId: form.wardId } : {}),
+          ...(isSuperAdmin && form.role === "SCHOOL_ADMIN" ? { schoolId: form.schoolId } : {}),
         });
         setNotice(isSuperAdmin
-          ? "Đã tạo tài khoản UBND phường và gán địa bàn quản lý."
+          ? form.role === "SCHOOL_ADMIN" ? "Đã tạo tài khoản Ban Giám hiệu và gán trường." : "Đã tạo tài khoản UBND phường và gán địa bàn quản lý."
           : "Đã tạo tài khoản mới. Tài khoản được gán vào trường của bạn.");
       }
       setShowForm(false);
@@ -174,15 +180,15 @@ export default function UserManagement() {
       <div className="um-intro">
         <div>
           <span className="um-eyebrow"><ShieldCheck size={15} /> {isSuperAdmin ? "QUẢN TRỊ TỔ CHỨC" : "QUẢN TRỊ TRONG PHẠM VI TRƯỜNG"}</span>
-          <h2>{isSuperAdmin ? "Quản lý tài khoản UBND" : "Quản lý tài khoản"}</h2>
+          <h2>{isSuperAdmin ? "Quản lý tài khoản UBND và BGH" : "Quản lý tài khoản"}</h2>
           <p>{isSuperAdmin
-            ? "Tạo và quản lý tài khoản cán bộ UBND, gắn mỗi tài khoản với một phường."
+            ? "Tạo tài khoản UBND theo phường và Ban Giám hiệu theo trường; quản lý trạng thái và mật khẩu."
             : "Tạo và quản lý tài khoản Bếp tại trường, Nhân viên trường thuộc đơn vị của bạn."}</p>
         </div>
         <button className="um-primary" onClick={openCreate}><Plus size={17} /> Tạo tài khoản</button>
       </div>
       <div className="um-stats">
-        <div><Users /><span><strong>{users.length}</strong><small>{isSuperAdmin ? "Tài khoản UBND" : "Tổng tài khoản"}</small></span></div>
+        <div><Users /><span><strong>{users.length}</strong><small>{isSuperAdmin ? "Tài khoản UBND và BGH" : "Tổng tài khoản"}</small></span></div>
         <div><UserRound /><span><strong>{users.filter(u => u.isActive).length}</strong><small>Đang hoạt động</small></span></div>
         <div><UserRoundX /><span><strong>{users.filter(u => !u.isActive).length}</strong><small>Đã khóa</small></span></div>
       </div>
@@ -195,12 +201,12 @@ export default function UserManagement() {
       {loading ? <div className="um-empty">Đang tải danh sách tài khoản...</div> : filtered.length === 0 ? <div className="um-empty">Không tìm thấy tài khoản phù hợp.</div> : (
         <div className="um-table-wrap">
           <table className="um-table">
-            <thead><tr><th>Tài khoản</th><th>Vai trò</th>{isSuperAdmin && <th>Phường quản lý</th>}<th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th>Tài khoản</th><th>Vai trò</th>{isSuperAdmin && <th>Đơn vị quản lý</th>}<th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead>
             <tbody>{filtered.map(user => (
               <tr key={user.id}>
                 <td><strong>{user.fullName}</strong><small>{user.email}</small></td>
                 <td>{roleLabel(user.role)}</td>
-                {isSuperAdmin && <td>{wardName(user.wardId)}</td>}
+                {isSuperAdmin && <td>{user.role === "SCHOOL_ADMIN" ? (schools.find(school => school.id === user.schoolId)?.name ?? "Chưa xác định") : wardName(user.wardId)}</td>}
                 <td><span className={`um-status ${user.isActive ? "active" : "inactive"}`}>{user.isActive ? "Đang hoạt động" : "Đã khóa"}</span></td>
                 <td>{new Date(user.createdAt).toLocaleDateString("vi-VN")}</td>
                 <td><div className="um-actions">
@@ -214,7 +220,7 @@ export default function UserManagement() {
         </div>
       )}
       <p className="um-footnote">{isSuperAdmin
-        ? "Tài khoản UBND được giới hạn dữ liệu theo phường được gán. Việc đổi phường cần được thực hiện qua quy trình quản trị có kiểm soát."
+        ? "Tài khoản UBND gắn với một phường; tài khoản BGH gắn với một trường. Không thay đổi đơn vị quản lý qua thao tác chỉnh sửa thông thường."
         : "Tài khoản Ban Giám Hiệu, Quản trị hệ thống và các đơn vị khác không nằm trong phạm vi chỉnh sửa tại đây."}</p>
 
       {showForm && <div className="um-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
@@ -225,21 +231,38 @@ export default function UserManagement() {
           {!editing && <label>Mật khẩu ban đầu<input required type="password" minLength={8} maxLength={100} autoComplete="new-password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /><small>Tối thiểu 8 ký tự.</small></label>}
           {isSuperAdmin ? (
             <>
-              <label>Vai trò<input value="Cán bộ UBND phường" readOnly /></label>
-              <label>Phường quản lý
-                <select required value={form.wardId} disabled={!!editing} onChange={e => setForm({ ...form, wardId: e.target.value })}>
-                  <option value="">Chọn phường</option>
-                  {wards.filter((ward): ward is NonNullable<ManagedSchool["ward"]> => !!ward).map(ward => <option key={ward.id} value={ward.id}>{ward.name}{ward.code ? ` · ${ward.code}` : ""}</option>)}
+              <label>Vai trò
+                <select value={form.role} disabled={!!editing} onChange={e => setForm({ ...form, role: e.target.value as Role, wardId: "", schoolId: "" })}>
+                  <option value="UBND_ADMIN">Cán bộ UBND phường</option>
+                  <option value="SCHOOL_ADMIN">Ban Giám hiệu</option>
                 </select>
-                <small>{editing ? "Không thể đổi phường trong thao tác chỉnh sửa thông thường." : "Tài khoản chỉ xem được các trường thuộc phường được chọn."}</small>
               </label>
-              {!editing && wards.length === 0 && <div className="um-error" role="alert">Chưa tìm thấy phường có trường học. Vui lòng kiểm tra dữ liệu phường và trường trước khi tạo tài khoản.</div>}
+              {form.role === "UBND_ADMIN" ? (
+                <label>Phường quản lý
+                  <select required value={form.wardId} disabled={!!editing} onChange={e => setForm({ ...form, wardId: e.target.value })}>
+                    <option value="">Chọn phường</option>
+                    {wards.filter((ward): ward is NonNullable<ManagedSchool["ward"]> => !!ward).map(ward => <option key={ward.id} value={ward.id}>{ward.name}{ward.code ? ` · ${ward.code}` : ""}</option>)}
+                  </select>
+                  <small>{editing ? "Không thể đổi phường khi chỉnh sửa tài khoản." : "Tài khoản chỉ truy cập các trường thuộc phường được chọn."}</small>
+                </label>
+              ) : (
+                <label>Trường quản lý
+                  <select required value={form.schoolId} disabled={!!editing} onChange={e => setForm({ ...form, schoolId: e.target.value })}>
+                    <option value="">Chọn trường</option>
+                    {schools.map(school => <option key={school.id} value={school.id}>{school.name}{school.ward ? ` · ${school.ward.name}` : ""}</option>)}
+                  </select>
+                  <small>{editing ? "Không thể đổi trường khi chỉnh sửa tài khoản." : "Tài khoản BGH chỉ quản lý trường được chọn."}</small>
+                </label>
+              )}
+              {!editing && (form.role === "UBND_ADMIN" ? wards.length === 0 : schools.length === 0) && (
+                <div className="um-error" role="alert">{form.role === "UBND_ADMIN" ? "Chưa tìm thấy phường có trường học." : "Chưa có trường học. Vui lòng tạo hồ sơ trường trước."}</div>
+              )}
             </>
           ) : (
             <label>Vai trò<select value={form.role} onChange={e => setForm({ ...form, role: e.target.value as Role })}><option value="SCHOOL_KITCHEN">Bếp tại trường</option><option value="SCHOOL_STAFF">Nhân viên trường</option></select></label>
           )}
           {error && <div className="um-error" role="alert">{error}</div>}
-          <div className="um-modal-actions"><button type="button" className="um-secondary" onClick={() => setShowForm(false)}>Hủy</button><button className="um-primary" disabled={busy || (isSuperAdmin && !editing && wards.length === 0)}>{busy ? "Đang lưu..." : editing ? "Lưu thay đổi" : "Tạo tài khoản"}</button></div>
+          <div className="um-modal-actions"><button type="button" className="um-secondary" onClick={() => setShowForm(false)}>Hủy</button><button className="um-primary" disabled={busy || (isSuperAdmin && !editing && (form.role === "UBND_ADMIN" ? wards.length === 0 : schools.length === 0))}>{busy ? "Đang lưu..." : editing ? "Lưu thay đổi" : "Tạo tài khoản"}</button></div>
         </form>
       </div>}
 
