@@ -21,6 +21,7 @@ export type ServerSupervision = {
   checks: Record<string,{status:string;evidenceRef?:string;ingredientReceipts?:unknown[];history?:unknown[]}>
   stages: Record<string,{confirmed:boolean;photos?:string[];note?:string;time?:string;confirmedAt?:string;confirmationNote?:string}>
   approvals: {snapshot:string;at:string;note:string}[]
+  approvalCurrent:boolean
 }
 export const readServerSupervision = (scope: SupervisionScope) => call<ServerSupervision>(scope)
 export const writeServerSupervision = (scope: SupervisionScope, body: Record<string,unknown>) =>
