@@ -828,9 +828,11 @@ function SupervisionSection({
               const dishNames = meal?.dishes.join(", ");
               const summary = dailyMenuError
                 ? "Chưa tải được thực đơn"
-                : dailyMenuLoading || !dailyMenu
-                  ? "Đang tải thực đơn…"
-                  : dishNames || "Chưa cập nhật món";
+                : isServerSupervisionScope({schoolId:school.id,serviceDate:date,mealType:option.value})
+                  ? "Xem thực đơn được duyệt"
+                  : dailyMenuLoading || !dailyMenu
+                    ? "Đang tải thực đơn…"
+                    : dishNames || "Chưa cập nhật món";
               return (
                 <button
                   type="button"
