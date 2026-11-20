@@ -758,3 +758,35 @@ model KitchenLegalEvent {
   @@index([documentId, createdAt])
   @@map("kitchen_legal_events")
 }
+
+
+model SupervisionMeal {
+  id String @id @default(uuid()) @db.Uuid
+  schoolId String @map("school_id") @db.Uuid
+  kitchenId String @map("kitchen_id") @db.Uuid
+  serviceDate DateTime @map("service_date") @db.Date
+  mealType String @map("meal_type")
+  checks Json @default("{}")
+  stages Json @default("{}")
+  approvals Json @default("[]")
+  events SupervisionEvent[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([schoolId, serviceDate, mealType])
+  @@index([kitchenId, serviceDate])
+  @@map("supervision_meals")
+}
+
+model SupervisionEvent {
+  id String @id @default(uuid()) @db.Uuid
+  mealId String @map("meal_id") @db.Uuid
+  meal SupervisionMeal @relation(fields: [mealId], references: [id], onDelete: Restrict)
+  actorId String @map("actor_id") @db.Uuid
+  actorRole String @map("actor_role")
+  action String
+  itemId String @map("item_id")
+  payload Json
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([mealId, createdAt])
+  @@map("supervision_events")
+}
