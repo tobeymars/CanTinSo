@@ -78,6 +78,8 @@ export default function UserManagement() {
   }
   useEffect(() => { void load(); }, []);
 
+  const wardName = (wardId: string | null) => wards.find(ward => ward?.id === wardId)?.name ?? "Chưa xác định";
+
   const filtered = useMemo(() => users.filter(user =>
     (roleFilter === "ALL" || user.role === roleFilter) &&
     `${user.fullName} ${user.email} ${roleLabel(user.role)} ${schools.find(s => s.id === user.schoolId)?.name ?? ""} ${wardName(user.wardId)}`.toLocaleLowerCase("vi").includes(keyword.toLocaleLowerCase("vi"))
@@ -173,7 +175,6 @@ export default function UserManagement() {
     }
   }
 
-  const wardName = (wardId: string | null) => wards.find(ward => ward?.id === wardId)?.name ?? "Chưa xác định";
 
   return (
     <>
