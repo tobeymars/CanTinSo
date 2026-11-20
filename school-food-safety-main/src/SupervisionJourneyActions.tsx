@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Activity, CheckCircle2, Clock3, Pencil, ShieldCheck, X } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { isServerSupervisionScope, readServerSupervision, writeServerSupervision } from './lib/supervisionApi'
 import type { DayData, School } from './lib/data'
 import type { ViewRole } from './lib/store'
 import type { JourneyStatus } from './lib/supervisionJourney'
@@ -27,6 +28,8 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   role: ViewRole
 }) {
   const scope: SupervisionScope = { schoolId: school.id, serviceDate: date, mealType }
+  const serverMode = isServerSupervisionScope(scope)
+  const serverQuery = useQuery({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType],queryFn:()=>readServerSupervision(scope),enabled:serverMode})
   const [revision, setRevision] = useState(0)
   const [editing, setEditing] = useState<Editing | null>(null)
   const [note, setNote] = useState('')
@@ -49,21 +52,24 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
     }
   }, [])
   void revision
-  const saved = getSavedJourney(scope)
+  const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:'Bếp',photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
   const stages = stagesForSchool(school.mode, role)
-  const next = getNextReportableStage(scope, school.mode, role)
+  const next = serverMode ? (()=>{const candidate=stages.find(stage=>!saved?.events.some(event=>event.status===stage));return candidate && (school.mode==='CENTRAL_KITCHEN' ? candidate==='DISPATCHED' ? role==='central_kitchen' : role==='school_kitchen' : role==='school_kitchen') ? candidate : null})() : getNextReportableStage(scope, school.mode, role)
   const pending = saved?.events.filter(event => !event.confirmed && stages.includes(event.status)) ?? []
   const isBoard = role === 'school_board'
   const canUpdate = !!next || (isBoard && pending.length > 0)
   const mealLabel = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
   const edit = (value: Editing) => { setEditing(value); setNote(''); setPhoto(''); setPhotoName(''); setError('') }
-  const save = (event: FormEvent<HTMLFormElement>) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!editing) return
     try {
-      updateJourney({ scope, school, data, role, status: editing.stage, action: editing.action, note, photo })
+      if(serverMode){
+        await writeServerSupervision(scope,{action:editing.action==='report'?'stage_report':'stage_confirm',itemId:editing.stage,note,photo})
+        await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
+      }else updateJourney({ scope, school, data, role, status: editing.stage, action: editing.action, note, photo })
       setEditing(null)
-      setNotice('Đã ghi nhận trạng thái mốc vận hành ' + mealLabel + ' trong DEMO.')
+      setNotice(serverMode ? 'Đã lưu mốc vận hành ' + mealLabel + '.' : 'Đã ghi nhận trạng thái mốc vận hành ' + mealLabel + ' trong DEMO.')
       for (const key of [['day'], ['week'], ['parent-meal-day'], ['supervision-meal-day']]) {
         void queryClient.invalidateQueries({ queryKey: key })
       }
