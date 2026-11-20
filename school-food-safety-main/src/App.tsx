@@ -1005,6 +1005,14 @@ function Shell() {
   const isWardWorkspace = role === "culture_social_office";
   const storedUser = getStoredUser();
   const isAuthenticatedWorkspace = !!storedUser;
+  // The bundled demo starts on 17/10/2026; real accounts must not inherit that historical date.
+  useEffect(() => {
+    if (isAuthenticatedWorkspace && date === "2026-10-17") {
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,10);
+      setDate(local);
+    }
+  }, [isAuthenticatedWorkspace, date, setDate]);
   const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
   const isRealCentralKitchen = storedUser?.role === "CENTRAL_KITCHEN" && !!storedUser?.kitchenId;
   const isRealKitchenAccount = (storedUser?.role === "CENTRAL_KITCHEN" || storedUser?.role === "SCHOOL_KITCHEN") && !!storedUser?.kitchenId;
