@@ -983,6 +983,7 @@ function Shell() {
   const week = weekDates(date);
   const isWardWorkspace = role === "culture_social_office";
   const storedUser = getStoredUser();
+  const isAuthenticatedWorkspace = !!storedUser;
   const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
   const isRealCentralKitchen = storedUser?.role === "CENTRAL_KITCHEN" && !!storedUser?.kitchenId;
   const isRealKitchenAccount = (storedUser?.role === "CENTRAL_KITCHEN" || storedUser?.role === "SCHOOL_KITCHEN") && !!storedUser?.kitchenId;
@@ -1209,7 +1210,7 @@ function Shell() {
             <small>
               {role === "parent"
                 ? "Đồng hành cùng nhà trường"
-                : isRealSchoolAdmin ? "Quản lý trường được phân công" : "Không gian làm việc DEMO"}
+                : isRealSchoolAdmin ? "Quản lý trường được phân công" : isAuthenticatedWorkspace ? "Không gian quản lý" : "Không gian làm việc DEMO"}
             </small>
           </div>
           <span className="small-dot" />
@@ -1302,7 +1303,7 @@ function Shell() {
             </div>
           </div>
           <div className="top-actions">
-            {demo && !isRealSchoolAdmin && <span className="demo-pill">BẢN DEMO</span>}
+            {demo && !isAuthenticatedWorkspace && <span className="demo-pill">BẢN DEMO</span>}
             <button
               aria-label="Tìm kiếm trường"
               className="icon-button"
@@ -1985,7 +1986,7 @@ function Shell() {
               <Sprout size={15} /> Vì những bữa ăn trọn vẹn của con.
             </span>
             <span>
-              {demo ? "DEMO · Dữ liệu và ảnh minh họa" : "Bữa ăn học đường"}
+              {demo && !isAuthenticatedWorkspace ? "DEMO · Dữ liệu và ảnh minh họa" : "Bữa ăn học đường"}
               <i />{" "}
               <button onClick={() => setModal("privacy")}>
                 Quyền riêng tư
