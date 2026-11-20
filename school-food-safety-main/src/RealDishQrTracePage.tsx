@@ -12,12 +12,12 @@ type PublicQr = {
 };
 const mealLabels: Record<string,string> = { BREAKFAST:'Bữa sáng', LUNCH:'Bữa trưa', DINNER:'Bữa tối', SNACK:'Bữa xế' };
 const nutritionLabels: Record<string,string> = {
-  energy:'Năng lượng', calories:'Năng lượng', kcal:'Năng lượng', protein:'Chất đạm',
-  fat:'Chất béo', carbohydrate:'Chất bột đường', carbs:'Chất bột đường',
-  fiber:'Chất xơ', calcium:'Canxi', iron:'Sắt', zinc:'Kẽm', vitaminA:'Vitamin A',
+  energy:'Năng lượng', energyKcal:'Năng lượng', calories:'Năng lượng', kcal:'Năng lượng', protein:'Chất đạm', proteinG:'Chất đạm',
+  fat:'Chất béo', fatG:'Chất béo', carbohydrate:'Chất bột đường', carbohydrateG:'Chất bột đường', carbs:'Chất bột đường',
+  fiber:'Chất xơ', fiberG:'Chất xơ', calcium:'Canxi', calciumMg:'Canxi', iron:'Sắt', ironMg:'Sắt', zinc:'Kẽm', zincMg:'Kẽm', vitaminA:'Vitamin A', vitaminARaeMcg:'Vitamin A',
   vitaminC:'Vitamin C', sodium:'Natri'
 };
-const nutritionUnits: Record<string,string> = {energy:'kcal',calories:'kcal',kcal:'kcal',protein:'g',fat:'g',carbohydrate:'g',carbs:'g',fiber:'g',calcium:'mg',iron:'mg',zinc:'mg',vitaminA:'µg',vitaminC:'mg',sodium:'mg'};
+const nutritionUnits: Record<string,string> = {energy:'kcal',energyKcal:'kcal',calories:'kcal',kcal:'kcal',protein:'g',proteinG:'g',fat:'g',fatG:'g',carbohydrate:'g',carbohydrateG:'g',carbs:'g',fiber:'g',fiberG:'g',calcium:'mg',calciumMg:'mg',iron:'mg',ironMg:'mg',zinc:'mg',zincMg:'mg',vitaminA:'µg',vitaminARaeMcg:'µg',vitaminC:'mg',sodium:'mg'};
 const numeric = (value: number | string) => {
   const n = Number(value);
   return Number.isFinite(n) ? n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : String(value);
@@ -40,9 +40,19 @@ export default function RealDishQrTracePage({token}:{token:string}) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [token]);
-  const nutrition = data?.nutrition && typeof data.nutrition === 'object' && !Array.isArray(data.nutrition)
-    ? Object.entries(data.nutrition).filter(([key, value]) => nutritionLabels[key] && (typeof value === 'number' || typeof value === 'string') && String(value).trim() !== '').slice(0, 12)
+  // The backend stores an immutable Annex 7 nutrition snapshot under nutrition.totals.
+  // Legacy snapshots may instead contain the nutrient fields at the top level.
+  const snapshot = data?.nutrition && typeof data.nutrition === 'object' && !Array.isArray(data.nutrition) ? data.nutrition : null;
+  const nestedTotals = snapshot?.totals;
+  const totals = nestedTotals && typeof nestedTotals === 'object' && !Array.isArray(nestedTotals)
+    ? nestedTotals as Record<string, unknown> : snapshot;
+  const nutrition = totals
+    ? Object.entries(totals).filter(([key, value]) => nutritionLabels[key] && (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))))).slice(0, 12)
     : [];
+  const coverage = snapshot?.coverage && typeof snapshot.coverage === 'object' && !Array.isArray(snapshot.coverage)
+    ? snapshot.coverage as Record<string, unknown> : null;
+  const nutritionComplete = coverage?.complete === true;
+  const nutritionWarnings = Array.isArray(snapshot?.warnings) ? snapshot.warnings.filter((value): value is string => typeof value === 'string') : [];
   const ingredients = Array.isArray(data?.ingredients) ? data.ingredients : [];
   return <main className="dish-trace-page">
     <div className="dish-trace-shell">
@@ -78,7 +88,11 @@ export default function RealDishQrTracePage({token}:{token:string}) {
         </section>
         <section className="dish-trace-panel dish-trace-section">
           <div className="dish-trace-section-heading"><span className="dish-trace-section-icon"><ShieldCheck size={20}/></span><div><h2>Thông tin dinh dưỡng</h2><p>Các chỉ số được lưu cùng phiên bản công thức.</p></div></div>
-          {nutrition.length ? <div className="dish-trace-nutrients">{nutrition.map(([key,value]) => <div className="dish-trace-nutrient" key={key}><small>{nutritionLabels[key]}</small><strong>{numeric(value as string | number)} <span>{nutritionUnits[key] ?? ''}</span></strong></div>)}</div> : <div className="dish-trace-empty">Chưa có dữ liệu dinh dưỡng chi tiết để hiển thị.</div>}
+          {nutrition.length ? <>
+            {coverage && !nutritionComplete && <div className="dish-trace-nutrition-warning" role="note"><Info size={17}/><span><strong>Dữ liệu dinh dưỡng chưa đầy đủ.</strong> Các giá trị dưới đây là tổng phần nguyên liệu đã có hồ sơ dinh dưỡng, không phải tổng dinh dưỡng đầy đủ của món. {typeof coverage.calculatedCount === 'number' && typeof coverage.ingredientCount === 'number' ? `Đã tính được ${coverage.calculatedCount}/${coverage.ingredientCount} nguyên liệu.` : ''}</span></div>}
+            <div className="dish-trace-nutrients">{nutrition.map(([key,value]) => <div className="dish-trace-nutrient" key={key}><small>{nutritionLabels[key]}</small><strong>{numeric(value as string | number)} <span>{nutritionUnits[key] ?? ''}</span></strong></div>)}</div>
+            {nutritionWarnings.length > 0 && <details className="dish-trace-nutrition-details"><summary>Xem lưu ý về dữ liệu dinh dưỡng ({nutritionWarnings.length})</summary><ul>{nutritionWarnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></details>}
+          </> : <div className="dish-trace-empty">Phiên bản công thức này chưa có số liệu dinh dưỡng được lưu để hiển thị.</div>}
         </section>
         <aside className="dish-trace-disclaimer"><Info size={20}/><div><strong>Lưu ý về thông tin truy xuất</strong><p>{data.note ? `${data.note} ` : ''}Mã QR cung cấp dữ liệu công thức và thực đơn đã lưu; không phải chứng nhận an toàn thực phẩm hay xác nhận lô nguyên liệu thực tế.</p></div></aside>
         <footer className="dish-trace-footer"><span>CanTinSo · Vì những bữa ăn học đường minh bạch</span><span>Phát hành QR: {date(data.issuedAt)}</span></footer>
