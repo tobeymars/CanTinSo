@@ -8,6 +8,9 @@ import { SupervisionService } from './supervision.service';
 @UseGuards(JwtAuthGuard,RolesGuard)
 export class SupervisionController {
  constructor(private readonly service:SupervisionService){}
+ @Get(':schoolId/:date/:mealType/context')
+ @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN','SCHOOL_ADMIN','UBND_ADMIN')
+ context(@CurrentUser() user:AuthUser,@Param('schoolId') schoolId:string,@Param('date') date:string,@Param('mealType') mealType:string){return this.service.context(user,schoolId,date,mealType)}
  @Get(':schoolId/:date/:mealType')
  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN','SCHOOL_ADMIN','UBND_ADMIN')
  read(@CurrentUser() user:AuthUser,@Param('schoolId') schoolId:string,@Param('date') date:string,@Param('mealType') mealType:string){return this.service.read(user,schoolId,date,mealType)}
