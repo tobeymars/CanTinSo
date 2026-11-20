@@ -19,7 +19,7 @@ async function call<T>(scope: SupervisionScope, init?: RequestInit): Promise<T> 
 }
 export type ServerSupervision = {
   checks: Record<string,{status:string;evidenceRef?:string;ingredientReceipts?:unknown[];history?:unknown[]}>
-  stages: Record<string,{confirmed:boolean;photos?:string[];note?:string;time?:string;confirmedAt?:string}>
+  stages: Record<string,{confirmed:boolean;photos?:string[];note?:string;time?:string;confirmedAt?:string;confirmationNote?:string}>
   approvals: {snapshot:string;at:string;note:string}[]
 }
 export const readServerSupervision = (scope: SupervisionScope) => call<ServerSupervision>(scope)
