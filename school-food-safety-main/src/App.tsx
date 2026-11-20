@@ -512,7 +512,7 @@ function MealDayDetail({
             <span>
               <Clock3 size={15} />
               Số suất dự kiến{" "}
-              <strong>{effectiveData.servings.toLocaleString("vi-VN")}</strong>
+              <strong>{data.servings.toLocaleString("vi-VN")}</strong>
             </span>
             <span>
               <CookingPot size={15} />
@@ -753,7 +753,7 @@ function SupervisionMealContent({
       {serverMode && (contextQuery.isLoading || serverQuery.isLoading) && <p className="muted" role="status">Đang tải thực đơn, kho và nhật ký từ hệ thống…</p>}
       {serverMode && (contextQuery.isError || serverQuery.isError) && <p className="error" role="alert">Không đọc được dữ liệu giám sát từ máy chủ. Không sử dụng dữ liệu DEMO để thay thế.</p>}
       <section className="supervision-meal-overview" aria-label={`Tổng quan giám sát ${mealLabel}`}>
-        <div><small>Suất dự kiến · {mealLabel}</small><strong>{data.servings.toLocaleString("vi-VN")}</strong></div>
+        <div><small>Suất dự kiến · {mealLabel}</small><strong>{effectiveData.servings.toLocaleString("vi-VN")}</strong></div>
         <div><small>Món trong thực đơn</small><strong>{effectiveData.dishes.length.toLocaleString("vi-VN")}</strong></div>
         <div><small>Mốc vận hành xác nhận</small><strong>{visibleEvents.filter(event => event.confirmed).length}/{visibleEvents.length}</strong></div>
         <div><small>Hồ sơ kiểm tra công khai</small><strong>{effectiveData.publicInspection ? "Có hồ sơ tham khảo" : "Chưa có hồ sơ theo bữa"}</strong></div>
