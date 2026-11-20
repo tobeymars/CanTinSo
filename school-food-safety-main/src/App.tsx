@@ -76,6 +76,7 @@ import KitchenLegalDocuments from "./KitchenLegalDocuments";
 import SupervisionStatusPanel from "./SupervisionStatusPanel";
 import SupervisionMealApproval from "./SupervisionMealApproval";
 import SupervisionJourneyActions from "./SupervisionJourneyActions";
+import { isServerSupervisionScope, readServerSupervision, readSupervisionContext } from "./lib/supervisionApi";
 import { SUPERVISION_JOURNEY_EVENT, stagesForSchool } from "./lib/supervisionJourney";
 import type { SupervisionMealType } from "./lib/supervisionStatus";
 import { compactDateLabel, weekDates, weekdayLabel } from "./lib/dates";
@@ -511,7 +512,7 @@ function MealDayDetail({
             <span>
               <Clock3 size={15} />
               Số suất dự kiến{" "}
-              <strong>{data.servings.toLocaleString("vi-VN")}</strong>
+              <strong>{effectiveData.servings.toLocaleString("vi-VN")}</strong>
             </span>
             <span>
               <CookingPot size={15} />
@@ -726,29 +727,46 @@ function SupervisionMealContent({
     title: string;
     description: string;
   } | null>(null);
-  const visibleStages = stagesForSchool(school.mode, role);
-  const visibleEvents = data.events.filter(event => visibleStages.some(stage => stage === event.status));
-  const readyEvent = data.events.find((event) => event.status === "READY");
+  const scope = {schoolId:school.id,serviceDate:date,mealType};
+  const serverMode = isServerSupervisionScope(scope);
+  const contextQuery = useQuery({queryKey:['supervision-context',school.id,date,mealType],queryFn:()=>readSupervisionContext(scope),enabled:serverMode});
+  const serverQuery = useQuery({queryKey:['supervision-server',school.id,date,mealType],queryFn:()=>readServerSupervision(scope),enabled:serverMode});
+  const effectiveSchool:School = serverMode ? {...school,mode:contextQuery.data?.kitchen?.type === 'CENTRAL' ? 'CENTRAL_KITCHEN' : 'ON_SITE'} : school;
+  const realEvents = Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({
+    status,label:status,time:item.time??'',actor:'Bếp',confirmed:!!item.confirmed,
+    photos:item.photos??[],hasReportedPhotos:(item.photos?.length??0)>0,
+  }));
+  const effectiveData:DayData = serverMode ? {
+    ...data,servings:contextQuery.data?.menu?.servings??0,
+    dishes:contextQuery.data?.menu?.dishes.map(item=>item.name)??[],
+    dishDetails:[],events:realEvents,kitchen:contextQuery.data?.kitchen?.name??'Chưa phân công bếp',
+    photo:'',publicInspection:null,
+  } : data;
+  const visibleStages = stagesForSchool(effectiveSchool.mode, role);
+  const visibleEvents = effectiveData.events.filter(event => visibleStages.some(stage => stage === event.status));
+  const readyEvent = effectiveData.events.find((event) => event.status === "READY");
   const publishedPhoto = readyEvent?.confirmed ? readyEvent.photos[0] : undefined;
   const placeholderPhoto = mealType === "BREAKFAST" ? breakfastDemo : mealType === "SNACK" ? snackDemo : readyServingDemo;
   const mealLabel = mealType === "BREAKFAST" ? "bữa sáng" : mealType === "LUNCH" ? "bữa trưa" : "bữa xế";
   return (
     <>
+      {serverMode && (contextQuery.isLoading || serverQuery.isLoading) && <p className="muted" role="status">Đang tải thực đơn, kho và nhật ký từ hệ thống…</p>}
+      {serverMode && (contextQuery.isError || serverQuery.isError) && <p className="error" role="alert">Không đọc được dữ liệu giám sát từ máy chủ. Không sử dụng dữ liệu DEMO để thay thế.</p>}
       <section className="supervision-meal-overview" aria-label={`Tổng quan giám sát ${mealLabel}`}>
         <div><small>Suất dự kiến · {mealLabel}</small><strong>{data.servings.toLocaleString("vi-VN")}</strong></div>
-        <div><small>Món trong thực đơn</small><strong>{data.dishes.length.toLocaleString("vi-VN")}</strong></div>
+        <div><small>Món trong thực đơn</small><strong>{effectiveData.dishes.length.toLocaleString("vi-VN")}</strong></div>
         <div><small>Mốc vận hành xác nhận</small><strong>{visibleEvents.filter(event => event.confirmed).length}/{visibleEvents.length}</strong></div>
-        <div><small>Hồ sơ kiểm tra công khai</small><strong>{data.publicInspection ? "Có hồ sơ tham khảo" : "Chưa có hồ sơ theo bữa"}</strong></div>
+        <div><small>Hồ sơ kiểm tra công khai</small><strong>{effectiveData.publicInspection ? "Có hồ sơ tham khảo" : "Chưa có hồ sơ theo bữa"}</strong></div>
       </section>
-      <SupervisionStatusPanel school={school} date={date} mealType={mealType} role={role} />
-      <SupervisionJourneyActions school={school} date={date} mealType={mealType} data={data} role={role} />
-      <SupervisionMealApproval school={school} date={date} mealType={mealType} role={role} />
+      <SupervisionStatusPanel school={effectiveSchool} date={date} mealType={mealType} role={role} />
+      <SupervisionJourneyActions school={effectiveSchool} date={date} mealType={mealType} data={effectiveData} role={role} />
+      <SupervisionMealApproval school={effectiveSchool} date={date} mealType={mealType} role={role} />
       <div className="content-grid">
         <MealJourneyPanel
-          school={school}
+          school={effectiveSchool}
           serviceDate={date}
           mealType={mealType}
-          data={data}
+          data={effectiveData}
           role={role}
           onReadyPhotoClick={() =>
             setPhotoPreview({
@@ -760,7 +778,7 @@ function SupervisionMealContent({
             })
           }
         />
-        <PublicInspectionCard inspection={data.publicInspection} mealType={mealType} />
+        <PublicInspectionCard inspection={effectiveData.publicInspection} mealType={mealType} />
       </div>
       {photoPreview && (
         <Dialog title={photoPreview.title} close={() => setPhotoPreview(null)}>
@@ -1021,7 +1039,7 @@ function Shell() {
     id: item.school.id,
     name: item.school.name,
     address: "Trường được phân công phục vụ",
-    mode: "ON_SITE",
+    mode: "CENTRAL_KITCHEN",
   }));
   const availableSchools = isWardWorkspace || isRealSchoolAdmin
     ? (schoolQuery.data ?? [])
