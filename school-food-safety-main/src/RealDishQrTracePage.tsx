@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, CalendarDays, ChefHat, CheckCircle2, Clock3, School, ShieldCheck } from 'lucide-react';
+import { AlertCircle, CalendarDays, ChefHat, CheckCircle2, Clock3, ClipboardList, Info, School, ShieldCheck, UtensilsCrossed } from 'lucide-react';
 import './PortionQr.css';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
@@ -11,6 +11,21 @@ type PublicQr = {
   issuedAt: string; note: string;
 };
 const mealLabels: Record<string,string> = { BREAKFAST:'Bữa sáng', LUNCH:'Bữa trưa', DINNER:'Bữa tối', SNACK:'Bữa xế' };
+const nutritionLabels: Record<string,string> = {
+  energy:'Năng lượng', calories:'Năng lượng', kcal:'Năng lượng', protein:'Chất đạm',
+  fat:'Chất béo', carbohydrate:'Chất bột đường', carbs:'Chất bột đường',
+  fiber:'Chất xơ', calcium:'Canxi', iron:'Sắt', zinc:'Kẽm', vitaminA:'Vitamin A',
+  vitaminC:'Vitamin C', sodium:'Natri'
+};
+const nutritionUnits: Record<string,string> = {energy:'kcal',calories:'kcal',kcal:'kcal',protein:'g',fat:'g',carbohydrate:'g',carbs:'g',fiber:'g',calcium:'mg',iron:'mg',zinc:'mg',vitaminA:'µg',vitaminC:'mg',sodium:'mg'};
+const numeric = (value: number | string) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : String(value);
+};
+const date = (value: string) => {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? 'Chưa xác định' : d.toLocaleDateString('vi-VN');
+};
 export default function RealDishQrTracePage({token}:{token:string}) {
   const [data, setData] = useState<PublicQr | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,36 +40,49 @@ export default function RealDishQrTracePage({token}:{token:string}) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [token]);
-  return <main className="portion-public-page" style={{maxWidth:920,margin:'0 auto',padding:'32px 16px 60px'}}>
-    <header className="card" style={{padding:24,marginBottom:20}}>
-      <span className="section-kicker"><ShieldCheck size={16}/> CANTINSO · TRUY XUẤT MÓN ĂN</span>
-      <h1 style={{fontSize:26,margin:'12px 0 6px'}}>Thông tin truy xuất món ăn</h1>
-      <p className="muted">Thông tin từ thực đơn được lưu trên hệ thống, theo phiên bản được phê duyệt.</p>
-    </header>
-    {loading && <div className="card" role="status" style={{padding:24}}>Đang tải thông tin truy xuất…</div>}
-    {error && <div className="card" role="alert" style={{padding:24,color:'#a33'}}><AlertCircle/>{error}</div>}
-    {data && <>
-      <div className="card" style={{padding:24,marginBottom:16}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,color:data.state === 'ACTIVE'?'#237a4a':'#aa4b32'}}>
-          {data.state === 'ACTIVE'?<CheckCircle2/>:<AlertCircle/>}
-          <strong>{data.state === 'ACTIVE' ? 'Mã QR đang hiệu lực' : 'Mã QR đã hết hiệu lực'}</strong>
-        </div>
-        {data.state !== 'ACTIVE' && <p role="alert">Thông tin này chỉ để đối chiếu lịch sử, không đại diện cho thực đơn hiện hành. {data.revokeReason ?? ''}</p>}
-        <h2 style={{fontSize:25,margin:'0 0 20px'}}>{data.dishName}</h2>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:15}}>
-          <div><School size={18}/><small style={{display:'block'}}>Trường</small><strong>{data.schoolName}</strong></div>
-          <div><ChefHat size={18}/><small style={{display:'block'}}>Bếp phục vụ</small><strong>{data.kitchenName}</strong></div>
-          <div><CalendarDays size={18}/><small style={{display:'block'}}>Ngày và bữa</small><strong>{new Date(data.serviceDate).toLocaleDateString('vi-VN')} · {mealLabels[data.mealType] ?? data.mealType}</strong></div>
-          <div><Clock3 size={18}/><small style={{display:'block'}}>Nhóm tuổi</small><strong>{data.ageGroup}</strong></div>
-        </div>
-      </div>
-      <section className="card" style={{padding:24,marginBottom:16}}>
-        <h2 style={{fontSize:19}}>Công thức nguyên liệu dự kiến</h2>
-        <p className="muted">Định lượng gốc của phiên bản công thức. Hệ số khẩu phần theo nhóm tuổi: {Number(data.portionFactor).toLocaleString('vi-VN')}.</p>
-        {data.ingredients.length ? <div className="table-scroll"><table><thead><tr><th>Nguyên liệu</th><th>Định lượng công thức</th></tr></thead><tbody>{data.ingredients.map((item,index) => <tr key={index}><td>{item.name}</td><td>{Number(item.quantity).toLocaleString('vi-VN')} {item.unit}</td></tr>)}</tbody></table></div> : <p>Chưa có nguyên liệu được khai báo.</p>}
+  const nutrition = data?.nutrition && typeof data.nutrition === 'object' && !Array.isArray(data.nutrition)
+    ? Object.entries(data.nutrition).filter(([key, value]) => nutritionLabels[key] && (typeof value === 'number' || typeof value === 'string') && String(value).trim() !== '').slice(0, 12)
+    : [];
+  const ingredients = Array.isArray(data?.ingredients) ? data.ingredients : [];
+  return <main className="dish-trace-page">
+    <div className="dish-trace-shell">
+      <header className="dish-trace-header">
+        <div className="dish-trace-brand"><span className="dish-trace-brand-icon"><UtensilsCrossed size={22}/></span><div><strong>CanTinSo</strong><small>TRUY XUẤT BỮA ĂN HỌC ĐƯỜNG</small></div></div>
+        <span className="dish-trace-header-tag"><ShieldCheck size={16}/> Thông tin từ hệ thống</span>
+      </header>
+      <section className="dish-trace-intro">
+        <span className="dish-trace-eyebrow">MINH BẠCH THÔNG TIN BỮA ĂN</span>
+        <h1>Thông tin truy xuất món ăn</h1>
+        <p>Tra cứu công thức, dinh dưỡng và thông tin phục vụ theo phiên bản thực đơn đã lưu.</p>
       </section>
-      {data.nutrition && <section className="card" style={{padding:24,marginBottom:16}}><h2 style={{fontSize:19}}>Thông tin dinh dưỡng trong công thức</h2><div style={{display:'flex',flexWrap:'wrap',gap:12}}>{Object.entries(data.nutrition).filter(([,value]) => typeof value === 'number' || typeof value === 'string').slice(0,16).map(([key,value]) => <div key={key} style={{padding:10,border:'1px solid var(--border)',borderRadius:10}}><small style={{display:'block'}}>{key}</small><strong>{String(value)}</strong></div>)}</div></section>}
-      <p className="muted" style={{fontSize:12,lineHeight:1.6}}><AlertCircle size={15} style={{verticalAlign:'middle'}}/> {data.note} QR không phải chứng nhận an toàn thực phẩm.</p>
-    </>}
+      {loading && <div className="dish-trace-panel dish-trace-state" role="status"><span className="dish-trace-spinner"/><h2>Đang tải thông tin món ăn</h2><p>Vui lòng chờ trong giây lát…</p></div>}
+      {error && <div className="dish-trace-panel dish-trace-state" role="alert"><span className="dish-trace-state-icon error"><AlertCircle size={28}/></span><h2>Không thể truy xuất mã QR</h2><p>{error}</p></div>}
+      {data && <>
+        <section className="dish-trace-panel dish-trace-dish">
+          <div className="dish-trace-dish-top"><span className={`dish-trace-status ${data.state === 'ACTIVE' ? 'active' : 'revoked'}`}>{data.state === 'ACTIVE' ? <CheckCircle2 size={17}/> : <AlertCircle size={17}/>} {data.state === 'ACTIVE' ? 'Mã QR đang hiệu lực' : 'Mã QR đã thu hồi'}</span><span className="dish-trace-meal"><UtensilsCrossed size={15}/>{mealLabels[data.mealType] ?? data.mealType}</span></div>
+          <span className="dish-trace-dish-label">MÓN ĂN ĐƯỢC TRUY XUẤT</span>
+          <h2>{data.dishName}</h2>
+          <p className="dish-trace-dish-subtitle">Thông tin được ghi nhận theo thực đơn và công thức đã lưu trên hệ thống.</p>
+          {data.state !== 'ACTIVE' && <div className="dish-trace-revoked-note" role="alert"><AlertCircle size={20}/><div><strong>Mã này không còn hiệu lực</strong><p>Thông tin chỉ phục vụ đối chiếu lịch sử, không đại diện cho thực đơn hiện hành. {data.revokeReason ?? ''}</p></div></div>}
+          <div className="dish-trace-facts">
+            <div><span className="dish-trace-fact-icon"><School size={20}/></span><div><small>Trường học</small><strong>{data.schoolName}</strong></div></div>
+            <div><span className="dish-trace-fact-icon"><ChefHat size={20}/></span><div><small>Đơn vị bếp phục vụ</small><strong>{data.kitchenName}</strong></div></div>
+            <div><span className="dish-trace-fact-icon"><CalendarDays size={20}/></span><div><small>Ngày phục vụ</small><strong>{date(data.serviceDate)}</strong></div></div>
+            <div><span className="dish-trace-fact-icon"><Clock3 size={20}/></span><div><small>Nhóm tuổi / lớp</small><strong>{data.ageGroup}</strong></div></div>
+          </div>
+        </section>
+        <section className="dish-trace-panel dish-trace-section">
+          <div className="dish-trace-section-heading"><span className="dish-trace-section-icon"><ClipboardList size={20}/></span><div><h2>Nguyên liệu trong công thức</h2><p>Định lượng dự kiến theo phiên bản công thức được lưu.</p></div><span className="dish-trace-total">{ingredients.length} nguyên liệu</span></div>
+          {ingredients.length ? <div className="dish-trace-table-wrap"><table className="dish-trace-table"><thead><tr><th>STT</th><th>Tên nguyên liệu</th><th>Định lượng công thức</th></tr></thead><tbody>{ingredients.map((item,index) => <tr key={index}><td>{String(index + 1).padStart(2,'0')}</td><td>{item.name}</td><td><strong>{numeric(item.quantity)} {item.unit}</strong></td></tr>)}</tbody></table></div> : <div className="dish-trace-empty">Chưa có nguyên liệu được khai báo.</div>}
+          <div className="dish-trace-factor"><Info size={16}/><span>Hệ số khẩu phần theo nhóm tuổi: <strong>{numeric(data.portionFactor)}</strong>. Đây là dữ liệu công thức dự kiến, không phải khối lượng thực tế đã sử dụng.</span></div>
+        </section>
+        <section className="dish-trace-panel dish-trace-section">
+          <div className="dish-trace-section-heading"><span className="dish-trace-section-icon"><ShieldCheck size={20}/></span><div><h2>Thông tin dinh dưỡng</h2><p>Các chỉ số được lưu cùng phiên bản công thức.</p></div></div>
+          {nutrition.length ? <div className="dish-trace-nutrients">{nutrition.map(([key,value]) => <div className="dish-trace-nutrient" key={key}><small>{nutritionLabels[key]}</small><strong>{numeric(value as string | number)} <span>{nutritionUnits[key] ?? ''}</span></strong></div>)}</div> : <div className="dish-trace-empty">Chưa có dữ liệu dinh dưỡng chi tiết để hiển thị.</div>}
+        </section>
+        <aside className="dish-trace-disclaimer"><Info size={20}/><div><strong>Lưu ý về thông tin truy xuất</strong><p>{data.note ? `${data.note} ` : ''}Mã QR cung cấp dữ liệu công thức và thực đơn đã lưu; không phải chứng nhận an toàn thực phẩm hay xác nhận lô nguyên liệu thực tế.</p></div></aside>
+        <footer className="dish-trace-footer"><span>CanTinSo · Vì những bữa ăn học đường minh bạch</span><span>Phát hành QR: {date(data.issuedAt)}</span></footer>
+      </>}
+    </div>
   </main>;
 }
