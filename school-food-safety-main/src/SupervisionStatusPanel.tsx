@@ -86,7 +86,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   // Recalculate after writes in this tab and cross-tab storage changes.
   void revision
   const statusLabel = (status: CheckStatus) => serverMode && status === 'confirmed' ? 'Đã xác nhận' : labels[status]
-  const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
+  const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []).map((event: any) => ({ id: String(event.id), action: event.action === 'request_revision' ? 'request_revision' : event.action, actorLabel: event.actorRole === 'SCHOOL_ADMIN' ? 'Ban Giám hiệu' : 'Bếp', recordedAt: event.at, note: event.note ?? '', evidenceRef: event.evidenceRef ?? '', ingredientReceipts: Array.isArray(event.ingredientReceipts) ? event.ingredientReceipts : [] })) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
   const ingredientCatalog = useMemo(() => supervisionIngredientCatalog(school.id), [school.id])
   const evidenceOptions = editing ? supervisionEvidenceCatalog(scope, editing.id) : []
   const canReport = canReportSupervision(role, school.mode)
