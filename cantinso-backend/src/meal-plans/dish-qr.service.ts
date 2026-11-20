@@ -119,7 +119,7 @@ export class DishQrService {
     const valid = !row.revokedAt && latest?.id === row.revisionId && latest.status === 'APPROVED';
     const version = row.revisionItem.dishVersion;
     const storedNutrition = version.nutritionSnapshot;
-    const hasStoredTotals = storedNutrition && typeof storedNutrition === 'object' && !Array.isArray(storedNutrition) && Object.keys(storedNutrition).length > 0;
+    const hasStoredTotals = storedNutrition && typeof storedNutrition === 'object' && !Array.isArray(storedNutrition) && (Object.keys(storedNutrition).some(key => ['energyKcal', 'proteinG', 'energy', 'protein'].includes(key)) || ('totals' in storedNutrition && storedNutrition.totals !== null && typeof storedNutrition.totals === 'object' && !Array.isArray(storedNutrition.totals) && Object.keys(storedNutrition.totals).length > 0));
     const nutrition = hasStoredTotals ? storedNutrition : await this.dishesService.reconstructNutritionForVersion(version.id);
     return { state: valid ? 'ACTIVE' : 'REVOKED', revokeReason: row.revokeReason,
       schoolName: row.school.name, kitchenName: row.kitchen.name,
