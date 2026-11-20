@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CheckCircle2, ClipboardCheck, Clock3, FileClock, Pencil, Plus, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { isServerSupervisionScope, readServerSupervision, writeServerSupervision } from './lib/supervisionApi'
+import { isServerSupervisionScope, readServerSupervision, readSupervisionContext, writeServerSupervision } from './lib/supervisionApi'
 import type { School } from './lib/data'
 import type { ViewRole } from './lib/store'
 import {
@@ -62,6 +62,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   const scope: SupervisionScope = { schoolId: school.id, serviceDate: date, mealType }
   const serverMode = isServerSupervisionScope(scope)
   const serverQuery = useQuery({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType],queryFn:()=>readServerSupervision(scope),enabled:serverMode})
+  const contextQuery = useQuery({queryKey:['supervision-context',scope.schoolId,scope.serviceDate,scope.mealType],queryFn:()=>readSupervisionContext(scope),enabled:serverMode})
   const [revision, setRevision] = useState(0)
   const [editing, setEditing] = useState<Editing | null>(null)
   const [note, setNote] = useState('')
@@ -87,7 +88,12 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   void revision
   const statusLabel = (status: CheckStatus) => serverMode && status === 'confirmed' ? 'Đã xác nhận' : labels[status]
   const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []).map((event: any) => ({ id: String(event.id), action: event.action === 'request_revision' ? 'request_revision' : event.action, actorLabel: event.actorRole === 'SCHOOL_ADMIN' ? 'Ban Giám hiệu' : 'Bếp', recordedAt: event.at, note: event.note ?? '', evidenceRef: event.evidenceRef ?? '', ingredientReceipts: Array.isArray(event.ingredientReceipts) ? event.ingredientReceipts : [] })) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
-  const ingredientCatalog = useMemo(() => supervisionIngredientCatalog(school.id), [school.id])
+  const demoIngredientCatalog = useMemo(() => supervisionIngredientCatalog(school.id), [school.id])
+  const ingredientCatalog = serverMode ? (contextQuery.data?.lots ?? []).map(lot=>({
+    itemId:lot.itemId, ingredientName:lot.ingredientName,lotCode:lot.lotCode,
+    supplierName:lot.supplierName,supplierContact:lot.supplierContact,supplierId:'',
+    expiresAt:lot.expiresAt ?? '9999-12-31',unit:lot.unit,quantityAvailable:lot.quantityAvailable,
+  })) : demoIngredientCatalog
   const evidenceOptions = editing && !serverMode ? supervisionEvidenceCatalog(scope, editing.id) : []
   const canReport = serverMode ? role === 'central_kitchen' || role === 'school_kitchen' : canReportSupervision(role, school.mode)
   const canConfirm = canConfirmSupervision(role)
@@ -111,10 +117,11 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
     event.preventDefault()
     if (!editing) return
     try {
+      if (serverMode && (serverQuery.isLoading || contextQuery.isLoading)) throw Error('Dữ liệu giám sát chưa tải xong.')
+      if (serverMode && (serverQuery.isError || contextQuery.isError)) throw Error('Không tải được dữ liệu trường và kho thực tế.')
       const ingredientReceipts = editing.id === 'ingredient_receipt' && editing.action === 'report'
         ? ingredientRows.filter(row => row.itemId).map(row => ({ itemId: row.itemId, quantity: Number(row.quantity) }))
         : undefined
-      if (serverMode && editing.id === 'ingredient_receipt' && editing.action === 'report') throw Error('Kiểm thực bước 1 chưa kết nối danh mục lô nguyên liệu thật; không được gửi dữ liệu kho DEMO.')
       if (serverMode) {
         await writeServerSupervision(scope,{action:editing.action==='report'?'check_report':editing.action==='confirm'?'check_confirm':'check_revision',itemId:editing.id,note,evidenceRef,ingredientReceipts})
         await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
@@ -137,7 +144,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
         </div>
         <div className="supervision-checklist-actions">
           <span className="supervision-check-count"><ShieldCheck size={16}/>{confirmedCount}/{checks.length} đã xác nhận</span>
-          {canReport && <button type="button" className="primary" disabled={!checks.some(item => item.status === 'not_reported' || item.status === 'revision_requested')} onClick={() => {
+          {canReport && <button type="button" className="primary" disabled={(serverMode && (serverQuery.isLoading || contextQuery.isLoading || serverQuery.isError || contextQuery.isError)) || !checks.some(item => item.status === 'not_reported' || item.status === 'revision_requested')} onClick={() => {
             const first = checks.find(item => item.status === 'not_reported' || item.status === 'revision_requested')
             if (first) start(first.id, 'report')
           }}><Pencil size={16}/>Cập nhật trạng thái</button>}
@@ -147,6 +154,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
           }}><ClipboardCheck size={16}/>Xác nhận trạng thái ({pendingCount})</button>}
         </div>
       </div>
+      {serverMode && contextQuery.isError && <p className="error" role="alert">Không lấy được dữ liệu kho, thực đơn theo trường và bữa từ hệ thống.</p>}
+      {serverMode && contextQuery.data?.menu && <p className="muted">Thực đơn: {contextQuery.data.menu.dishes.map(dish=>dish.name).join(', ') || 'Chưa có món được duyệt'} · {contextQuery.data.menu.servings} suất dự kiến</p>}
       {message && <div className="supervision-status-message" role="status"><CheckCircle2 size={16}/><span>{message}</span><button type="button" aria-label="Đóng thông báo" onClick={() => setMessage('')}><X size={15}/></button></div>}
       <div className="supervision-check-rows">
         {CHECK_DEFINITIONS.map(def => {
@@ -184,7 +193,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
               {!serverMode && evidenceOptions.length === 0 && <small className="supervision-reference-empty">Chưa có hồ sơ thuộc đúng trường, ngày và bữa để liên kết.</small>}
             </label>}
             {editing.action !== 'report' && <p className="supervision-edit-guidance">{editing.action === 'confirm' ? 'BGH xác nhận đã đối chiếu bản báo cáo và hồ sơ tương ứng trong DEMO. Không phải xác nhận kiểm tra ATTP chính thức.' : 'Hồ sơ sẽ chuyển sang Cần bổ sung để bếp cập nhật lại, không xóa lịch sử cũ.'}</p>}
-            {editing.id === 'ingredient_receipt' && editing.action === 'report' && !serverMode && <fieldset className="supervision-ingredient-fieldset">
+            {editing.id === 'ingredient_receipt' && editing.action === 'report' && <fieldset className="supervision-ingredient-fieldset">
               <legend>Nguyên liệu đã tiếp nhận <span aria-hidden="true">*</span></legend>
               <p>Thêm từng dòng, tìm và chọn trong toàn bộ danh mục kho của trường. Mỗi nguyên liệu chỉ được chọn một lần.</p>
               {ingredientCatalog.length === 0 ? <div className="supervision-ingredient-empty">Chưa có nguyên liệu trong danh mục kho của trường. Cần cập nhật kho trước khi lập bước kiểm thực này.</div> : <div className="supervision-ingredient-options">
