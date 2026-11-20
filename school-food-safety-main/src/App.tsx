@@ -77,7 +77,7 @@ import SupervisionStatusPanel from "./SupervisionStatusPanel";
 import SupervisionMealApproval from "./SupervisionMealApproval";
 import SupervisionJourneyActions from "./SupervisionJourneyActions";
 import { isServerSupervisionScope, readServerSupervision, readSupervisionContext } from "./lib/supervisionApi";
-import { SUPERVISION_JOURNEY_EVENT, stagesForSchool } from "./lib/supervisionJourney";
+import { SUPERVISION_JOURNEY_EVENT, stagesForSchool, stageNames } from "./lib/supervisionJourney";
 import type { SupervisionMealType } from "./lib/supervisionStatus";
 import { compactDateLabel, weekDates, weekdayLabel } from "./lib/dates";
 import IngredientTraceDialog from "./IngredientTraceDialog";
@@ -381,7 +381,7 @@ function MealDayDetail({
   const readyEvent = data.events.find((event) => event.status === "READY");
   const readyPhoto = readyEvent?.confirmed ? readyEvent.photos[0] : undefined;
   useEffect(() => {
-    if (!demo || school.mode !== "CENTRAL_KITCHEN" || !data.dishes.length) return;
+    if (!demo || isServerSupervisionScope({schoolId:school.id,serviceDate:date,mealType}) || school.mode !== "CENTRAL_KITCHEN" || !data.dishes.length) return;
     try {
       portionQrDemo.seedPublishedDemo({
         scope: portionQrDemo.scopeForSchool({
@@ -733,14 +733,14 @@ function SupervisionMealContent({
   const serverQuery = useQuery({queryKey:['supervision-server',school.id,date,mealType],queryFn:()=>readServerSupervision(scope),enabled:serverMode});
   const effectiveSchool:School = serverMode ? {...school,mode:contextQuery.data?.kitchen?.type === 'CENTRAL' ? 'CENTRAL_KITCHEN' : 'ON_SITE'} : school;
   const realEvents = Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({
-    status,label:status,time:item.time??'',actor:'Bếp',confirmed:!!item.confirmed,
+    status,label:stageNames[status as keyof typeof stageNames] ?? status,time:item.time??'',actor:'Bếp',confirmed:!!item.confirmed,
     photos:item.photos??[],hasReportedPhotos:(item.photos?.length??0)>0,
   }));
   const effectiveData:DayData = serverMode ? {
     ...data,servings:contextQuery.data?.menu?.servings??0,
     dishes:contextQuery.data?.menu?.dishes.map(item=>item.name)??[],
     dishDetails:[],events:realEvents,kitchen:contextQuery.data?.kitchen?.name??'Chưa phân công bếp',
-    photo:'',publicInspection:null,
+    photo:'',publicInspection:null,suppliers:0,transportDistanceKm:null,transportDurationMinutes:null,mealUseByAt:null,
   } : data;
   const visibleStages = stagesForSchool(effectiveSchool.mode, role);
   const visibleEvents = effectiveData.events.filter(event => visibleStages.some(stage => stage === event.status));
