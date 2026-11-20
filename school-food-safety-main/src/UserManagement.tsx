@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Building2, GraduationCap, KeyRound, Pencil, Plus, RefreshCw, Search, ShieldCheck, UserRound, UserRoundX, Users, X } from "lucide-react";
+import { Building2, Factory, GraduationCap, KeyRound, Pencil, Plus, RefreshCw, Search, ShieldCheck, UserRound, UserRoundX, Users, X } from "lucide-react";
 import {
   createManagedUser,
   getManagedSchools,
@@ -40,6 +40,7 @@ export default function UserManagement() {
   const [busy, setBusy] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
+  const [activeSection, setActiveSection] = useState<"accounts" | "kitchens">("accounts");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<ManagedUser | null>(null);
@@ -178,17 +179,25 @@ export default function UserManagement() {
 
   return (
     <>
-    {(isSuperAdmin || isWardAdmin) && <CentralKitchenManagement />}
-    {!isWardAdmin && <section className="user-management">
+    {isSuperAdmin && <header className="um-workspace-head">
+      <div className="um-workspace-mark"><ShieldCheck size={23} /></div>
+      <div><span className="um-eyebrow">TRUNG TÂM QUẢN TRỊ</span><h1>Quản lý tài khoản & đơn vị</h1><p>Quản lý quyền truy cập và đơn vị vận hành trên cùng một không gian.</p></div>
+    </header>}
+    {isSuperAdmin && <nav className="um-section-nav" aria-label="Phân hệ quản lý">
+      <button type="button" className={activeSection === "accounts" ? "active" : ""} aria-current={activeSection === "accounts" ? "page" : undefined} onClick={() => setActiveSection("accounts")}><Users size={18} /><span><strong>Tài khoản người dùng</strong><small>UBND phường · Ban Giám hiệu</small></span></button>
+      <button type="button" className={activeSection === "kitchens" ? "active" : ""} aria-current={activeSection === "kitchens" ? "page" : undefined} onClick={() => setActiveSection("kitchens")}><Factory size={18} /><span><strong>Bếp trung tâm</strong><small>Đơn vị bếp · Phân công trường</small></span></button>
+    </nav>}
+    {(isWardAdmin || (isSuperAdmin && activeSection === "kitchens")) && <CentralKitchenManagement />}
+    {!isWardAdmin && activeSection === "accounts" && <section className="user-management um-accounts-section">
       <div className="um-intro um-panel-header">
         <div>
           <span className="um-eyebrow"><ShieldCheck size={15} /> {isSuperAdmin ? "QUẢN TRỊ TỔ CHỨC" : "QUẢN TRỊ TRONG PHẠM VI TRƯỜNG"}</span>
-          <h2>{isSuperAdmin ? "Quản lý tài khoản UBND và BGH" : "Quản lý tài khoản"}</h2>
+          <h2>{isSuperAdmin ? "Danh sách tài khoản" : "Quản lý tài khoản"}</h2>
           <p>{isSuperAdmin
-            ? "Tạo tài khoản UBND theo phường và Ban Giám hiệu theo trường; quản lý trạng thái và mật khẩu."
+            ? "Theo dõi tài khoản, phân quyền theo đơn vị và quản lý trạng thái truy cập."
             : "Tạo và quản lý tài khoản Bếp tại trường, Nhân viên trường thuộc đơn vị của bạn."}</p>
         </div>
-        <button className="um-primary" onClick={openCreate}><Plus size={17} /> Tạo tài khoản</button>
+        <button className="um-primary" onClick={openCreate}><Plus size={17} /> Thêm tài khoản</button>
       </div>
       <div className="um-stats">
         <div><span className="um-stat-icon"><Users /></span><span><strong>{users.length}</strong><small>Tổng tài khoản</small></span></div>
@@ -197,8 +206,9 @@ export default function UserManagement() {
       </div>
       {notice && <div className="um-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Đóng thông báo">×</button></div>}
       {error && !showForm && <div className="um-error" role="alert">{error}</div>}
+      <div className="um-list-heading"><div><h3>Người dùng hệ thống</h3><p>{filtered.length} tài khoản phù hợp</p></div></div>
       <div className="um-toolbar">
-        <label><Search size={17} /><input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="Tìm theo tên, email hoặc vai trò..." /></label>
+        <label><Search size={17} /><input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="Tìm tên, email, trường hoặc phường..." /></label>
         {isSuperAdmin && <div className="um-filter-tabs" role="group" aria-label="Lọc vai trò">{[["ALL", "Tất cả"], ["UBND_ADMIN", "UBND"], ["SCHOOL_ADMIN", "Ban Giám hiệu"]].map(([value, label]) => <button key={value} className={roleFilter === value ? "selected" : ""} onClick={() => setRoleFilter(value)} aria-pressed={roleFilter === value}>{label}</button>)}</div>}
         <button className="um-secondary" onClick={() => void load()} disabled={loading}><RefreshCw size={15} /> Làm mới</button>
       </div>
@@ -214,8 +224,8 @@ export default function UserManagement() {
                 <td><span className={`um-status ${user.isActive ? "active" : "inactive"}`}>{user.isActive ? "Đang hoạt động" : "Đã khóa"}</span></td>
                 <td>{new Date(user.createdAt).toLocaleDateString("vi-VN")}</td>
                 <td><div className="um-actions">
-                  <button title="Chỉnh sửa" aria-label={`Chỉnh sửa ${user.email}`} onClick={() => openEdit(user)}><Pencil size={16} /></button>
-                  <button title="Đặt lại mật khẩu" aria-label={`Đặt lại mật khẩu ${user.email}`} onClick={() => { setPasswordTarget(user); setNewPassword(""); setError(""); }}><KeyRound size={16} /></button>
+                  <button type="button" title="Chỉnh sửa" aria-label={`Chỉnh sửa ${user.email}`} onClick={() => openEdit(user)}><Pencil size={16} /></button>
+                  <button type="button" title="Đặt lại mật khẩu" aria-label={`Đặt lại mật khẩu ${user.email}`} onClick={() => { setPasswordTarget(user); setNewPassword(""); setError(""); }}><KeyRound size={16} /></button>
                   <button title={user.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"} aria-label={user.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"} onClick={() => void toggleActive(user)} disabled={busy}>{user.isActive ? <UserRoundX size={16} /> : <UserRound size={16} />}</button>
                 </div></td>
               </tr>
