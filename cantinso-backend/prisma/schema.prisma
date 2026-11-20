@@ -206,6 +206,7 @@ model Kitchen {
   users       User[]
   dishes      Dish[]
   mealPlans   MealPlan[]
+  legalDocuments KitchenLegalDocument[]
   dishQrs     DishQr[]
   schools     KitchenSchoolAssignment[]
   createdAt   DateTime                  @default(now()) @map("created_at")
@@ -706,4 +707,54 @@ model DishQr {
   @@index([schoolId, issuedAt])
   @@index([kitchenId, issuedAt])
   @@map("dish_qrs")
+}
+
+model KitchenLegalDocument {
+  id String @id @default(uuid()) @db.Uuid
+  kitchenId String @map("kitchen_id") @db.Uuid
+  kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  title String
+  category String
+  applicability String @default("conditional")
+  status String @default("missing")
+  documentNumber String? @map("document_number")
+  issuer String?
+  issuedAt DateTime? @map("issued_at") @db.Date
+  expiresAt DateTime? @map("expires_at") @db.Date
+  publicSummary String @default("") @map("public_summary")
+  note String @default("")
+  createdById String @map("created_by_id") @db.Uuid
+  updatedById String @map("updated_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  attachments KitchenLegalAttachment[]
+  events KitchenLegalEvent[]
+  @@index([kitchenId, category])
+  @@index([expiresAt])
+  @@map("kitchen_legal_documents")
+}
+
+model KitchenLegalAttachment {
+  id String @id @default(uuid()) @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  document KitchenLegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  name String
+  mimeType String @map("mime_type")
+  size Int
+  data Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([documentId])
+  @@map("kitchen_legal_attachments")
+}
+
+model KitchenLegalEvent {
+  id String @id @default(uuid()) @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  document KitchenLegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actorId String @map("actor_id") @db.Uuid
+  action String
+  details Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([documentId, createdAt])
+  @@map("kitchen_legal_events")
 }
