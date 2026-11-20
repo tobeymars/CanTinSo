@@ -88,3 +88,37 @@
 .dish-grid .dish-card-nutrition {min-height:52px}
 .dish-grid .dish-card-bottom {margin-top:auto;min-height:43px}
 
+
+
+/* Refined dish cards — consistent CanTinSo blue, clearer hierarchy */
+.dish-grid{gap:20px;grid-template-columns:repeat(auto-fill,minmax(min(100%,285px),1fr));align-items:stretch}
+.dish-grid .dish-meal-card{position:relative;border:1px solid #dae5f0!important;border-radius:18px!important;box-shadow:0 4px 16px #153d6c0b!important;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease!important}
+.dish-grid .dish-meal-card:hover{transform:translateY(-3px);border-color:#9bc4ed!important;box-shadow:0 13px 30px #164d8719!important}
+.dish-grid .dish-card-image{height:190px;background:#eef3fa}
+.dish-grid .dish-card-image img{transition:transform .35s ease}
+.dish-grid .dish-meal-card:hover .dish-card-image img{transform:scale(1.035)}
+.dish-grid .dish-card-image:after{content:"";position:absolute;inset:auto 0 0;height:44px;pointer-events:none;background:linear-gradient(transparent,#0a2b4724)}
+.dish-grid .dish-card-image>span{z-index:1;top:14px;left:14px;padding:8px 12px;border-radius:10px;background:#ffffffed;border:1px solid #fff;color:#174d7e;box-shadow:0 3px 10px #12375a14;font-size:11px}
+.dish-grid .dish-card-content{padding:19px 19px 15px;gap:0}
+.dish-grid .dish-card-status{min-height:31px}
+.dish-grid .dish-complete,.dish-grid .dish-partial{padding:7px 10px;border-radius:9px;font-size:11px;gap:6px}
+.dish-grid .dish-card-content h4{font-size:19px;letter-spacing:-.35px;line-height:1.35;margin:10px 0 8px;color:#173d67;min-height:26px}
+.dish-grid .dish-card-content>p{font-size:12px;line-height:1.65;color:#70849a;min-height:39px;margin:0 0 16px}
+.dish-grid .dish-card-chips{gap:8px;margin-bottom:16px}
+.dish-grid .dish-card-chips span{padding:7px 10px;border-radius:9px;font-size:11px;background:#f0f5fb;border:1px solid #e0eaf4;color:#466887;font-weight:700}
+.dish-grid .dish-card-nutrition{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:68px;padding:13px 14px;border-radius:12px;background:linear-gradient(110deg,#edf5ff,#f6f9fd);border:1px solid #e3edf8}
+.dish-grid .dish-card-nutrition .dish-card-energy{display:flex;align-items:center;gap:9px;min-width:0;color:#2375ba}
+.dish-grid .dish-card-energy>span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dish-grid .dish-card-energy b{font-size:16px;color:#0e5ca7;line-height:1.15;white-space:nowrap}
+.dish-grid .dish-card-energy small{font-size:10px;color:#718aa5;font-weight:650}
+.dish-grid .dish-card-ingredients{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:750;color:#527697;text-align:right;white-space:nowrap}
+.dish-grid .dish-card-bottom{margin-top:17px;padding-top:14px;border-top:1px solid #e7edf5;gap:9px;flex-wrap:wrap}
+.dish-grid .dish-card-bottom>small{color:#8195a9;font-size:11px;white-space:nowrap}
+.dish-grid .dish-card-actions{margin-left:auto;gap:6px}
+.dish-grid .dish-card-actions button{min-height:36px;padding:8px 10px;border:1px solid #e3edf7;border-radius:9px;background:#f0f5fb;color:#2d628f;font-size:11px;transition:background .15s,border-color .15s,transform .15s}
+.dish-grid .dish-card-actions button:hover{background:#e6f1fd;border-color:#b6d3f0;transform:translateY(-1px)}
+.dish-grid .dish-card-actions button:focus-visible{outline:3px solid #83b9ef;outline-offset:2px}
+.dish-grid .dish-card-actions .dish-delete-action{background:#fff2f3;color:#b44352;border-color:#fae4e6}
+.dish-grid .dish-card-actions .dish-delete-action:hover{background:#ffe9ed;border-color:#f3c4cc}
+@media(max-width:650px){.dish-grid{padding:14px;gap:15px;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))}.dish-grid .dish-card-image{height:180px}.dish-grid .dish-card-content{padding:16px}.dish-grid .dish-card-nutrition{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){.dish-grid .dish-meal-card,.dish-grid .dish-card-image img,.dish-grid .dish-card-actions button{transition:none!important}.dish-grid .dish-meal-card:hover,.dish-grid .dish-meal-card:hover .dish-card-image img{transform:none}}
