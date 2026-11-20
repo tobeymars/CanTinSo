@@ -42,7 +42,22 @@ export class SupervisionService {
     const [plan, lots, kitchen, legalDocuments] = await Promise.all([
       this.prisma.mealPlan.findUnique({
         where: {schoolId_serviceDate_mealType: {schoolId:scope.schoolId,serviceDate:scope.serviceDate,mealType:scope.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
-        include: {revisions: {where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,include:{items:{include:{dishVersion:{include:{dish:true}}}}}}}},
+        include: {
+          revisions: {
+            where: { status: 'APPROVED' },
+            orderBy: { revisionNo: 'desc' },
+            take: 1,
+            include: {
+              items: {
+                include: {
+                  dishVersion: {
+                    include: { dish: true },
+                  },
+                },
+              },
+            },
+          },
+        },
       }),
       this.prisma.inventoryLot.findMany({
         where:{schoolId:scope.schoolId, receivedAt:{lte:new Date(date+'T23:59:59.999Z')}},
