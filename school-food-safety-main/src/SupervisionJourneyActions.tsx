@@ -53,8 +53,8 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   }, [])
   void revision
   const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:'Bếp',photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
-  const stages = stagesForSchool(school.mode, role)
-  const next = serverMode ? (()=>{const candidate=stages.find(stage=>!saved?.events.some(event=>event.status===stage));return candidate && (school.mode==='CENTRAL_KITCHEN' ? candidate==='DISPATCHED' ? role==='central_kitchen' : role==='school_kitchen' : role==='school_kitchen') ? candidate : null})() : getNextReportableStage(scope, school.mode, role)
+  const stages = serverMode && role === 'central_kitchen' ? ['DISPATCHED','ARRIVED','PLATED','READY'] as JourneyStatus[] : stagesForSchool(school.mode, role)
+  const next = serverMode ? (()=>{const candidate=stages.find(stage=>!saved.events.some(event=>event.status===stage));return candidate && (candidate==='DISPATCHED' ? role==='central_kitchen' : role==='school_kitchen') ? candidate : null})() : getNextReportableStage(scope, school.mode, role)
   const pending = saved?.events.filter(event => !event.confirmed && stages.includes(event.status)) ?? []
   const isBoard = role === 'school_board'
   const canUpdate = !!next || (isBoard && pending.length > 0)
