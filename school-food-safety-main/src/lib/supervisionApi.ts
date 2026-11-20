@@ -25,3 +25,11 @@ export type ServerSupervision = {
 export const readServerSupervision = (scope: SupervisionScope) => call<ServerSupervision>(scope)
 export const writeServerSupervision = (scope: SupervisionScope, body: Record<string,unknown>) =>
   call<{success:boolean;id:string}>(scope, {method:'POST',body:JSON.stringify(body)}, '/actions')
+
+export type SupervisionContext = {
+  schoolId:string;serviceDate:string;mealType:string
+  kitchen:{id:string;name:string;type:'CENTRAL'|'SCHOOL'}|null
+  menu:{id:string;servings:number;status:string;dishes:{id:string;name:string}[]}|null
+  lots:{itemId:string;ingredientName:string;lotCode:string;supplierName:string;supplierContact:string;expiresAt:string|null;quantityAvailable:number;unit:string;status:string;receivedAt:string}[]
+}
+export const readSupervisionContext = (scope:SupervisionScope) => call<SupervisionContext>(scope,undefined,'/context')
