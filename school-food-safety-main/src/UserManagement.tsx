@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { KeyRound, Pencil, Plus, RefreshCw, Search, ShieldCheck, UserRound, UserRoundX, Users } from "lucide-react";
+import { Building2, GraduationCap, KeyRound, Pencil, Plus, RefreshCw, Search, ShieldCheck, UserRound, UserRoundX, Users, X } from "lucide-react";
 import {
   createManagedUser,
   getManagedSchools,
@@ -39,6 +39,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [keyword, setKeyword] = useState("");
+  const [roleFilter, setRoleFilter] = useState("ALL");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<ManagedUser | null>(null);
@@ -78,8 +79,9 @@ export default function UserManagement() {
   useEffect(() => { void load(); }, []);
 
   const filtered = useMemo(() => users.filter(user =>
-    `${user.fullName} ${user.email} ${roleLabel(user.role)}`.toLocaleLowerCase("vi").includes(keyword.toLocaleLowerCase("vi"))
-  ), [users, keyword]);
+    (roleFilter === "ALL" || user.role === roleFilter) &&
+    `${user.fullName} ${user.email} ${roleLabel(user.role)} ${schools.find(s => s.id === user.schoolId)?.name ?? ""} ${wardName(user.wardId)}`.toLocaleLowerCase("vi").includes(keyword.toLocaleLowerCase("vi"))
+  ), [users, keyword, roleFilter, schools, wards]);
 
   function openCreate() {
     setEditing(null);
@@ -177,7 +179,7 @@ export default function UserManagement() {
     <>
     {(isSuperAdmin || isWardAdmin) && <CentralKitchenManagement />}
     {!isWardAdmin && <section className="user-management">
-      <div className="um-intro">
+      <div className="um-intro um-panel-header">
         <div>
           <span className="um-eyebrow"><ShieldCheck size={15} /> {isSuperAdmin ? "QUẢN TRỊ TỔ CHỨC" : "QUẢN TRỊ TRONG PHẠM VI TRƯỜNG"}</span>
           <h2>{isSuperAdmin ? "Quản lý tài khoản UBND và BGH" : "Quản lý tài khoản"}</h2>
@@ -188,14 +190,15 @@ export default function UserManagement() {
         <button className="um-primary" onClick={openCreate}><Plus size={17} /> Tạo tài khoản</button>
       </div>
       <div className="um-stats">
-        <div><Users /><span><strong>{users.length}</strong><small>{isSuperAdmin ? "Tài khoản UBND và BGH" : "Tổng tài khoản"}</small></span></div>
-        <div><UserRound /><span><strong>{users.filter(u => u.isActive).length}</strong><small>Đang hoạt động</small></span></div>
-        <div><UserRoundX /><span><strong>{users.filter(u => !u.isActive).length}</strong><small>Đã khóa</small></span></div>
+        <div><span className="um-stat-icon"><Users /></span><span><strong>{users.length}</strong><small>Tổng tài khoản</small></span></div>
+        <div><span className="um-stat-icon"><UserRound /></span><span><strong>{users.filter(u => u.isActive).length}</strong><small>Đang hoạt động</small></span></div>
+        <div><span className="um-stat-icon"><UserRoundX /></span><span><strong>{users.filter(u => !u.isActive).length}</strong><small>Đã khóa</small></span></div>
       </div>
       {notice && <div className="um-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Đóng thông báo">×</button></div>}
       {error && !showForm && <div className="um-error" role="alert">{error}</div>}
       <div className="um-toolbar">
         <label><Search size={17} /><input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="Tìm theo tên, email hoặc vai trò..." /></label>
+        {isSuperAdmin && <div className="um-filter-tabs" role="group" aria-label="Lọc vai trò">{[["ALL", "Tất cả"], ["UBND_ADMIN", "UBND"], ["SCHOOL_ADMIN", "Ban Giám hiệu"]].map(([value, label]) => <button key={value} className={roleFilter === value ? "selected" : ""} onClick={() => setRoleFilter(value)} aria-pressed={roleFilter === value}>{label}</button>)}</div>}
         <button className="um-secondary" onClick={() => void load()} disabled={loading}><RefreshCw size={15} /> Làm mới</button>
       </div>
       {loading ? <div className="um-empty">Đang tải danh sách tài khoản...</div> : filtered.length === 0 ? <div className="um-empty">Không tìm thấy tài khoản phù hợp.</div> : (
@@ -204,8 +207,8 @@ export default function UserManagement() {
             <thead><tr><th>Tài khoản</th><th>Vai trò</th>{isSuperAdmin && <th>Đơn vị quản lý</th>}<th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead>
             <tbody>{filtered.map(user => (
               <tr key={user.id}>
-                <td><strong>{user.fullName}</strong><small>{user.email}</small></td>
-                <td>{roleLabel(user.role)}</td>
+                <td><div className="um-person"><span className="um-avatar">{user.fullName.trim().charAt(0).toUpperCase()}</span><span><strong>{user.fullName}</strong><small>{user.email}</small></span></div></td>
+                <td><span className={`um-role ${user.role === "SCHOOL_ADMIN" ? "school" : "ward"}`}>{user.role === "SCHOOL_ADMIN" ? <GraduationCap size={14} /> : <Building2 size={14} />}{roleLabel(user.role)}</span></td>
                 {isSuperAdmin && <td>{user.role === "SCHOOL_ADMIN" ? (schools.find(school => school.id === user.schoolId)?.name ?? "Chưa xác định") : wardName(user.wardId)}</td>}
                 <td><span className={`um-status ${user.isActive ? "active" : "inactive"}`}>{user.isActive ? "Đang hoạt động" : "Đã khóa"}</span></td>
                 <td>{new Date(user.createdAt).toLocaleDateString("vi-VN")}</td>
@@ -225,7 +228,7 @@ export default function UserManagement() {
 
       {showForm && <div className="um-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
         <form className="um-modal" onSubmit={submitUser}>
-          <div className="um-modal-head"><h3>{editing ? "Cập nhật tài khoản" : "Tạo tài khoản mới"}</h3><button type="button" onClick={() => setShowForm(false)} aria-label="Đóng">×</button></div>
+          <div className="um-modal-head"><div><span className="um-modal-kicker">QUẢN LÝ NGƯỜI DÙNG</span><h3>{editing ? "Cập nhật tài khoản" : "Tạo tài khoản mới"}</h3><p>{editing ? "Chỉnh sửa thông tin đăng nhập và hồ sơ người dùng." : "Thiết lập tài khoản và phạm vi truy cập phù hợp."}</p></div><button type="button" onClick={() => setShowForm(false)} aria-label="Đóng"><X size={20} /></button></div>
           <label>Họ và tên<input required minLength={2} maxLength={120} value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} /></label>
           <label>Email đăng nhập<input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
           {!editing && <label>Mật khẩu ban đầu<input required type="password" minLength={8} maxLength={100} autoComplete="new-password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /><small>Tối thiểu 8 ký tự.</small></label>}
@@ -268,7 +271,7 @@ export default function UserManagement() {
 
       {passwordTarget && <div className="um-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setPasswordTarget(null); }}>
         <form className="um-modal" onSubmit={submitPassword}>
-          <div className="um-modal-head"><h3>Đặt lại mật khẩu</h3><button type="button" onClick={() => setPasswordTarget(null)} aria-label="Đóng">×</button></div>
+          <div className="um-modal-head"><div><span className="um-modal-kicker">BẢO MẬT TÀI KHOẢN</span><h3>Đặt lại mật khẩu</h3></div><button type="button" onClick={() => setPasswordTarget(null)} aria-label="Đóng"><X size={20} /></button></div>
           <p>Đặt mật khẩu mới cho <strong>{passwordTarget.email}</strong>.</p>
           <label>Mật khẩu mới<input required type="password" minLength={8} maxLength={100} autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} /><small>Tối thiểu 8 ký tự.</small></label>
           {error && <div className="um-error" role="alert">{error}</div>}
