@@ -44,7 +44,10 @@ export class DishQrService {
         revisionItem: { include: { dishVersion: { include: { dish: { select: { name: true } } } } } } },
     });
     const latest = plan.revisions[0];
-    return { plan: { id: plan.id, schoolName: plan.school.name, kitchenName: plan.kitchen?.name ?? '',
+    const expected = latest?.items.flatMap(item => latest.ageGroups.filter(group => group.plannedServings > 0 && (!item.portions.length || item.portions.some(portion => portion.ageGroupId === group.ageGroupId))).map(group => ({ itemId: item.id, groupId: group.ageGroupId }))) ?? [];
+    const currentKeys = new Set(records.filter(row => row.revisionId === latest?.id && !row.revokedAt).map(row => `${row.revisionItemId}:${row.ageGroupId}`));
+    const missing = latest?.status === 'APPROVED' ? expected.filter(pair => !currentKeys.has(`${pair.itemId}:${pair.groupId}`)).length : 0;
+    return { expectedCount: expected.length, missingCount: missing, approvedDishNames: latest?.items.map(item => item.dishVersion.dish.name) ?? [], plan: { id: plan.id, schoolName: plan.school.name, kitchenName: plan.kitchen?.name ?? '',
       serviceDate: plan.serviceDate, mealType: plan.mealType, revisionId: latest?.id ?? null, status: latest?.status ?? 'DRAFT' },
       records: records.map(row => ({ id: row.id, token: row.publicToken, dishName: row.revisionItem.dishVersion.dish.name,
         ageGroup: row.ageGroup.name, ageGroupCode: row.ageGroup.code, revisionId: row.revisionId,
@@ -71,15 +74,16 @@ export class DishQrService {
       if (current?.id !== revision.id || current.status !== 'APPROVED') throw new BadRequestException('Thực đơn vừa thay đổi. Hãy tải lại.');
       const existing = await tx.dishQr.findMany({ where: { revisionId: revision.id } });
       if (existing.some(row => row.revokedAt)) throw new BadRequestException('QR đã thu hồi không được phát hành lại cho cùng phiên bản. Cần tạo phiên bản thực đơn mới.');
-      if (existing.length && existing.length !== pairs.length) throw new BadRequestException('Danh sách QR chưa đồng bộ; cần kiểm tra lại thực đơn.');
-      if (!existing.length) {
-        await tx.dishQr.createMany({ data: pairs.map(({ item, group }) => ({
+      const existingKeys = new Set(existing.map(row => `${row.revisionItemId}:${row.ageGroupId}`));
+      const missingPairs = pairs.filter(({ item, group }) => !existingKeys.has(`${item.id}:${group.ageGroupId}`));
+      if (missingPairs.length) {
+        await tx.dishQr.createMany({ data: missingPairs.map(({ item, group }) => ({
           publicToken: randomBytes(24).toString('base64url'), schoolId: plan.schoolId,
           kitchenId: user.kitchenId!, mealPlanId: plan.id, revisionId: revision.id,
           revisionItemId: item.id, ageGroupId: group.ageGroupId, issuedById: user.sub,
         })) });
       }
-      return { issued: existing.length || pairs.length, revisionId: revision.id };
+      return { issued: missingPairs.length, total: existing.length + missingPairs.length, revisionId: revision.id };
     });
   }
 
