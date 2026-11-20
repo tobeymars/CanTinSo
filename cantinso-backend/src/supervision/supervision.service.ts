@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, SupervisionMeal } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/current-user.decorator';
 
@@ -51,7 +52,7 @@ export class SupervisionService {
       await tx.supervisionMeal.upsert({where:this.key(s),create:{...s,checks:{},stages:{},approvals:[]},update:{}});
       const current = await tx.supervisionMeal.findUniqueOrThrow({where:this.key(s)});
       const checks = asObject(current.checks), journey = asObject(current.stages), approvals = asArray(current.approvals);
-      const eventId = crypto.randomUUID();
+      const eventId = randomUUID();
       const entry = {id:eventId,actorId:user.sub,actorRole:user.role,at:new Date().toISOString(),note};
       if (action === 'check_report') {
         if (checks[itemId] && !['revision_requested'].includes(checks[itemId].status)) throw new ConflictException('Mục đã báo cáo.');
