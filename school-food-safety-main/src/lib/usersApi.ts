@@ -88,7 +88,8 @@ export function createManagedUser(payload: {
   email: string;
   fullName: string;
   password: string;
-  role: "UBND_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
+  role: "UBND_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
+  schoolId?: string;
   wardId?: string;
 }) {
   return request<ManagedUser>("/users", { method: "POST", body: JSON.stringify(payload) });
@@ -97,7 +98,7 @@ export function createManagedUser(payload: {
 export function updateManagedUser(id: string, payload: {
   email?: string;
   fullName?: string;
-  role?: "UBND_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
+  role?: "UBND_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_KITCHEN" | "SCHOOL_STAFF";
   isActive?: boolean;
 }) {
   return request<ManagedUser>(`/users/${encodeURIComponent(id)}`, {
