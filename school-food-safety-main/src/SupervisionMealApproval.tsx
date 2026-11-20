@@ -54,9 +54,8 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
   const confirmedStages = requiredStages.filter(id=>stages[id]?.confirmed).length
   const pendingDetails = [...['ingredient_receipt','processing','before_serving','food_sample'].filter(id=>checks[id]?.status!=='confirmed'),...requiredStages.filter(id=>!stages[id]?.confirmed)]
   const approvals = serverQuery.data?.approvals ?? []
-  const snapshot = JSON.stringify({checks,journey:stages})
   const latestApproval = approvals.at(-1)
-  const status = serverMode ? {confirmedChecks,requiredChecks:4,confirmedStages,requiredStages:requiredStages.length,pendingDetails,ready:pendingDetails.length===0,approved:!!latestApproval && latestApproval.snapshot===snapshot && pendingDetails.length===0,stale:!!latestApproval && (latestApproval.snapshot!==snapshot || pendingDetails.length>0),latest:latestApproval ? {actorLabel:'Ban Giám hiệu',confirmedAt:latestApproval.at,note:latestApproval.note}:undefined} : localStatus!
+  const status = serverMode ? {confirmedChecks,requiredChecks:4,confirmedStages,requiredStages:requiredStages.length,pendingDetails,ready:pendingDetails.length===0,approved:!!latestApproval && serverQuery.data?.approvalCurrent === true && pendingDetails.length===0,stale:!!latestApproval && (serverQuery.data?.approvalCurrent !== true || pendingDetails.length>0),latest:latestApproval ? {actorLabel:'Ban Giám hiệu',confirmedAt:latestApproval.at,note:latestApproval.note}:undefined} : localStatus!
   const history = serverMode ? approvals.map((a,i)=>({id:String(i),actorLabel:'Ban Giám hiệu',confirmedAt:a.at,note:a.note})) : readMealApprovalHistory(scope)
   const isBoard = role === 'school_board'
   const label = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
