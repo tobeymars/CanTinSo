@@ -88,7 +88,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   const statusLabel = (status: CheckStatus) => serverMode && status === 'confirmed' ? 'Đã xác nhận' : labels[status]
   const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []).map((event: any) => ({ id: String(event.id), action: event.action === 'request_revision' ? 'request_revision' : event.action, actorLabel: event.actorRole === 'SCHOOL_ADMIN' ? 'Ban Giám hiệu' : 'Bếp', recordedAt: event.at, note: event.note ?? '', evidenceRef: event.evidenceRef ?? '', ingredientReceipts: Array.isArray(event.ingredientReceipts) ? event.ingredientReceipts : [] })) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
   const ingredientCatalog = useMemo(() => supervisionIngredientCatalog(school.id), [school.id])
-  const evidenceOptions = editing ? supervisionEvidenceCatalog(scope, editing.id) : []
+  const evidenceOptions = editing && !serverMode ? supervisionEvidenceCatalog(scope, editing.id) : []
   const canReport = canReportSupervision(role, school.mode)
   const canConfirm = canConfirmSupervision(role)
   const confirmedCount = checks.filter(item => item.status === 'confirmed').length
@@ -114,6 +114,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
       const ingredientReceipts = editing.id === 'ingredient_receipt' && editing.action === 'report'
         ? ingredientRows.filter(row => row.itemId).map(row => ({ itemId: row.itemId, quantity: Number(row.quantity) }))
         : undefined
+      if (serverMode && editing.id === 'ingredient_receipt' && editing.action === 'report') throw Error('Kiểm thực bước 1 chưa kết nối danh mục lô nguyên liệu thật; không được gửi dữ liệu kho DEMO.')
       if (serverMode) {
         await writeServerSupervision(scope,{action:editing.action==='report'?'check_report':editing.action==='confirm'?'check_confirm':'check_revision',itemId:editing.id,note,evidenceRef,ingredientReceipts})
         await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
@@ -170,7 +171,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
         })}
       </div>
       <div className="supervision-check-footer">
-        <p><ShieldAlert size={16}/> Nhật ký tự báo cáo không thay thế hồ sơ, biên bản hoặc kết luận của cơ quan có thẩm quyền. Dữ liệu DEMO chỉ lưu trên trình duyệt này.</p>
+        <p><ShieldAlert size={16}/> Nhật ký tự báo cáo không thay thế hồ sơ, biên bản hoặc kết luận của cơ quan có thẩm quyền. {serverMode ? 'Dữ liệu được ghi nhận trên hệ thống.' : 'Dữ liệu DEMO chỉ lưu trên trình duyệt này.'}</p>
         {(canReport || canConfirm) && <button type="button" className="text-button" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Ẩn lịch sử cập nhật' : 'Xem lịch sử cập nhật'}</button>}
       </div>
       {editing && selected && <div className="supervision-edit-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setEditing(null) }}>
@@ -179,11 +180,11 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
           <p className="supervision-edit-context">{school.name} · {date} · {mealLabel} · <strong>{selected.label}</strong></p>
           <form onSubmit={submit} className="supervision-edit-form">
             {editing.action === 'report' && <label>Mã sổ / mã mẫu / tham chiếu hồ sơ <span aria-hidden="true">*</span>
-              <Select label="Tham chiếu hồ sơ" required searchable value={evidenceRef} options={evidenceOptions} placeholder={evidenceOptions.length ? 'Tìm và chọn hồ sơ' : 'Chưa có hồ sơ phù hợp'} searchPlaceholder="Tìm theo mã, loại hồ sơ hoặc nguyên liệu…" onValueChange={setEvidenceRef}/>
-              {evidenceOptions.length === 0 && <small className="supervision-reference-empty">Chưa có hồ sơ thuộc đúng trường, ngày và bữa để liên kết.</small>}
+              {serverMode ? <input required maxLength={180} value={evidenceRef} onChange={event => setEvidenceRef(event.target.value)} placeholder="Nhập mã hồ sơ thực tế đã đối chiếu" /> : <Select label="Tham chiếu hồ sơ" required searchable value={evidenceRef} options={evidenceOptions} placeholder={evidenceOptions.length ? 'Tìm và chọn hồ sơ' : 'Chưa có hồ sơ phù hợp'} searchPlaceholder="Tìm theo mã, loại hồ sơ hoặc nguyên liệu…" onValueChange={setEvidenceRef}/>}
+              {!serverMode && evidenceOptions.length === 0 && <small className="supervision-reference-empty">Chưa có hồ sơ thuộc đúng trường, ngày và bữa để liên kết.</small>}
             </label>}
             {editing.action !== 'report' && <p className="supervision-edit-guidance">{editing.action === 'confirm' ? 'BGH xác nhận đã đối chiếu bản báo cáo và hồ sơ tương ứng trong DEMO. Không phải xác nhận kiểm tra ATTP chính thức.' : 'Hồ sơ sẽ chuyển sang Cần bổ sung để bếp cập nhật lại, không xóa lịch sử cũ.'}</p>}
-            {editing.id === 'ingredient_receipt' && editing.action === 'report' && <fieldset className="supervision-ingredient-fieldset">
+            {editing.id === 'ingredient_receipt' && editing.action === 'report' && !serverMode && <fieldset className="supervision-ingredient-fieldset">
               <legend>Nguyên liệu đã tiếp nhận <span aria-hidden="true">*</span></legend>
               <p>Thêm từng dòng, tìm và chọn trong toàn bộ danh mục kho của trường. Mỗi nguyên liệu chỉ được chọn một lần.</p>
               {ingredientCatalog.length === 0 ? <div className="supervision-ingredient-empty">Chưa có nguyên liệu trong danh mục kho của trường. Cần cập nhật kho trước khi lập bước kiểm thực này.</div> : <div className="supervision-ingredient-options">
@@ -222,7 +223,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             })()}
             <label>Ghi chú / nội dung ghi nhận <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Nhập thông tin đối chiếu hoặc nội dung cần bổ sung…" /></label>
             {error && <p className="error" role="alert">{error}</p>}
-            <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary">{editing.action === 'report' ? 'Lưu và gửi BGH xác nhận' : editing.action === 'confirm' ? 'Xác nhận DEMO' : 'Gửi yêu cầu bổ sung'}</button></div>
+            <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary">{editing.action === 'report' ? 'Lưu và gửi BGH xác nhận' : editing.action === 'confirm' ? '(serverMode ? 'Xác nhận' : 'Xác nhận DEMO') : 'Gửi yêu cầu bổ sung'}</button></div>
           </form>
         </section>
       </div>}
