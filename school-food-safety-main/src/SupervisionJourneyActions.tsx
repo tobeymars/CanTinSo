@@ -12,7 +12,7 @@ import type { SupervisionMealType, SupervisionScope } from './lib/supervisionSta
 type Editing = { action: 'report' | 'confirm'; stage: JourneyStatus }
 function readPhoto(file: File): Promise<string> {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return Promise.reject(Error('Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP.'))
-  if (file.size > 750 * 1024) return Promise.reject(Error('Ảnh tối đa 750 KB để tránh đầy bộ nhớ DEMO.'))
+  if (file.size > 750 * 1024) return Promise.reject(Error('Ảnh tối đa 750 KB.'))
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(Error('Không thể đọc ảnh đã chọn.'))
@@ -53,7 +53,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   }, [])
   void revision
   const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:'Bếp',photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
-  const stages = serverMode && role === 'central_kitchen' ? ['DISPATCHED','ARRIVED','PLATED','READY'] as JourneyStatus[] : stagesForSchool(school.mode, role)
+  const stages = stagesForSchool(school.mode, role)
   const next = serverMode ? (()=>{const candidate=stages.find(stage=>!saved?.events.some(event=>event.status===stage));return candidate && (candidate==='DISPATCHED' ? role==='central_kitchen' : role==='school_kitchen') ? candidate : null})() : getNextReportableStage(scope, school.mode, role)
   const pending = saved?.events.filter(event => !event.confirmed && stages.includes(event.status)) ?? []
   const isBoard = role === 'school_board'
@@ -95,12 +95,12 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
         const event = saved?.events.find(entry => entry.status === status)
         return <div className="supervision-stage-row" key={status}>
           <span className="supervision-check-icon">{event?.confirmed ? <CheckCircle2 size={18}/> : event ? <Clock3 size={18}/> : <Activity size={18}/>}</span>
-          <div className="supervision-stage-info"><strong>{stageNames[status]}</strong><small>{event ? `${event.actorLabel} · ${event.time}${event.confirmedAt ? ' · BGH xác nhận' : ''}` : 'Chưa ghi nhận mới · DEMO'}</small>{event?.confirmationNote && (role === 'school_board' || role === 'school_kitchen' || role === 'central_kitchen') && <small>Ghi chú xác nhận: {event.confirmationNote}</small>}</div>
+          <div className="supervision-stage-info"><strong>{stageNames[status]}</strong><small>{event ? `${event.actorLabel} · ${event.time}${event.confirmedAt ? ' · BGH xác nhận' : ''}` : 'Chưa ghi nhận mới'}</small>{event?.confirmationNote && (role === 'school_board' || role === 'school_kitchen' || role === 'central_kitchen') && <small>Ghi chú xác nhận: {event.confirmationNote}</small>}</div>
           <div className="supervision-check-controls"><span className={`supervision-check-pill ${event?.confirmed ? 'confirmed' : event ? 'reported' : 'not_reported'}`}>{event?.confirmed ? 'Đã xác nhận' : event ? 'Chờ xác nhận' : 'Chưa cập nhật'}</span>{next === status && <button className="outline" type="button" onClick={() => edit({action:'report',stage:status})}>Cập nhật</button>}{isBoard && event && !event.confirmed && <button className="primary" type="button" onClick={() => edit({action:'confirm',stage:status})}>Xác nhận</button>}</div>
         </div>
       })}
     </div>
-    <p className="supervision-stage-footnote">{saved?.events.length ? 'Các mốc đã ghi nhận trong DEMO được lưu riêng theo bữa. BGH phải xác nhận để ảnh phục vụ được công khai.' : 'Đang hiển thị lịch trình minh họa ở nhật ký bên dưới. Khi bếp bắt đầu báo cáo, lịch trình sẽ chuyển sang các mốc ghi nhận mới của bữa này.'} Không phải chứng nhận an toàn thực phẩm.</p>
+    <p className="supervision-stage-footnote">{saved?.events.length ? (serverMode ? 'Các mốc được lưu theo đúng bữa trên hệ thống. BGH phải xác nhận để ảnh phục vụ được công khai.' : 'Các mốc đã ghi nhận trong DEMO được lưu riêng theo bữa. BGH phải xác nhận để ảnh phục vụ được công khai.') : 'Đang hiển thị lịch trình minh họa ở nhật ký bên dưới. Khi bếp bắt đầu báo cáo, lịch trình sẽ chuyển sang các mốc ghi nhận mới của bữa này.'} Không phải chứng nhận an toàn thực phẩm.</p>
     {editing && <div className="supervision-edit-backdrop" role="presentation" onMouseDown={event => {if(event.target===event.currentTarget)setEditing(null)}}>
       <section role="dialog" aria-modal="true" aria-labelledby="edit-stage-title" className="supervision-edit-dialog">
         <div className="dialog-head"><h2 id="edit-stage-title">{editing.action === 'report' ? 'Cập nhật mốc vận hành' : 'Xác nhận mốc vận hành'}</h2><button className="icon-button" type="button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
@@ -115,7 +115,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
           }}/>{photoName && <small>Đã chọn: {photoName}</small>}</label>}
           <label>Ghi chú / nội dung đối chiếu <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={3} value={note} onChange={event => setNote(event.target.value)} placeholder="Ghi rõ hoạt động đã thực hiện…" /></label>
           {error && <p className="error" role="alert">{error}</p>}
-          <div className="supervision-edit-buttons"><button className="outline" type="button" onClick={() => setEditing(null)}>Hủy</button><button className="primary" disabled={loadingPhoto || (editing.action === 'report' && editing.stage === 'READY' && !photo)} type="submit">{editing.action === 'report' ? 'Lưu mốc · Chờ BGH xác nhận' : 'Xác nhận DEMO'}</button></div>
+          <div className="supervision-edit-buttons"><button className="outline" type="button" onClick={() => setEditing(null)}>Hủy</button><button className="primary" disabled={loadingPhoto || (editing.action === 'report' && editing.stage === 'READY' && !photo)} type="submit">{editing.action === 'report' ? 'Lưu mốc · Chờ BGH xác nhận' : serverMode ? 'Xác nhận' : 'Xác nhận DEMO'}</button></div>
         </form>
       </section>
     </div>}
