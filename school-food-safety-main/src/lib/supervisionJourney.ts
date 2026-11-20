@@ -39,7 +39,7 @@ const roleNames: Partial<Record<ViewRole, string>> = {
  */
 export const stagesForSchool = (mode: School['mode'], role?: ViewRole): JourneyStatus[] =>
   mode === 'CENTRAL_KITCHEN'
-    ? role === 'school_kitchen' ? ['DISPATCHED', 'PLATED', 'READY'] : allStages
+    ? allStages
     : ['PLATED', 'READY']
 
 function readAll(): SavedJourney[] {
