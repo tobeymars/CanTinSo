@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CheckCircle2, ClipboardCheck, Clock3, FileClock, Pencil, Plus, ShieldAlert, ShieldCheck, X } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { isServerSupervisionScope, readServerSupervision, writeServerSupervision } from './lib/supervisionApi'
 import type { School } from './lib/data'
 import type { ViewRole } from './lib/store'
 import {
@@ -59,6 +60,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   role: ViewRole
 }) {
   const scope: SupervisionScope = { schoolId: school.id, serviceDate: date, mealType }
+  const serverMode = isServerSupervisionScope(scope)
+  const serverQuery = useQuery({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType],queryFn:()=>readServerSupervision(scope),enabled:serverMode})
   const [revision, setRevision] = useState(0)
   const [editing, setEditing] = useState<Editing | null>(null)
   const [note, setNote] = useState('')
@@ -82,7 +85,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   }, [])
   // Recalculate after writes in this tab and cross-tab storage changes.
   void revision
-  const checks = readSupervisionStatuses(scope)
+  const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
   const ingredientCatalog = useMemo(() => supervisionIngredientCatalog(school.id), [school.id])
   const evidenceOptions = editing ? supervisionEvidenceCatalog(scope, editing.id) : []
   const canReport = canReportSupervision(role, school.mode)
@@ -103,17 +106,20 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
         : [createIngredientRow()]
       : [])
   }
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!editing) return
     try {
       const ingredientReceipts = editing.id === 'ingredient_receipt' && editing.action === 'report'
         ? ingredientRows.filter(row => row.itemId).map(row => ({ itemId: row.itemId, quantity: Number(row.quantity) }))
         : undefined
-      updateSupervisionStatus({ scope, id: editing.id, action: editing.action, role, schoolMode: school.mode, note, evidenceRef, ingredientReceipts })
+      if (serverMode) {
+        await writeServerSupervision(scope,{action:editing.action==='report'?'check_report':editing.action==='confirm'?'check_confirm':'check_revision',itemId:editing.id,note,evidenceRef,ingredientReceipts})
+        await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
+      } else updateSupervisionStatus({ scope, id: editing.id, action: editing.action, role, schoolMode: school.mode, note, evidenceRef, ingredientReceipts })
       setEditing(null)
       setError('')
-      setMessage('Đã cập nhật trạng thái DEMO cho ' + mealLabel + '. Chưa phải kết quả kiểm tra ATTP chính thức.')
+      setMessage(serverMode ? 'Đã lưu trạng thái giám sát cho ' + mealLabel + '.' : 'Đã cập nhật trạng thái DEMO cho ' + mealLabel + '. Chưa phải kết quả kiểm tra ATTP chính thức.')
       void queryClient.invalidateQueries({ queryKey: ['supervision-meal-day', school.id, date, mealType] })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Không thể lưu trạng thái. Vui lòng thử lại.')
