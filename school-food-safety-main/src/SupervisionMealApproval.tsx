@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { isServerSupervisionScope, readServerSupervision, writeServerSupervision } from './lib/supervisionApi'
 import type { FormEvent } from 'react'
 import { AlertCircle, CheckCircle2, ClipboardCheck, Clock3, ShieldCheck, X } from 'lucide-react'
 import type { School } from './lib/data'
@@ -18,6 +20,9 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
   role: ViewRole
 }) {
   const scope: SupervisionScope = { schoolId: school.id, serviceDate: date, mealType }
+  const serverMode = isServerSupervisionScope(scope)
+  const queryClient = useQueryClient()
+  const serverQuery = useQuery({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType],queryFn:()=>readServerSupervision(scope),enabled:serverMode})
   const [revision, setRevision] = useState(0)
   const [confirming, setConfirming] = useState(false)
   const [note, setNote] = useState('')
@@ -41,18 +46,31 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
     }
   }, [])
   void revision
-  const status = mealApprovalStatus(scope, school)
-  const history = readMealApprovalHistory(scope)
+  const localStatus = serverMode ? null : mealApprovalStatus(scope, school)
+  const checks = serverQuery.data?.checks ?? {}
+  const stages = serverQuery.data?.stages ?? {}
+  const requiredStages = school.mode === 'CENTRAL_KITCHEN' ? ['DISPATCHED','ARRIVED','PLATED','READY'] : ['PLATED','READY']
+  const confirmedChecks = ['ingredient_receipt','processing','before_serving','food_sample'].filter(id=>checks[id]?.status==='confirmed').length
+  const confirmedStages = requiredStages.filter(id=>stages[id]?.confirmed).length
+  const pendingDetails = [...['ingredient_receipt','processing','before_serving','food_sample'].filter(id=>checks[id]?.status!=='confirmed'),...requiredStages.filter(id=>!stages[id]?.confirmed)]
+  const approvals = serverQuery.data?.approvals ?? []
+  const snapshot = JSON.stringify({checks,journey:stages})
+  const latestApproval = approvals.at(-1)
+  const status = serverMode ? {confirmedChecks,requiredChecks:4,confirmedStages,requiredStages:requiredStages.length,pendingDetails,ready:pendingDetails.length===0,approved:!!latestApproval && latestApproval.snapshot===snapshot && pendingDetails.length===0,stale:!!latestApproval && (latestApproval.snapshot!==snapshot || pendingDetails.length>0),latest:latestApproval ? {actorLabel:'Ban Giám hiệu',confirmedAt:latestApproval.at,note:latestApproval.note}:undefined} : localStatus!
+  const history = serverMode ? approvals.map((a,i)=>({id:String(i),actorLabel:'Ban Giám hiệu',confirmedAt:a.at,note:a.note})) : readMealApprovalHistory(scope)
   const isBoard = role === 'school_board'
   const label = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     try {
-      confirmMealSupervision({ scope, school, role, note })
+      if(serverMode){
+        await writeServerSupervision(scope,{action:'meal_confirm',note})
+        await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
+      }else confirmMealSupervision({ scope, school, role, note })
       setConfirming(false)
       setNote('')
       setError('')
-      setNotice(`Ban Giám hiệu đã xác nhận tổng thể Giám sát & an toàn ${label} (DEMO).`)
+      setNotice(serverMode ? `Ban Giám hiệu đã xác nhận tổng thể Giám sát & an toàn ${label}.` : `Ban Giám hiệu đã xác nhận tổng thể Giám sát & an toàn ${label} (DEMO).`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Không thể xác nhận tổng thể.')
     }
@@ -83,7 +101,7 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
       <button type="button" className="text-button" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Ẩn lịch sử xác nhận' : `Xem lịch sử xác nhận (${history.length})`}</button>
       {showHistory && <ol>{[...history].reverse().map(item => <li key={item.id}><strong>{item.actorLabel}</strong> · {new Date(item.confirmedAt).toLocaleString('vi-VN')} · {item.note}</li>)}</ol>}
     </div>}
-    <p className="supervision-approval-disclaimer">DEMO · Xác nhận nội bộ của Ban Giám hiệu, không thay thế kết luận kiểm tra an toàn thực phẩm của cơ quan có thẩm quyền. Dữ liệu chỉ lưu trên trình duyệt.</p>
+    <p className="supervision-approval-disclaimer">{serverMode ? 'Xác nhận nội bộ của Ban Giám hiệu, không thay thế kết luận kiểm tra an toàn thực phẩm của cơ quan có thẩm quyền.' : 'DEMO · Xác nhận nội bộ của Ban Giám hiệu, không thay thế kết luận kiểm tra an toàn thực phẩm của cơ quan có thẩm quyền. Dữ liệu chỉ lưu trên trình duyệt.'}</p>
     {isBoard && confirming && <div className="supervision-edit-backdrop" role="presentation" onMouseDown={event => {if(event.target===event.currentTarget)setConfirming(false)}}>
       <section className="supervision-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="supervision-final-approval-title">
         <div className="dialog-head"><h2 id="supervision-final-approval-title">Xác nhận Giám sát & an toàn · {label}</h2><button type="button" className="icon-button" aria-label="Đóng" onClick={() => setConfirming(false)}><X size={20}/></button></div>
