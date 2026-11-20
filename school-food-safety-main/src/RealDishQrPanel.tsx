@@ -61,6 +61,11 @@ export default function RealDishQrPanel() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Thao tác không thành công.'); }
     finally { setBusy(false); }
   }
+  // Older backend instances may not expose QR reconciliation fields yet.
+  // Never let an incomplete API payload crash the entire management page.
+  const approvedDishNames = Array.isArray(registry?.approvedDishNames) ? registry.approvedDishNames : [];
+  const expectedCount = typeof registry?.expectedCount === 'number' ? registry.expectedCount : null;
+  const missingCount = typeof registry?.missingCount === 'number' ? registry.missingCount : null;
   const rows = (registry?.records ?? []).filter(row => (showRevoked || row.state === 'ACTIVE') && `${row.dishName} ${row.ageGroup}`.toLocaleLowerCase('vi').includes(filter.toLocaleLowerCase('vi')));
   const active = registry?.records.filter(row => row.state === 'ACTIVE') ?? [];
   return <section className="portion-qr-page real-qr-workspace">
@@ -79,7 +84,8 @@ export default function RealDishQrPanel() {
       {notice && <p className="inventory-success" role="status"><CheckCircle2 size={17}/>{notice}</p>}
       {selected && registry && <>
         <div className="portion-privacy"><ShieldAlert size={19}/><p><strong>Phiên bản {selected.revisions[0]?.revisionNo ?? '—'} · {registry.plan.status === 'APPROVED' ? 'Đã duyệt' : 'Chưa được duyệt'}.</strong> QR chỉ có hiệu lực khi phiên bản thực đơn mới nhất được duyệt và mã chưa bị thu hồi. Thông tin lô nguyên liệu chưa được xác minh sẽ không hiển thị như dữ liệu thực tế.</p></div>
-        <p className="muted" style={{margin:'12px 0'}}>Món trong thực đơn đã duyệt: <strong>{registry.approvedDishNames.join(', ') || 'Chưa có món'}</strong>. Dự kiến {registry.expectedCount} mã QR; còn thiếu {registry.missingCount} mã.</p>
+        <p className="muted" style={{margin:'12px 0'}}>Món trong thực đơn đã duyệt: <strong>{approvedDishNames.join(', ') || 'Chưa có dữ liệu từ API'}</strong>. Dự kiến {expectedCount ?? '—'} mã QR; còn thiếu {missingCount ?? '—'} mã.</p>
+        {missingCount === null && <p role="status" className="muted" style={{margin:'8px 0 16px'}}>API QR chưa trả về số lượng mã cần phát hành. Hãy khởi động lại backend để nhận phiên bản mới.</p>}
         <div className="portion-qr-summary">
           <div className="card"><QrCode/><strong>{active.length}</strong><span>QR đang hiệu lực</span></div>
           <div className="card"><CheckCircle2/><strong>{registry.records.length}</strong><span>Tổng mã đã phát hành</span></div>
@@ -88,7 +94,7 @@ export default function RealDishQrPanel() {
         {canIssue && <div className="portion-actions" style={{flexWrap:'wrap'}}>
           <div><strong>Phát hành theo thực đơn được duyệt</strong><p>Không thể cấp lại mã đã thu hồi cho cùng phiên bản.</p></div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <button type="button" className="primary" disabled={busy || registry.plan.status !== 'APPROVED' || registry.missingCount === 0} onClick={() => void mutate('issue')}><QrCode size={16}/>{registry.records.length ? 'Bổ sung QR còn thiếu' : 'Phát hành QR'}</button>
+            <button type="button" className="primary" disabled={busy || registry.plan.status !== 'APPROVED' || missingCount === null || missingCount === 0} onClick={() => void mutate('issue')}><QrCode size={16}/>{registry.records.length ? 'Bổ sung QR còn thiếu' : 'Phát hành QR'}</button>
             <button type="button" className="outline" disabled={busy || !active.length} onClick={() => window.print()}><Printer size={16}/>In QR</button>
           </div>
         </div>}
@@ -109,7 +115,7 @@ export default function RealDishQrPanel() {
             <a href={url} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',gap:6,alignItems:'center',marginTop:8}}><ExternalLink size={14}/>Xem trang truy xuất</a>
           </article>; })}
         </div>
-        {!rows.length && <p className="portion-empty">Chưa có mã QR phù hợp. {canIssue && registry.plan.status === 'APPROVED' && registry.missingCount > 0 ? 'Chọn Phát hành QR để tạo mã.' : ''}</p>}
+        {!rows.length && <p className="portion-empty">Chưa có mã QR phù hợp. {canIssue && registry.plan.status === 'APPROVED' && (missingCount ?? 0) > 0 ? 'Chọn Phát hành QR để tạo mã.' : ''}</p>}
       </>}
       {!loading && !plans.length && <div className="portion-empty"><QrCode size={36}/><h3>Chưa có thực đơn</h3><p>Cần lập thực đơn, gửi và được BGH duyệt trước khi phát hành QR.</p></div>}
     </div>
