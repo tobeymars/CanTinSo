@@ -223,7 +223,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             })()}
             <label>Ghi chú / nội dung ghi nhận <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Nhập thông tin đối chiếu hoặc nội dung cần bổ sung…" /></label>
             {error && <p className="error" role="alert">{error}</p>}
-            <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary">{editing.action === 'report' ? 'Lưu và gửi BGH xác nhận' : editing.action === 'confirm' ? '(serverMode ? 'Xác nhận' : 'Xác nhận DEMO') : 'Gửi yêu cầu bổ sung'}</button></div>
+            <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary">{editing.action === 'report' ? 'Lưu và gửi BGH xác nhận' : editing.action === 'confirm' ? (serverMode ? 'Xác nhận' : 'Xác nhận DEMO') : 'Gửi yêu cầu bổ sung'}</button></div>
           </form>
         </section>
       </div>}
