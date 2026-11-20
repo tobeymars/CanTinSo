@@ -132,10 +132,11 @@ export default function RealDishQrPanel() {
         </div>
         <div className="real-qr-grid">
           {rows.map(row => { const url = `${window.location.origin}/truy-xuat-suat/${row.token}`; return <article className="real-qr-print-card" key={row.id}>
-            <div className="real-qr-card-head"><span className={`real-qr-status ${row.state === 'ACTIVE' ? 'approved' : 'pending'}`}>{row.state === 'ACTIVE' ? 'Đang hiệu lực' : 'Hết hiệu lực'}</span><small>{row.ageGroup}</small></div>
-            <h4>{row.dishName}</h4>
-            <div className="real-qr-code"><QRCodeSVG value={url} size={166} level="M" marginSize={2}/></div>
-            <div className="real-qr-card-foot"><p>{registry.plan.schoolName} · {new Date(registry.plan.serviceDate).toLocaleDateString('vi-VN')}</p><a href={url} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/> Xem trang truy xuất</a></div>
+            <div className="real-qr-card-accent" aria-hidden="true"/>
+            <div className="real-qr-card-head"><span className={`real-qr-status ${row.state === 'ACTIVE' ? 'approved' : 'pending'}`}><span className="real-qr-status-dot"/>{row.state === 'ACTIVE' ? 'Đang hiệu lực' : 'Hết hiệu lực'}</span><span className="real-qr-card-type"><UtensilsCrossed size={13}/> Món ăn</span></div>
+            <div className="real-qr-card-title"><h4>{row.dishName}</h4><span className="real-qr-age-tag">{row.ageGroup}</span></div>
+            <div className="real-qr-code"><span className="real-qr-code-label">QUÉT ĐỂ TRUY XUẤT</span><QRCodeSVG value={url} size={176} level="M" marginSize={2}/><span className="real-qr-code-caption">Thông tin món ăn &amp; dinh dưỡng</span></div>
+            <div className="real-qr-card-foot"><div className="real-qr-card-meta"><span><School size={14}/>{registry.plan.schoolName}</span><span><CalendarDays size={14}/>{new Date(registry.plan.serviceDate).toLocaleDateString('vi-VN')}</span></div><a href={url} target="_blank" rel="noopener noreferrer"><span>Xem thông tin truy xuất</span><ExternalLink size={16}/></a></div>
           </article>; })}
         </div>
         {!rows.length && <div className="real-qr-empty"><QrCode size={32}/><h3>Chưa có mã QR phù hợp</h3><p>{canIssue && registry.plan.status === 'APPROVED' && (missingCount ?? 0) > 0 ? 'Hãy phát hành mã QR cho các món trong thực đơn đã duyệt.' : 'Thử thay đổi bộ lọc hoặc chọn thực đơn khác.'}</p></div>}
