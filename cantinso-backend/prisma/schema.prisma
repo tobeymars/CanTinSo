@@ -180,6 +180,7 @@ model School {
   mealPlans            MealPlan[]
   dishQrs              DishQr[]
   dishApprovals        DishApproval[]
+  supervisionMeals     SupervisionMeal[]
   foodSafetyChecks     FoodSafetyCheck[]
   hikvisionEnrollments HikvisionStudentEnrollment[]
   createdAt            DateTime                     @default(now()) @map("created_at")
@@ -207,6 +208,7 @@ model Kitchen {
   dishes      Dish[]
   mealPlans   MealPlan[]
   legalDocuments KitchenLegalDocument[]
+  supervisionMeals SupervisionMeal[]
   dishQrs     DishQr[]
   schools     KitchenSchoolAssignment[]
   createdAt   DateTime                  @default(now()) @map("created_at")
@@ -763,7 +765,9 @@ model KitchenLegalEvent {
 model SupervisionMeal {
   id String @id @default(uuid()) @db.Uuid
   schoolId String @map("school_id") @db.Uuid
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   kitchenId String @map("kitchen_id") @db.Uuid
+  kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
   serviceDate DateTime @map("service_date") @db.Date
   mealType String @map("meal_type")
   checks Json @default("{}")
