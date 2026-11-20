@@ -52,6 +52,7 @@ export default function RealDishQrTracePage({token}:{token:string}) {
   const coverage = snapshot?.coverage && typeof snapshot.coverage === 'object' && !Array.isArray(snapshot.coverage)
     ? snapshot.coverage as Record<string, unknown> : null;
   const nutritionComplete = coverage?.complete === true;
+  const nutritionReconstructed = snapshot?.reconstructed === true;
   const nutritionWarnings = Array.isArray(snapshot?.warnings) ? snapshot.warnings.filter((value): value is string => typeof value === 'string') : [];
   const ingredients = Array.isArray(data?.ingredients) ? data.ingredients : [];
   return <main className="dish-trace-page">
@@ -89,6 +90,7 @@ export default function RealDishQrTracePage({token}:{token:string}) {
         <section className="dish-trace-panel dish-trace-section">
           <div className="dish-trace-section-heading"><span className="dish-trace-section-icon"><ShieldCheck size={20}/></span><div><h2>Thông tin dinh dưỡng</h2><p>Các chỉ số được lưu cùng phiên bản công thức.</p></div></div>
           {nutrition.length ? <>
+            {nutritionReconstructed && <div className="dish-trace-nutrition-warning" role="note"><Info size={17}/><span><strong>Số liệu được tính lại từ hồ sơ dinh dưỡng hiện có.</strong> Đây không phải dữ liệu dinh dưỡng đã lưu khi BGH phê duyệt phiên bản món ăn này.</span></div>}
             {coverage && !nutritionComplete && <div className="dish-trace-nutrition-warning" role="note"><Info size={17}/><span><strong>Dữ liệu dinh dưỡng chưa đầy đủ.</strong> Các giá trị dưới đây là tổng phần nguyên liệu đã có hồ sơ dinh dưỡng, không phải tổng dinh dưỡng đầy đủ của món. {typeof coverage.calculatedCount === 'number' && typeof coverage.ingredientCount === 'number' ? `Đã tính được ${coverage.calculatedCount}/${coverage.ingredientCount} nguyên liệu.` : ''}</span></div>}
             <div className="dish-trace-nutrients">{nutrition.map(([key,value]) => <div className="dish-trace-nutrient" key={key}><small>{nutritionLabels[key]}</small><strong>{numeric(value as string | number)} <span>{nutritionUnits[key] ?? ''}</span></strong></div>)}</div>
             {nutritionWarnings.length > 0 && <details className="dish-trace-nutrition-details"><summary>Xem lưu ý về dữ liệu dinh dưỡng ({nutritionWarnings.length})</summary><ul>{nutritionWarnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></details>}
