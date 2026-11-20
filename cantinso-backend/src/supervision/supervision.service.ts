@@ -15,12 +15,13 @@ export class SupervisionService {
     if (!/^[0-9a-f-]{36}$/i.test(schoolId) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !['BREAKFAST','LUNCH','SNACK'].includes(mealType))
       throw new BadRequestException('Trường, ngày hoặc bữa không hợp lệ.');
     const serviceDate = new Date(date + 'T00:00:00.000Z');
+    const serviceDayEnd = new Date(date + 'T23:59:59.999Z');
     if (Number.isNaN(serviceDate.valueOf()) || serviceDate.toISOString().slice(0,10) !== date) throw new BadRequestException('Ngày không hợp lệ.');
     const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { id:true, wardId:true } });
     if (!school) throw new NotFoundException('Không tìm thấy trường.');
     if (user.role === 'SCHOOL_ADMIN' && user.schoolId !== schoolId) throw new ForbiddenException('Không thuộc trường được quản lý.');
     if (user.role === 'UBND_ADMIN' && (!user.wardId || school.wardId !== user.wardId)) throw new ForbiddenException('Không thuộc địa bàn được quản lý.');
-    const assignment = await this.prisma.kitchenSchoolAssignment.findFirst({where:{schoolId,isActive:true,startsAt:{lte:serviceDate},OR:[{endsAt:null},{endsAt:{gte:serviceDate}}]},select:{kitchenId:true}});
+    const assignment = await this.prisma.kitchenSchoolAssignment.findFirst({where:{schoolId,isActive:true,startsAt:{lte:serviceDayEnd},OR:[{endsAt:null},{endsAt:{gte:serviceDate}}]},select:{kitchenId:true}});
     const onSite = await this.prisma.kitchen.findFirst({where:{schoolId,isActive:true},select:{id:true}});
     const kitchenId = assignment?.kitchenId ?? onSite?.id;
     if (!kitchenId) throw new BadRequestException('Trường chưa có bếp phục vụ tại ngày này.');
@@ -30,6 +31,34 @@ export class SupervisionService {
     }
     if (!['CENTRAL_KITCHEN','SCHOOL_KITCHEN','SCHOOL_ADMIN','UBND_ADMIN'].includes(user.role)) throw new ForbiddenException();
     return { schoolId, kitchenId, serviceDate, mealType };
+  }
+  async context(user: AuthUser, schoolId: string, date: string, mealType: string) {
+    const scope = await this.scope(user, schoolId, date, mealType);
+    const [plan, lots, kitchen] = await Promise.all([
+      this.prisma.mealPlan.findUnique({
+        where: {schoolId_serviceDate_mealType: {schoolId:scope.schoolId,serviceDate:scope.serviceDate,mealType:scope.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
+        include: {revisions: {where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,include:{items:{include:{dishVersion:{include:{dish:true}}}}}}}},
+      }),
+      this.prisma.inventoryLot.findMany({
+        where:{schoolId:scope.schoolId, receivedAt:{lte:new Date(date+'T23:59:59.999Z')}},
+        include:{ingredient:{select:{name:true}},supplier:{select:{name:true,contactName:true,phone:true}}},
+        orderBy:{receivedAt:'desc'},
+        take:200,
+      }),
+      this.prisma.kitchen.findUnique({where:{id:scope.kitchenId},select:{id:true,name:true,type:true}}),
+    ]);
+    return {
+      schoolId:scope.schoolId,serviceDate:date,mealType,kitchen,
+      menu:plan ? {id:plan.id,servings:plan.servings,status:plan.revisions[0]?.status ?? plan.status,
+        dishes:plan.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name})) ?? []} : null,
+      lots:lots.map(lot=>({
+        itemId:lot.id,ingredientName:lot.ingredient.name,lotCode:lot.lotCode,
+        supplierName:lot.supplier.name,supplierContact:lot.supplier.contactName || lot.supplier.phone || '',
+        expiresAt:lot.expiryDate?.toISOString().slice(0,10) ?? null,
+        quantityAvailable:Number(lot.remainingQty),unit:lot.unit,status:lot.status,
+        receivedAt:lot.receivedAt.toISOString(),
+      })),
+    };
   }
   private key(s: Awaited<ReturnType<SupervisionService['scope']>>) { return {schoolId_serviceDate_mealType:{schoolId:s.schoolId,serviceDate:s.serviceDate,mealType:s.mealType}}; }
   async read(user: AuthUser, schoolId: string, date: string, mealType: string) {
@@ -57,7 +86,31 @@ export class SupervisionService {
       if (action === 'check_report') {
         if (checks[itemId] && !['revision_requested'].includes(checks[itemId].status)) throw new ConflictException('Mục đã báo cáo.');
         if (typeof body.evidenceRef !== 'string' || !body.evidenceRef.trim()) throw new BadRequestException('Thiếu tham chiếu hồ sơ.');
-        if (itemId === 'ingredient_receipt' && (!Array.isArray(body.ingredientReceipts) || !body.ingredientReceipts.length)) throw new BadRequestException('Thiếu nguyên liệu tiếp nhận.');
+        if (itemId === 'ingredient_receipt') {
+          if (!Array.isArray(body.ingredientReceipts) || body.ingredientReceipts.length === 0 || body.ingredientReceipts.length > 100)
+            throw new BadRequestException('Cần chọn nguyên liệu tiếp nhận từ kho.');
+          const ids = body.ingredientReceipts.map((line:any) => line?.itemId);
+          if (ids.some((id:any) => typeof id !== 'string') || new Set(ids).size !== ids.length)
+            throw new BadRequestException('Lô nguyên liệu không hợp lệ hoặc bị trùng.');
+          const lots = await tx.inventoryLot.findMany({
+            where:{schoolId:s.schoolId,id:{in:ids}},
+            include:{ingredient:{select:{name:true}},supplier:{select:{name:true,contactName:true,phone:true}}},
+          });
+          if (lots.length !== ids.length) throw new BadRequestException('Lô nguyên liệu không thuộc trường đang giám sát.');
+          const normalized = body.ingredientReceipts.map((line:any)=>{
+            const lot=lots.find(item=>item.id===line.itemId)!;
+            const quantity=Number(line.quantity);
+            if (!Number.isFinite(quantity) || quantity <= 0 || quantity > Number(lot.quantity))
+              throw new BadRequestException('Số lượng nguyên liệu không hợp lệ.');
+            if (lot.receivedAt > new Date(date+'T23:59:59.999Z'))
+              throw new BadRequestException('Lô chưa được tiếp nhận tại ngày bữa ăn.');
+            return {itemId:lot.id,ingredientName:lot.ingredient.name,lotCode:lot.lotCode,
+              supplierName:lot.supplier.name,supplierContact:lot.supplier.contactName || lot.supplier.phone || '',
+              expiresAt:lot.expiryDate?.toISOString().slice(0,10) ?? '',
+              quantity,unit:lot.unit};
+          });
+          body.ingredientReceipts=normalized;
+        }
         checks[itemId] = {status:'reported',evidenceRef:body.evidenceRef.trim(),ingredientReceipts:body.ingredientReceipts??[],history:[...(checks[itemId]?.history??[]),{...entry,action:'report',status:'reported',evidenceRef:body.evidenceRef.trim(),ingredientReceipts:body.ingredientReceipts??[]}]};
       } else if (action === 'check_confirm' || action === 'check_revision') {
         if (checks[itemId]?.status !== 'reported') throw new ConflictException('Mục chưa chờ xác nhận.');
