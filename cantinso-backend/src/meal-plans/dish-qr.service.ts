@@ -2,10 +2,11 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { randomBytes } from 'node:crypto';
 import { AuthUser } from '../common/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { DishesService } from '../dishes/dishes.service';
 
 @Injectable()
 export class DishQrService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly dishesService: DishesService) {}
 
   private async scopedPlan(user: AuthUser, planId: string) {
     if (!['CENTRAL_KITCHEN', 'SCHOOL_KITCHEN', 'SCHOOL_ADMIN', 'UBND_ADMIN'].includes(user.role)) throw new ForbiddenException('Không có quyền xem QR.');
@@ -117,11 +118,14 @@ export class DishQrService {
     });
     const valid = !row.revokedAt && latest?.id === row.revisionId && latest.status === 'APPROVED';
     const version = row.revisionItem.dishVersion;
+    const storedNutrition = version.nutritionSnapshot;
+    const hasStoredTotals = storedNutrition && typeof storedNutrition === 'object' && !Array.isArray(storedNutrition) && Object.keys(storedNutrition).length > 0;
+    const nutrition = hasStoredTotals ? storedNutrition : await this.dishesService.reconstructNutritionForVersion(version.id);
     return { state: valid ? 'ACTIVE' : 'REVOKED', revokeReason: row.revokeReason,
       schoolName: row.school.name, kitchenName: row.kitchen.name,
       serviceDate: row.mealPlan.serviceDate, mealType: row.mealPlan.mealType,
       dishName: version.dish.name, ageGroup: row.ageGroup.name, ageGroupCode: row.ageGroup.code,
-      recipe: version.recipeSnapshot, nutrition: version.nutritionSnapshot,
+      recipe: version.recipeSnapshot, nutrition,
       portionFactor: row.revisionItem.portions.find(p => p.ageGroupId === row.ageGroupId)?.portionFactor ?? 1,
       ingredients: version.ingredients.map(i => ({ name: i.ingredient.name, quantity: i.quantity, unit: i.unitCode })),
       issuedAt: row.issuedAt, note: 'Thông tin nguyên liệu là công thức dự kiến, chưa xác nhận lô nguyên liệu hoặc nhật ký chế biến.' };
