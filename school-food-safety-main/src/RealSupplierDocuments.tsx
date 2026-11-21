@@ -53,7 +53,7 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
  }
  const records=docs.data??[]
  return <section className="card supply-panel supply-documents">
-  <header className="card-header"><div><span className="section-kicker">HỒ SƠ NHÀ CUNG CẤP</span><h3><Paperclip size={18}/>{supplierName}</h3><p className="muted">Chứng từ được lưu theo nhà cung cấp và bếp, không dùng dữ liệu DEMO. Tệp đính kèm chưa đồng nghĩa đã xác minh pháp lý.</p></div></header>
+  <header className="card-header"><div><span className="section-kicker">HỒ SƠ NHÀ CUNG CẤP</span><h3><Paperclip size={18}/>{supplierName}</h3><p className="muted">Theo dõi hồ sơ, ngày hiệu lực và chứng từ liên quan. Hồ sơ tải lên cần được kiểm tra trước khi xác nhận.</p></div></header>
   {docs.isLoading&&<p role="status">Đang tải hồ sơ…</p>}
   {docs.isError&&<p className="error" role="alert">{docs.error.message}</p>}
   <div className="supply-table-scroll"><table className="management-table supply-table"><thead><tr><th>Loại hồ sơ</th><th>Tên tệp</th><th>Số hồ sơ</th><th>Phiếu nhập</th><th>Đơn vị cấp</th><th>Ngày hết hạn</th><th></th></tr></thead><tbody>
