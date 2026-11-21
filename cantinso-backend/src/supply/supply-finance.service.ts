@@ -37,7 +37,7 @@ export class SupplyFinanceService {
       this.prisma.purchaseReceipt.findMany({where:{kitchenId},orderBy:{createdAt:'desc'},include:{
         supplier:{select:{id:true,name:true,code:true}},
         lines:{include:{lot:{include:{ingredient:{select:{name:true,unit:true}}}}}},
-        payments:{select:{id:true,amount:true}},
+        payments:{where:{reversedAt:null},select:{id:true,amount:true}},
       }}),
       this.prisma.supplierPayment.findMany({where:{kitchenId},orderBy:{paidAt:'desc'},include:{
         receipt:{select:{id:true,number:true}},supplier:{select:{id:true,name:true}},
@@ -47,7 +47,7 @@ export class SupplyFinanceService {
     const supplierRows=suppliers.map(supplier=>{
       const theirs=receipts.filter(receipt=>receipt.supplierId===supplier.id);
       const purchases=theirs.reduce((sum,receipt)=>sum+Number(receipt.total),0);
-      const paid=payments.filter(payment=>payment.supplierId===supplier.id).reduce((sum,payment)=>sum+Number(payment.amount),0);
+      const paid=payments.filter(payment=>payment.supplierId===supplier.id && !payment.reversedAt).reduce((sum,payment)=>sum+Number(payment.amount),0);
       return {...supplier,totalPurchase:purchases,paid,debt:purchases-paid,receipts:theirs.length};
     });
     const receiptRows=receipts.map(receipt=>{
@@ -113,6 +113,18 @@ export class SupplyFinanceService {
       throw error;
     }
   }
+  async reversePayment(user:AuthUser,kitchenId:string,paymentId:string,body:any){
+    await this.supply.permitted(user,kitchenId,true);
+    if(!uuid(paymentId))throw new BadRequestException('Mã phiếu chi không hợp lệ.');
+    const reason=code(body?.reason,'Lý do hủy bút toán',500);
+    if(reason.length<5)throw new BadRequestException('Lý do hủy bút toán phải từ 5 ký tự.');
+    const result=await this.prisma.supplierPayment.updateMany({
+      where:{id:paymentId,kitchenId,reversedAt:null},
+      data:{reversedAt:new Date(),reversedById:user.sub,reversalReason:reason},
+    });
+    if(!result.count)throw new ConflictException('Phiếu chi đã hủy hoặc không thuộc bếp.');
+    return {id:paymentId,reversed:true};
+  }
   async pay(user:AuthUser,kitchenId:string,body:any){
     await this.supply.permitted(user,kitchenId,true);
     const receiptId=body?.receiptId;
@@ -125,7 +137,7 @@ export class SupplyFinanceService {
     const note=code(body?.note,'Ghi chú',500,false)||null;
     try{
       return await this.prisma.$transaction(async tx=>{
-        const receipt=await tx.purchaseReceipt.findFirst({where:{id:receiptId,kitchenId},select:{id:true,supplierId:true,total:true,payments:{select:{amount:true}}}});
+        const receipt=await tx.purchaseReceipt.findFirst({where:{id:receiptId,kitchenId},select:{id:true,supplierId:true,total:true,payments:{where:{reversedAt:null},select:{amount:true}}}});
         if(!receipt)throw new NotFoundException('Phiếu nhập không thuộc bếp.');
         const paid=receipt.payments.reduce((sum,item)=>sum+Number(item.amount),0);
         if(amount>Number(receipt.total)-paid)throw new ConflictException('Số tiền vượt công nợ còn lại của phiếu nhập.');
