@@ -26,6 +26,7 @@ export function canonicalQuantity(value:unknown, selected:unknown, canonical:str
   const allowZero=options?.allowZero??false;
   if(value===null||value===undefined||value===''||!Number.isFinite(number)||number<0||(!allowZero&&number===0))
     throw new BadRequestException('Số lượng phải lớn hơn 0 và có đơn vị đo rõ ràng.');
+  if(Math.abs(number*1000000-Math.round(number*1000000))>0.0000001)throw new BadRequestException('Số lượng nhập chỉ hỗ trợ tối đa 6 chữ số thập phân.');
   const from=typeof selected==='string'&&selected.trim()?selected.trim():canonical;
   const a=unitInfo[unitText(from)],b=unitInfo[unitText(canonical)];
   if(a?.family!==b?.family && unitText(from)!==unitText(canonical))
