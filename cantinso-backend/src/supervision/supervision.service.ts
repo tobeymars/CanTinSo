@@ -148,6 +148,8 @@ export class SupervisionService {
             const quantity=Number(line.quantity);
             if (!Number.isFinite(quantity) || quantity <= 0 || quantity > (issued.get(lot.id)??0))
               throw new BadRequestException('Số lượng nguyên liệu không hợp lệ.');
+            if (lot.expiryDate && lot.expiryDate.getTime() < s.serviceDate.getTime())
+              throw new BadRequestException('Lô hết hạn tại ngày bữa ăn.');
             if (lot.receivedAt > new Date(date+'T23:59:59.999Z'))
               throw new BadRequestException('Lô chưa được tiếp nhận tại ngày bữa ăn.');
             return {itemId:lot.id,ingredientName:lot.ingredient.name,lotCode:lot.lotCode,
