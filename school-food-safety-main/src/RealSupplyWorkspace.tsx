@@ -38,6 +38,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [viewingSupplier,setViewingSupplier]=useState<string|null>(null)
   const [supplierSearch,setSupplierSearch]=useState('')
   const [supplierDebtOnly,setSupplierDebtOnly]=useState(false)
+  const [supplierPage,setSupplierPage]=useState(1)
   const [issue,setIssue]=useState(emptyIssue)
   const [issueLot,setIssueLot]=useState<SupplyLot|null>(null)
   const [section,setSection]=useState<'overview'|'stock'|'receipts'|'issues'|'transfers'|'lots'|'trace'>('overview')
@@ -51,7 +52,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setMoveLot(null);setStatusLot(null);setSection('overview');setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -97,6 +98,9 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     if(!issueLot)return
     void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{quantity:Number(issue.quantity),note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType});setIssueLot(null);setIssue(emptyIssue())},'Đã xuất kho và cập nhật tồn lô.')
   }
+  const filteredSuppliers=(suppliers.data??[]).filter(item=>{const query=supplierSearch.toLocaleLowerCase('vi');return (item.code+' '+item.name+' '+(item.phone??'')).toLocaleLowerCase('vi').includes(query)&&(!supplierDebtOnly||(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0)>0)})
+  const supplierPages=Math.max(1,Math.ceil(filteredSuppliers.length/10))
+  const visibleSuppliers=filteredSuppliers.slice((Math.min(supplierPage,supplierPages)-1)*10,Math.min(supplierPage,supplierPages)*10)
   const matchedLots=(lots.data??[]).filter(lot=>(lot.lotCode+' '+lot.ingredient.name+' '+lot.supplier.name).toLocaleLowerCase('vi').includes(lotSearch.toLocaleLowerCase('vi')))
   const matchedMovements=(movements.data??[]).filter(item=>(item.lot.lotCode+' '+item.lot.ingredient.name+' '+(item.description??'')).toLocaleLowerCase('vi').includes(movementSearch.toLocaleLowerCase('vi')))
   function confirmMove(e:FormEvent){e.preventDefault();if(!moveLot)return
@@ -145,14 +149,19 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <button className="outline" type="button" onClick={exportSupplierList}>Xuất CSV</button>
         </div>
       </div>
-      <div className="management-toolbar" style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>setSupplierSearch(e.target.value)}/></label><label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>setSupplierDebtOnly(e.target.checked)}/>Còn công nợ</label></div>
+      <div className="management-toolbar" style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>{setSupplierSearch(e.target.value);setSupplierPage(1)}}/></label><label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>{setSupplierDebtOnly(e.target.checked);setSupplierPage(1)}}/>Còn công nợ</label></div>
       {suppliers.data?.length===0&&<p className="muted">Chưa có nhà cung cấp. Bếp cần tạo trước khi nhập lô nguyên liệu.</p>}
       <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th>Còn phải trả</th><th>Chức năng</th></tr></thead><tbody>
-        {suppliers.data?.filter(item=>{const query=supplierSearch.toLocaleLowerCase('vi');return (item.code+' '+item.name+' '+(item.phone??'')).toLocaleLowerCase('vi').includes(query)&&(!supplierDebtOnly||(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0)>0)}).map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0).toLocaleString('vi-VN')} đ</td><td><div style={{display:'flex',gap:6}}><button type="button" className="outline" onClick={()=>setViewingSupplier(current=>current===item.id?null:item.id)}>Hồ sơ</button>{canEdit&&<div style={{display:'flex',gap:6}}>
+        {visibleSuppliers.map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0).toLocaleString('vi-VN')} đ</td><td><div style={{display:'flex',gap:6}}><button type="button" className="outline" onClick={()=>setViewingSupplier(current=>current===item.id?null:item.id)}>Hồ sơ</button>{canEdit&&<div style={{display:'flex',gap:6}}>
           <button className="outline" type="button" onClick={()=>editVendor(item)}>Sửa</button>
           <button className="outline" type="button" disabled={busy} onClick={()=>void execute(()=>updateSupplySupplierStatus(activeId,item.id,item.status==='ACTIVE'?'INACTIVE':'ACTIVE'),item.status==='ACTIVE'?'Đã ngừng sử dụng nhà cung cấp.':'Đã kích hoạt nhà cung cấp.')}>{item.status==='ACTIVE'?'Ngừng dùng':'Kích hoạt'}</button>
         </div>}</div></td></tr>)}
       </tbody></table></div>
+      <div className="management-pagination" style={{display:'flex',gap:10,justifyContent:'flex-end',alignItems:'center'}}>
+        <span>Hiển thị {visibleSuppliers.length} / {filteredSuppliers.length} nhà cung cấp · Trang {Math.min(supplierPage,supplierPages)}/{supplierPages}</span>
+        <button type="button" className="outline" disabled={supplierPage<=1} onClick={()=>setSupplierPage(page=>Math.max(1,page-1))}>Trước</button>
+        <button type="button" className="outline" disabled={supplierPage>=supplierPages} onClick={()=>setSupplierPage(page=>Math.min(supplierPages,page+1))}>Sau</button>
+      </div>
       {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<RealSupplierDocuments kitchenId={activeId} supplierId={viewingSupplier} supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''} receipts={(finance.data?.receipts??[]).map(item=>({id:item.id,number:item.number,supplierId:item.supplier.id}))} canEdit={canEdit} busy={busy} execute={execute}/>}
     </>}
     {activeId&&mode==='warehouse'&&<>
