@@ -26,7 +26,7 @@ Khi lưu tồn, giới hạn 3 chữ số thập phân theo đơn vị chuẩn d
 ## 3. Giá tiền khi đổi đơn vị
 
 - `unitPrice` là giá theo **đơn vị nhập mua**, không mặc định là giá/kg hoặc giá/g.
-- `amount = round(enteredQuantity × unitPrice, 0)` VND **cho từng dòng**; giá đơn vị có thể là số thập phân tối đa 6 chữ số (`DECIMAL(18,6)`) vì giá/g có thể dưới 1 VND.
+- `amount = round(enteredQuantity × unitPrice, 0)` VND **cho từng dòng**; giá đơn vị có thể là số thập phân tối đa 6 chữ số (`DECIMAL(24,6)`) vì giá/g có thể dưới 1 VND.
 - Ví dụ: mua **2 kg × 100.000 VND/kg = 200.000 VND**. Chọn lại g thì phải hiển thị **2.000 g × 100 VND/g = 200.000 VND**. Nếu không bảo toàn thành tiền sau giới hạn độ chính xác, giao diện ngăn chuyển tự động để người dùng kiểm tra.
 - Giá trị tồn theo giá nhập được tính từ **thành tiền ÷ lượng nhập sau quy đổi**, nhân lượng tồn chuẩn; không nhân trực tiếp giá/kg với số gam tồn.
 - Các phiếu nhập cũ có `enteredQuantity/enteredUnit = NULL` tiếp tục được hiểu theo đơn vị kho chuẩn của thời điểm ghi nhận; không tự ước lượng lại giá.
