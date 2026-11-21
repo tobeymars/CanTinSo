@@ -60,7 +60,7 @@ export class SupervisionService {
         },
       }),
       this.prisma.inventoryLot.findMany({
-        where:{schoolId:scope.schoolId, receivedAt:{lte:new Date(date+'T23:59:59.999Z')}},
+        where:{kitchenId:scope.kitchenId, receivedAt:{lte:new Date(date+'T23:59:59.999Z')}},
         include:{ingredient:{select:{name:true}},supplier:{select:{name:true,contactName:true,phone:true}}},
         orderBy:{receivedAt:'desc'},
         take:200,
@@ -118,10 +118,10 @@ export class SupervisionService {
           if (ids.some((id:any) => typeof id !== 'string') || new Set(ids).size !== ids.length)
             throw new BadRequestException('Lô nguyên liệu không hợp lệ hoặc bị trùng.');
           const lots = await tx.inventoryLot.findMany({
-            where:{schoolId:s.schoolId,id:{in:ids}},
+            where:{kitchenId:s.kitchenId,id:{in:ids}},
             include:{ingredient:{select:{name:true}},supplier:{select:{name:true,contactName:true,phone:true}}},
           });
-          if (lots.length !== ids.length) throw new BadRequestException('Lô nguyên liệu không thuộc trường đang giám sát.');
+          if (lots.length !== ids.length) throw new BadRequestException('Lô nguyên liệu không thuộc bếp phục vụ trường đang giám sát.');
           const normalized = body.ingredientReceipts.map((line:any)=>{
             const lot=lots.find(item=>item.id===line.itemId)!;
             const quantity=Number(line.quantity);
