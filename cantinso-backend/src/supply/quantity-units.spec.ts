@@ -21,6 +21,7 @@ test('units of different physical dimensions do not convert',()=>{
 });
 test('counted goods preserve their exact label and quantities',()=>{
   assert.equal(canonicalQuantity(12,'chai','chai').quantity,12);
+  assert.throws(()=>canonicalQuantity(0.5,'chai','chai'));
   assert.deepEqual(unitOptions('hộp'),['hộp']);
 });
 test('stored canonical precision cannot silently round',()=>{
