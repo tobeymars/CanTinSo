@@ -45,7 +45,7 @@ export const createSupplyPayment=(id:string,input:{receiptId:string;reference:st
 export type SupplierDocument = {id:string;category:string;filename:string;mimeType:string;size:number;documentNumber:string|null;issuer:string|null;issuedAt:string|null;expiresAt:string|null;createdAt:string}
 const docPath=(kitchenId:string,supplierId:string)=>kitchenPath(kitchenId)+'/suppliers/'+encodeURIComponent(supplierId)+'/documents'
 export const getSupplierDocuments=(kitchenId:string,supplierId:string)=>request<SupplierDocument[]>(docPath(kitchenId,supplierId))
-export const uploadSupplierDocument=(kitchenId:string,supplierId:string,input:{category:string;filename:string;mimeType:string;base64:string;documentNumber:string;issuer:string;issuedAt:string;expiresAt:string})=>request<SupplierDocument>(docPath(kitchenId,supplierId),{method:'POST',body:JSON.stringify(input)})
+export const uploadSupplierDocument=(kitchenId:string,supplierId:string,input:{category:string;receiptId:string;filename:string;mimeType:string;base64:string;documentNumber:string;issuer:string;issuedAt:string;expiresAt:string})=>request<SupplierDocument>(docPath(kitchenId,supplierId),{method:'POST',body:JSON.stringify(input)})
 export const downloadSupplierDocument=(kitchenId:string,supplierId:string,id:string)=>request<{filename:string;mimeType:string;base64:string}>(docPath(kitchenId,supplierId)+'/'+encodeURIComponent(id))
 export const archiveSupplierDocument=(kitchenId:string,supplierId:string,id:string)=>request<{id:string;isArchived:boolean}>(docPath(kitchenId,supplierId)+'/'+encodeURIComponent(id),{method:'DELETE'})
 
