@@ -118,7 +118,7 @@ export class SupplyService {
       if(current<quantity) throw new ConflictException('Không đủ số lượng tồn.');
       const changed=await tx.inventoryLot.updateMany({where:{id:lotId,kitchenId,status:'AVAILABLE',remainingQty:{gte:quantity}},data:{remainingQty:{decrement:quantity},...(current===quantity?{status:'DEPLETED' as const}:{})}});
       if(changed.count!==1) throw new ConflictException('Tồn kho đã thay đổi; vui lòng tải lại.');
-      await tx.traceEvent.create({data:{lotId,eventType:'PREPARED',actorId:user.sub,description:reason,metadata:{kind:'ISSUE',quantity,unit:'from-lot'}}});
+      await tx.traceEvent.create({data:{lotId,eventType:'ISSUED',actorId:user.sub,description:reason,metadata:{kind:'ISSUE',quantity}}});
       return {lotId,quantity,remainingQty:current-quantity};
     });
   }
