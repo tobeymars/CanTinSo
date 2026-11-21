@@ -13,7 +13,7 @@ import RealSupplierFinance from './RealSupplierFinance'
 import RealPurchaseReceipt from './RealPurchaseReceipt'
 import RealSupplierDocuments from './RealSupplierDocuments'
 import RealWarehouseOverview from './RealWarehouseOverview'
-import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit } from './lib/supervisionUnits'
+import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit, readableStockQuantity } from './lib/supervisionUnits'
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:'',note:''})
 const emptyIssue=()=>({quantity:'',unit:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
@@ -209,14 +209,14 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <label>Tìm mã lô / nguyên liệu / nhà cung cấp <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Nhập từ khóa để lọc…"/></label>
         {lots.data?.length===0&&<p className="muted">Bếp chưa có lô nguyên liệu thật. Hãy tạo nhà cung cấp và nhập kho.</p>}
         <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Lô</th><th>Nguyên liệu</th><th>Nhà cung cấp</th><th>Tồn</th><th>Hạn dùng</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-        {matchedLots.map(lot=><tr key={lot.id}><td><strong>{lot.lotCode}</strong><small style={{display:'block'}}>{lot.storageLocation||'Chưa cập nhật vị trí'}</small></td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td>{fmt(lot.remainingQty)} {lot.unit}</td><td>{date(lot.expiryDate)}</td><td>{expired(lot.expiryDate)?'Hết hạn':lot.status==='AVAILABLE'?'Có thể xuất':lot.status==='DEPLETED'?'Đã hết':'Cách ly / tạm ngưng'}</td><td><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+        {matchedLots.map(lot=><tr key={lot.id}><td><strong>{lot.lotCode}</strong><small style={{display:'block'}}>{lot.storageLocation||'Chưa cập nhật vị trí'}</small></td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td><strong>{readableStockQuantity(lot.remainingQty,lot.unit)}</strong>{readableStockQuantity(lot.remainingQty,lot.unit)!==fmt(lot.remainingQty)+' '+lot.unit&&<small style={{display:'block'}}>Số liệu kho: {fmt(lot.remainingQty)} {lot.unit}</small>}</td><td>{date(lot.expiryDate)}</td><td>{expired(lot.expiryDate)?'Hết hạn':lot.status==='AVAILABLE'?'Có thể xuất':lot.status==='DEPLETED'?'Đã hết':'Cách ly / tạm ngưng'}</td><td><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
           {canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue({...emptyIssue(),unit:preferredReceiptUnit(lot.unit,lot.remainingQty)})}}>Xuất lô</button>}
           {canEdit&&lot.status!=='DEPLETED'&&<button type="button" className="outline" onClick={()=>{setMoveLot(lot);setNewLocation(lot.storageLocation??'');setMoveReason('');setSection('transfers')}}>Chuyển vị trí</button>}
           {canEdit&&(lot.status==='AVAILABLE'||lot.status==='QUARANTINED')&&<button type="button" className="outline" onClick={()=>{setStatusLot(lot);setStatusReason('')}}>{lot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'}</button>}
         </div></td></tr>)}
         </tbody></table></div>
         {issueLot&&canEdit&&<form onSubmit={submitIssue} style={{display:'grid',gap:10}}>
-          <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({fmt(issueLot.remainingQty)} {issueLot.unit} còn lại)</h3>
+          <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({readableStockQuantity(issueLot.remainingQty,issueLot.unit)} còn lại)</h3>
           <div style={{display:'grid',gridTemplateColumns:'minmax(160px,1fr) minmax(95px,140px)',gap:10}}>
             <label>Số lượng xuất *<input type="number" required min="0.000001" step="any" max={convertReceiptQuantity(issueLot.remainingQty,issueLot.unit,issue.unit||issueLot.unit)??undefined} value={issue.quantity} onChange={e=>setIssue(v=>({...v,quantity:e.target.value}))}/></label>
             <label>Đơn vị<select value={issue.unit||issueLot.unit} onChange={e=>setIssue(v=>{
