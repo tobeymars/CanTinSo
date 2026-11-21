@@ -63,6 +63,7 @@ enum MealType {
 }
 
 enum TraceEventType {
+  ISSUED
   RECEIVED
   INSPECTED
   STORED
