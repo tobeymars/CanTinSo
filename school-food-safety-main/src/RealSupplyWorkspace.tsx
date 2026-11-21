@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucide-react'
 import type { ViewRole } from './lib/store'
 import {
-  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,
+  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,
   issueSupplyLot,receiveSupplyLot,saveSupplySupplier,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
@@ -12,7 +12,7 @@ import './WarehouseManagement.css'
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:''})
 const emptyReceipt=()=>({lotCode:'',ingredientId:'',supplierId:'',quantity:'',expiryDate:'',storageLocation:'',note:''})
-const emptyIssue=()=>({quantity:'',note:''})
+const emptyIssue=()=>({quantity:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
 const fmt=(value:number)=>value.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const date=(value?:string|null)=>value?new Date(value).toLocaleDateString('vi-VN'):'Chưa có'
 export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'warehouse';role:ViewRole}){
@@ -22,6 +22,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [kitchenId,setKitchenId]=useState('')
   const kitchens=kitchenQuery.data??[]
   const activeId=kitchens.some(item=>item.id===kitchenId)?kitchenId:kitchens[0]?.id??''
+  const schoolQuery=useQuery({queryKey:['supply-schools',activeId],queryFn:()=>getSupplySchools(activeId),enabled:!!activeId&&mode==='warehouse'})
   const suppliers=useQuery({queryKey:['supply-suppliers',activeId],queryFn:()=>getSupplySuppliers(activeId),enabled:!!activeId})
   const ingredients=useQuery({queryKey:['supply-ingredients',activeId],queryFn:()=>getSupplyIngredients(activeId),enabled:!!activeId&&mode==='warehouse'})
   const lots=useQuery({queryKey:['supply-lots',activeId],queryFn:()=>getSupplyLots(activeId),enabled:!!activeId&&mode==='warehouse'})
@@ -116,7 +117,10 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         {issueLot&&canEdit&&<form onSubmit={submitIssue} style={{display:'grid',gap:10}}>
           <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({fmt(issueLot.remainingQty)} {issueLot.unit} còn lại)</h3>
           <label>Số lượng xuất *<input type="number" required min="0.001" step="0.001" max={issueLot.remainingQty} value={issue.quantity} onChange={e=>setIssue(v=>({...v,quantity:e.target.value}))}/></label>
-          <label>Lý do / bữa sử dụng *<input required maxLength={500} value={issue.note} onChange={e=>setIssue(v=>({...v,note:e.target.value}))}/></label>
+          <label>Trường được cấp nguyên liệu *<select required value={issue.schoolId} onChange={e=>setIssue(v=>({...v,schoolId:e.target.value}))}><option value="">Chọn trường nhận</option>{schoolQuery.data?.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          <label>Ngày sử dụng *<input type="date" required value={issue.serviceDate} onChange={e=>setIssue(v=>({...v,serviceDate:e.target.value}))}/></label>
+          <label>Bữa sử dụng *<select value={issue.mealType} onChange={e=>setIssue(v=>({...v,mealType:e.target.value as typeof issue.mealType}))}><option value="BREAKFAST">Bữa sáng</option><option value="LUNCH">Bữa trưa</option><option value="SNACK">Bữa xế</option></select></label>
+          <label>Lý do / chứng từ xuất *<input required maxLength={500} value={issue.note} onChange={e=>setIssue(v=>({...v,note:e.target.value}))}/></label>
           <div style={{display:'flex',gap:10}}><button className="primary" type="submit" disabled={busy}>Xác nhận xuất kho</button><button className="outline" type="button" onClick={()=>setIssueLot(null)}>Hủy</button></div>
         </form>}
       </>}
