@@ -134,6 +134,7 @@ export class SupplyFinanceService {
     const method=body?.method;
     if(!['BANK_TRANSFER','CASH','OTHER'].includes(method))throw new BadRequestException('Phương thức thanh toán không hợp lệ.');
     const paidAt=parseDate(body?.paidAt)??new Date();
+    if(paidAt.getTime()>Date.now())throw new BadRequestException('Không ghi nhận thanh toán ở ngày tương lai.');
     const note=code(body?.note,'Ghi chú',500,false)||null;
     try{
       return await this.prisma.$transaction(async tx=>{
