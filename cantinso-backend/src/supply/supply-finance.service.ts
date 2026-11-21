@@ -18,7 +18,7 @@ const money=(v:unknown,allowZero=false)=>{
 };
 const unitPriceMoney=(v:unknown)=>{
   const value=Number(v);
-  if(v===null||v===undefined||v===''||!Number.isFinite(value)||value<=0||value>1000000000000)
+  if(v===null||v===undefined||v===''||!Number.isFinite(value)||value<=0||value>=1000000000000)
     throw new BadRequestException('Đơn giá trên đơn vị mua phải là số dương.');
   const decimal=new Prisma.Decimal(String(v));
   if(decimal.decimalPlaces()>6)throw new BadRequestException('Đơn giá chỉ hỗ trợ tối đa 6 chữ số thập phân.');
