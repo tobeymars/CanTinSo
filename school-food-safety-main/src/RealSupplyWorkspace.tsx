@@ -5,13 +5,14 @@ import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucid
 import type { ViewRole } from './lib/store'
 import {
   getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,
-  issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,
+  issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
 import './WarehouseManagement.css'
 import RealSupplierFinance from './RealSupplierFinance'
 import RealPurchaseReceipt from './RealPurchaseReceipt'
 import RealSupplierDocuments from './RealSupplierDocuments'
+import RealWarehouseOverview from './RealWarehouseOverview'
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:'',note:''})
 const emptyIssue=()=>({quantity:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
@@ -38,11 +39,18 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [supplierDebtOnly,setSupplierDebtOnly]=useState(false)
   const [issue,setIssue]=useState(emptyIssue)
   const [issueLot,setIssueLot]=useState<SupplyLot|null>(null)
-  const [section,setSection]=useState<'stock'|'receipts'|'movements'>('stock')
+  const [section,setSection]=useState<'overview'|'stock'|'receipts'|'issues'|'transfers'|'lots'|'trace'>('overview')
+  const [lotSearch,setLotSearch]=useState('')
+  const [movementSearch,setMovementSearch]=useState('')
+  const [moveLot,setMoveLot]=useState<SupplyLot|null>(null)
+  const [newLocation,setNewLocation]=useState('')
+  const [moveReason,setMoveReason]=useState('')
+  const [statusLot,setStatusLot]=useState<SupplyLot|null>(null)
+  const [statusReason,setStatusReason]=useState('')
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setMoveLot(null);setStatusLot(null);setSection('overview');setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -70,6 +78,15 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     e.preventDefault()
     if(!issueLot)return
     void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{quantity:Number(issue.quantity),note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType});setIssueLot(null);setIssue(emptyIssue())},'Đã xuất kho và cập nhật tồn lô.')
+  }
+  const matchedLots=(lots.data??[]).filter(lot=>(lot.lotCode+' '+lot.ingredient.name+' '+lot.supplier.name).toLocaleLowerCase('vi').includes(lotSearch.toLocaleLowerCase('vi')))
+  const matchedMovements=(movements.data??[]).filter(item=>(item.lot.lotCode+' '+item.lot.ingredient.name+' '+(item.description??'')).toLocaleLowerCase('vi').includes(movementSearch.toLocaleLowerCase('vi')))
+  function confirmMove(e:FormEvent){e.preventDefault();if(!moveLot)return
+    void execute(async()=>{await moveSupplyLot(activeId,moveLot.id,newLocation,moveReason);setMoveLot(null);setNewLocation('');setMoveReason('')},'Đã chuyển vị trí bảo quản và ghi nhật ký.')
+  }
+  function confirmStatus(e:FormEvent){e.preventDefault();if(!statusLot)return
+    const nextStatus=statusLot.status==='QUARANTINED'?'AVAILABLE':'QUARANTINED'
+    void execute(async()=>{await changeSupplyLotStatus(activeId,statusLot.id,nextStatus,statusReason);setStatusLot(null);setStatusReason('')},nextStatus==='AVAILABLE'?'Đã mở cách ly lô.':'Đã cách ly lô và ghi rõ lý do.')
   }
   const isLoading=kitchenQuery.isLoading||(!!activeId&&(suppliers.isLoading|| (mode==='warehouse'&&lots.isLoading)))
   const failure=kitchenQuery.error||suppliers.error||lots.error||ingredients.error||movements.error||finance.error||schoolQuery.error
@@ -116,13 +133,19 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     </>}
     {activeId&&mode==='warehouse'&&<>
       <nav style={{display:'flex',gap:8,flexWrap:'wrap'}} aria-label="Quản lý kho">
-        {([['stock','Tồn & lô hàng'],['receipts','Nhập kho'],['movements','Nhật ký nhập / xuất']] as const).map(([id,label])=><button type="button" key={id} className={section===id?'primary':'outline'} onClick={()=>setSection(id)}>{label}</button>)}
+        {([['overview','Tổng quan'],['stock','Tồn kho'],['receipts','Nhập kho'],['issues','Xuất kho'],['transfers','Chuyển vị trí'],['lots','Lô hàng'],['trace','Truy xuất nguồn gốc']] as const).map(([id,label])=><button type="button" key={id} className={section===id?'primary':'outline'} onClick={()=>setSection(id)}>{label}</button>)}
       </nav>
-      {section==='stock'&&<>
-        <h3><Boxes size={19}/>Tồn kho theo lô ({lots.data?.length??0})</h3>
+      {section==='overview'&&<RealWarehouseOverview lots={lots.data??[]} movements={movements.data??[]} finance={finance.data} onOpen={setSection}/>}
+      {(section==='stock'||section==='lots'||section==='issues')&&<>
+        <h3><Boxes size={19}/>{section==='issues'?'Chọn lô để xuất kho':'Tồn kho theo lô'} ({matchedLots.length})</h3>
+        <label>Tìm mã lô / nguyên liệu / nhà cung cấp <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Nhập từ khóa để lọc…"/></label>
         {lots.data?.length===0&&<p className="muted">Bếp chưa có lô nguyên liệu thật. Hãy tạo nhà cung cấp và nhập kho.</p>}
         <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Lô</th><th>Nguyên liệu</th><th>Nhà cung cấp</th><th>Tồn</th><th>Hạn dùng</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-        {lots.data?.map(lot=><tr key={lot.id}><td>{lot.lotCode}</td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td>{fmt(lot.remainingQty)} {lot.unit}</td><td>{date(lot.expiryDate)}</td><td>{expired(lot.expiryDate)?'Hết hạn':lot.status==='AVAILABLE'?'Có thể xuất':lot.status==='DEPLETED'?'Đã hết':'Cách ly / tạm ngưng'}</td><td>{canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue(emptyIssue())}}>Xuất lô</button>}</td></tr>)}
+        {matchedLots.map(lot=><tr key={lot.id}><td><strong>{lot.lotCode}</strong><small style={{display:'block'}}>{lot.storageLocation||'Chưa cập nhật vị trí'}</small></td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td>{fmt(lot.remainingQty)} {lot.unit}</td><td>{date(lot.expiryDate)}</td><td>{expired(lot.expiryDate)?'Hết hạn':lot.status==='AVAILABLE'?'Có thể xuất':lot.status==='DEPLETED'?'Đã hết':'Cách ly / tạm ngưng'}</td><td><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+          {canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue(emptyIssue())}}>Xuất lô</button>}
+          {canEdit&&lot.status!=='DEPLETED'&&<button type="button" className="outline" onClick={()=>{setMoveLot(lot);setNewLocation(lot.storageLocation??'');setMoveReason('');setSection('transfers')}}>Chuyển vị trí</button>}
+          {canEdit&&(lot.status==='AVAILABLE'||lot.status==='QUARANTINED')&&<button type="button" className="outline" onClick={()=>{setStatusLot(lot);setStatusReason('')}}>{lot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'}</button>}
+        </div></td></tr>)}
         </tbody></table></div>
         {issueLot&&canEdit&&<form onSubmit={submitIssue} style={{display:'grid',gap:10}}>
           <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({fmt(issueLot.remainingQty)} {issueLot.unit} còn lại)</h3>
@@ -138,13 +161,29 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <h3><PackagePlus size={18}/>Tiếp nhận lô nguyên liệu mới</h3>
         <RealPurchaseReceipt kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>setSection('stock')}/>
       </>}
-      {section==='movements'&&<>
-        <h3>Nhật ký nhập / xuất theo lô</h3>
+      {section==='trace'&&<>
+        <h3>Truy xuất nguồn gốc và nhật ký nhập / xuất</h3>
+        <label>Tìm mã lô hoặc nguyên liệu <input value={movementSearch} onChange={e=>setMovementSearch(e.target.value)} placeholder="Mã lô / nguyên liệu / diễn giải"/></label>
         {movements.data?.length===0&&<p className="muted">Chưa có nhật ký.</p>}
         <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Thời điểm</th><th>Nguyên liệu</th><th>Mã lô</th><th>Loại</th><th>Nội dung</th></tr></thead><tbody>
-        {movements.data?.map(item=><tr key={item.id}><td>{date(item.occurredAt)}</td><td>{item.lot.ingredient.name}</td><td>{item.lot.lotCode}</td><td>{item.eventType==='RECEIVED'?'Nhập kho':item.eventType==='ISSUED'?'Xuất kho':item.eventType}</td><td>{item.description}</td></tr>)}
+        {matchedMovements.map(item=><tr key={item.id}><td>{date(item.occurredAt)}</td><td>{item.lot.ingredient.name}</td><td>{item.lot.lotCode}</td><td>{item.eventType==='RECEIVED'?'Nhập kho':item.eventType==='ISSUED'?'Xuất kho':item.eventType}</td><td>{item.description}</td></tr>)}
         </tbody></table></div>
       </>}
+      {section==='transfers'&&<div style={{display:'grid',gap:12}}>
+        <h3>Chuyển vị trí bảo quản nội bộ</h3>
+        <p className="muted">Chỉ thay đổi vị trí bảo quản của nguyên lô trong cùng bếp và lưu nhật ký; không phải chuyển hàng giữa hai bếp.</p>
+        {canEdit&&<label>Chọn lô hàng <select value={moveLot?.id??''} onChange={e=>{const lot=lots.data?.find(row=>row.id===e.target.value)??null;setMoveLot(lot);setNewLocation(lot?.storageLocation??'')}}><option value="">Chọn lô cần chuyển</option>{lots.data?.filter(row=>row.status!=='DEPLETED').map(row=><option key={row.id} value={row.id}>{row.lotCode} · {row.ingredient.name}</option>)}</select></label>}
+        {moveLot&&canEdit&&<form onSubmit={confirmMove} style={{display:'grid',gap:10}}>
+          <label>Vị trí mới *<input required maxLength={120} value={newLocation} onChange={e=>setNewLocation(e.target.value)}/></label>
+          <label>Lý do / chứng từ *<input required maxLength={500} value={moveReason} onChange={e=>setMoveReason(e.target.value)}/></label>
+          <button className="primary" type="submit" disabled={busy}>Xác nhận chuyển vị trí</button>
+        </form>}
+      </div>}
+      {statusLot&&canEdit&&<form onSubmit={confirmStatus} className="card" style={{padding:16,display:'grid',gap:8}}>
+        <h3>{statusLot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'} · {statusLot.lotCode}</h3>
+        <label>Lý do và căn cứ *<input required maxLength={500} value={statusReason} onChange={e=>setStatusReason(e.target.value)}/></label>
+        <div style={{display:'flex',gap:10}}><button type="submit" className="primary" disabled={busy}>Lưu trạng thái</button><button type="button" className="outline" onClick={()=>setStatusLot(null)}>Hủy</button></div>
+      </form>}
     </>}
   </section>
 }
