@@ -68,6 +68,16 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     catch(e){setError(e instanceof Error?e.message:'Không thể lưu dữ liệu.')}
     finally{setBusy(false)}
   }
+  function exportWarehouseCsv(){
+    const rows=section==='trace'
+      ? [['Thời điểm','Mã lô','Nguyên liệu','Loại sự kiện','Diễn giải'],...matchedMovements.map(item=>[item.occurredAt,item.lot.lotCode,item.lot.ingredient.name,item.eventType,item.description??''])]
+      : section==='receipts'
+        ? [['Phiếu nhập','Ngày nhập','Nhà cung cấp','Tổng tiền VND','Đã trả VND','Còn nợ VND'],...(finance.data?.receipts??[]).map(item=>[item.number,item.createdAt,item.supplier.name,String(item.total),String(item.paid),String(item.debt)])]
+        : [['Mã lô','Nguyên liệu','Nhà cung cấp','Số lượng nhập','Số lượng tồn','Đơn vị','Hạn dùng','Vị trí','Trạng thái'],...matchedLots.map(item=>[item.lotCode,item.ingredient.name,item.supplier.name,String(item.quantity),String(item.remainingQty),item.unit,item.expiryDate??'',item.storageLocation??'',item.status])];
+    const content='\uFEFF'+rows.map(row=>row.map(value=>'"'+value.replaceAll('"','""')+'"').join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download='bao-cao-kho-'+section+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }
   function exportSupplierList(){
     const rows=[['Mã','Tên','Người liên hệ','Điện thoại','Email','Mã số thuế','Địa chỉ','Ghi chú','Trạng thái'],...(suppliers.data??[]).map(row=>[row.code,row.name,row.contactName??'',row.phone??'',row.email??'',row.taxCode??'',row.address??'',row.note??'',row.status])];
     const csv='\uFEFF'+rows.map(row=>row.map(value=>'"'+value.replaceAll('"','""')+'"').join(',')).join('\r\n');
@@ -117,7 +127,10 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       <div><span className="section-kicker">DỮ LIỆU POSTGRESQL · THEO BẾP</span>
         <h2>{mode==='suppliers'?'Nhà cung cấp của bếp':'Quản lý kho bếp'}</h2>
         <p className="muted">Một bếp trung tâm sử dụng chung kho cho các trường được phân công. Hồ sơ giám sát đọc trực tiếp nguồn dữ liệu này.</p></div>
-      <button type="button" className="outline" onClick={()=>void refresh()} disabled={!activeId}><RefreshCw size={16}/>Làm mới</button>
+      <div style={{display:'flex',gap:8}}>
+        {activeId&&mode==='warehouse'&&<button type="button" className="outline" onClick={exportWarehouseCsv}>Xuất báo cáo CSV</button>}
+        <button type="button" className="outline" onClick={()=>void refresh()} disabled={!activeId}><RefreshCw size={16}/>Làm mới</button>
+      </div>
     </div>
     {kitchens.length>1&&<label>Chọn bếp cần xem <select value={activeId} onChange={e=>setKitchenId(e.target.value)}>{kitchens.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}</select></label>}
     {activeId&&<p className="muted"><strong>Kho: {kitchens.find(k=>k.id===activeId)?.name}</strong> · {canEdit?'Có quyền cập nhật':'Chỉ xem'} · Không sử dụng dữ liệu DEMO</p>}
