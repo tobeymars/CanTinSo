@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AuthUser } from '../common/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupplyService } from './supply.service';
+import { canonicalQuantity } from './quantity-units';
 
 const code=(v:unknown,label:string,max=100,required=true)=>{
   const value=typeof v==='string'?v.trim():'';
@@ -53,7 +54,7 @@ export class SupplyFinanceService {
     const receiptRows=receipts.map(receipt=>{
       const paid=receipt.payments.reduce((sum,item)=>sum+Number(item.amount),0);
       return {...receipt,total:Number(receipt.total),paid,debt:Number(receipt.total)-paid,
-        lines:receipt.lines.map(line=>({...line,quantity:Number(line.quantity),unitPrice:Number(line.unitPrice),amount:Number(line.amount)}))};
+        lines:receipt.lines.map(line=>({...line,quantity:Number(line.quantity),enteredQuantity:line.enteredQuantity===null?null:Number(line.enteredQuantity),unitPrice:Number(line.unitPrice),amount:Number(line.amount)}))};
     });
     const paymentRows=payments.map(payment=>({...payment,amount:Number(payment.amount)}));
     const totalPurchase=supplierRows.reduce((sum,row)=>sum+row.totalPurchase,0);
@@ -69,18 +70,20 @@ export class SupplyFinanceService {
     if(!supplier)throw new BadRequestException('Nhà cung cấp không còn hoạt động trong bếp.');
     const inputLines=body?.lines;
     if(!Array.isArray(inputLines)||inputLines.length<1||inputLines.length>50)throw new BadRequestException('Phiếu nhập cần từ 1 đến 50 dòng.');
-    const lines=inputLines.map((line:any)=>{
-      if(!uuid(line?.ingredientId))throw new BadRequestException('Cần chọn nguyên liệu từ danh mục.');
-      const lotCode=code(line?.lotCode,'Mã lô',100);
-      const n=quantity(line?.quantity),unitPrice=money(line?.unitPrice);
-      const amount=Number(new Prisma.Decimal(n).mul(unitPrice).toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP));
-      if(!Number.isSafeInteger(amount)||amount>1000000000000)throw new BadRequestException('Thành tiền vượt giới hạn.');
-      return {ingredientId:line.ingredientId as string,lotCode,quantity:n,unitPrice,amount,expiryDate:parseDate(line?.expiryDate),storageLocation:code(line?.storageLocation,'Vị trí lưu',120,false)||null};
-    });
-    if(new Set(lines.map(line=>line.lotCode)).size!==lines.length)throw new BadRequestException('Không được nhập trùng mã lô trong phiếu.');
-    const ingredientIds=[...new Set(lines.map(line=>line.ingredientId))];
+    const ingredientIds=[...new Set(inputLines.map((line:any)=>line?.ingredientId))];
+    if(ingredientIds.some(id=>!uuid(id)))throw new BadRequestException('Cần chọn nguyên liệu hợp lệ từ danh mục.');
     const ingredients=await this.prisma.ingredient.findMany({where:{id:{in:ingredientIds}},select:{id:true,unit:true}});
     if(ingredients.length!==ingredientIds.length)throw new BadRequestException('Nguyên liệu không hợp lệ.');
+    const lines=inputLines.map((line:any)=>{
+      const ingredient=ingredients.find(item=>item.id===line.ingredientId)!;
+      const lotCode=code(line?.lotCode,'Mã lô',100);
+      const entered=canonicalQuantity(line?.quantity,line?.unit,ingredient.unit);
+      const unitPrice=money(line?.unitPrice);
+      const amount=Number(new Prisma.Decimal(entered.enteredQuantity).mul(unitPrice).toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP));
+      if(!Number.isSafeInteger(amount)||amount>1000000000000)throw new BadRequestException('Thành tiền vượt giới hạn.');
+      return {ingredientId:line.ingredientId as string,lotCode,quantity:entered.quantity,enteredQuantity:entered.enteredQuantity,enteredUnit:entered.enteredUnit,unitPrice,amount,expiryDate:parseDate(line?.expiryDate),storageLocation:code(line?.storageLocation,'Vị trí lưu',120,false)||null};
+    });
+    if(new Set(lines.map(line=>line.lotCode)).size!==lines.length)throw new BadRequestException('Không được nhập trùng mã lô trong phiếu.');
     const today=new Date();today.setUTCHours(0,0,0,0);
     if(lines.some(line=>line.expiryDate&&line.expiryDate<today))throw new BadRequestException('Không tiếp nhận lô đã hết hạn.');
     const total=lines.reduce((sum,line)=>sum+line.amount,0);
@@ -100,10 +103,10 @@ export class SupplyFinanceService {
             expiryDate:line.expiryDate,storageLocation:line.storageLocation,
           }});
           await tx.purchaseReceiptLine.create({data:{
-            receiptId:receipt.id,lotId:lot.id,quantity:line.quantity,unitPrice:line.unitPrice,amount:line.amount,
+            receiptId:receipt.id,lotId:lot.id,quantity:line.quantity,enteredQuantity:line.enteredQuantity,enteredUnit:line.enteredUnit,unitPrice:line.unitPrice,amount:line.amount,
           }});
           await tx.traceEvent.create({data:{lotId:lot.id,eventType:'RECEIVED',actorId:user.sub,
-            description:'Nhập kho theo phiếu '+number,metadata:{receiptId:receipt.id,receiptNumber:number,quantity:line.quantity,unit:ingredient.unit}}});
+            description:'Nhập kho theo phiếu '+number,metadata:{receiptId:receipt.id,receiptNumber:number,quantity:line.quantity,unit:ingredient.unit,enteredQuantity:line.enteredQuantity,enteredUnit:line.enteredUnit}}});
         }
         return {id:receipt.id,number,total,lines:lines.length};
       });
