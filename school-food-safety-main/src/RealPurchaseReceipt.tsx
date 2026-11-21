@@ -3,9 +3,10 @@ import type { FormEvent } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { createSupplyPurchase } from './lib/supplyApi'
 import type { SupplyIngredient,SupplySupplier } from './lib/supplyApi'
+import { convertReceiptQuantity, receiptUnitOptions, formatReceiptQuantity } from './lib/supervisionUnits'
 
-type Line={key:number;ingredientId:string;lotCode:string;quantity:string;unitPrice:string;expiryDate:string;storageLocation:string}
-const blank=(key:number):Line=>({key,ingredientId:'',lotCode:'',quantity:'',unitPrice:'',expiryDate:'',storageLocation:''})
+type Line={key:number;ingredientId:string;lotCode:string;quantity:string;unit:string;unitPrice:string;expiryDate:string;storageLocation:string}
+const blank=(key:number):Line=>({key,ingredientId:'',lotCode:'',quantity:'',unit:'',unitPrice:'',expiryDate:'',storageLocation:''})
 const cash=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
 export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,canEdit,busy,execute,onSaved}:{
   kitchenId:string;ingredients:SupplyIngredient[];suppliers:SupplySupplier[];canEdit:boolean;busy:boolean;
@@ -23,8 +24,13 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
   function submit(event:FormEvent){
     event.preventDefault()
     void execute(async()=>{
+      for(const line of lines){
+        const base=ingredients.find(item=>item.id===line.ingredientId)?.unit
+        const normalized=base?convertReceiptQuantity(Number(line.quantity),line.unit||base,base):null
+        if(normalized===null||normalized<=0||Math.abs(normalized*1000-Math.round(normalized*1000))>0.0000001)throw new Error('Số lượng sau quy đổi phải có tối đa 3 chữ số thập phân theo đơn vị kho.')
+      }
       await createSupplyPurchase(kitchenId,{number,supplierId,invoiceNumber,reference,description,
-        lines:lines.map(line=>({ingredientId:line.ingredientId,lotCode:line.lotCode,quantity:Number(line.quantity),
+        lines:lines.map(line=>({ingredientId:line.ingredientId,lotCode:line.lotCode,quantity:Number(line.quantity),unit:line.unit,
           unitPrice:Number(line.unitPrice),expiryDate:line.expiryDate,storageLocation:line.storageLocation}))})
       setNumber('');setSupplierId('');setInvoiceNumber('');setReference('');setDescription('');setLines([blank(1)]);setNextId(2);onSaved()
     },'Đã lưu phiếu nhập nhiều dòng và ghi nhận công nợ theo đơn giá thực tế.')
@@ -44,12 +50,22 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
       <h3>Chi tiết nguyên liệu ({lines.length} dòng)</h3>
       <button type="button" className="outline" disabled={lines.length>=50} onClick={()=>{setLines(items=>[...items,blank(nextId)]);setNextId(nextId+1)}}><Plus size={15}/>Thêm dòng</button>
     </div>
-    <div className="table-scroll"><table className="management-table"><thead><tr><th>Nguyên liệu</th><th>Mã lô</th><th>Số lượng</th><th>Đơn vị</th><th>Đơn giá (VND)</th><th>Thành tiền</th><th>Hạn dùng</th><th>Vị trí</th><th></th></tr></thead><tbody>
+    <div className="table-scroll"><table className="management-table"><thead><tr><th>Nguyên liệu</th><th>Mã lô</th><th>Số lượng</th><th>Đơn vị nhập</th><th>Quy đổi về kho</th><th>Đơn giá / đơn vị nhập (VND)</th><th>Thành tiền</th><th>Hạn dùng</th><th>Vị trí</th><th></th></tr></thead><tbody>
       {lines.map((line,index)=><tr key={line.key}>
-        <td><select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value})}><option value="">Chọn nguyên liệu</option>{ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></td>
+        <td><select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:ingredients.find(item=>item.id===e.target.value)?.unit??'',quantity:''})}><option value="">Chọn nguyên liệu</option>{ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></td>
         <td><input aria-label={'Mã lô dòng '+(index+1)} required maxLength={100} value={line.lotCode} onChange={e=>change(line.key,{lotCode:e.target.value})}/></td>
-        <td><input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.001" step="0.001" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})}/></td>
-        <td>{ingredients.find(item=>item.id===line.ingredientId)?.unit??'—'}</td>
+        <td><input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.000001" step="any" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})}/></td>
+        <td><select required aria-label={'Đơn vị nhập dòng '+(index+1)} value={line.unit} onChange={e=>{
+          const base=ingredients.find(item=>item.id===line.ingredientId)?.unit??''
+          const converted=convertReceiptQuantity(Number(line.quantity),line.unit||base,e.target.value)
+          change(line.key,{unit:e.target.value,quantity:line.quantity&&converted!==null?String(converted):line.quantity})
+        }}><option value="" disabled>Chọn đơn vị</option>{receiptUnitOptions(ingredients.find(item=>item.id===line.ingredientId)?.unit??'').map(unit=><option key={unit} value={unit}>{unit}</option>)}</select></td>
+        <td>{(()=>{
+          const base=ingredients.find(item=>item.id===line.ingredientId)?.unit
+          if(!base||!line.quantity)return '—'
+          const normalized=convertReceiptQuantity(Number(line.quantity),line.unit||base,base)
+          return normalized===null?'Không quy đổi được':formatReceiptQuantity(normalized)+' '+base
+        })()}</td>
         <td><input aria-label={'Đơn giá dòng '+(index+1)} type="number" required min="1" step="1" value={line.unitPrice} onChange={e=>change(line.key,{unitPrice:e.target.value})}/></td>
         <td><strong>{cash(Math.round((Number(line.quantity)||0)*(Number(line.unitPrice)||0)))}</strong></td>
         <td><input aria-label={'Hạn dùng dòng '+(index+1)} type="date" value={line.expiryDate} onChange={e=>change(line.key,{expiryDate:e.target.value})}/></td>
