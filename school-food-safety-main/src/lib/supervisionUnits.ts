@@ -46,3 +46,10 @@ export function preferredReceiptUnit(baseUnit: string, availableCanonical?: numb
   if(key==='ml' && (availableCanonical===undefined || availableCanonical>=1000))return 'lít'
   return baseUnit
 }
+
+/** Readable stock labels only: conversion is visual, canonical data is never overwritten. */
+export function readableStockQuantity(quantity:number,baseUnit:string):string {
+  const chosen=preferredReceiptUnit(baseUnit,quantity)
+  const converted=convertReceiptQuantity(quantity,baseUnit,chosen)
+  return formatReceiptQuantity(converted??quantity)+' '+(converted===null?baseUnit:chosen)
+}
