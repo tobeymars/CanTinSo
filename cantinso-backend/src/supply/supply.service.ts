@@ -94,6 +94,13 @@ export class SupplyService {
     try{return await this.prisma.supplier.create({data:{...data,kitchenId}});}
     catch(error){if(error instanceof Prisma.PrismaClientKnownRequestError && error.code==='P2002') throw new ConflictException('Mã nhà cung cấp đã tồn tại.');throw error;}
   }
+  async supplierStatus(user:AuthUser,kitchenId:string,id:string,status:unknown) {
+    await this.permitted(user,kitchenId,true);
+    if(!uuid(id) || !['ACTIVE','INACTIVE'].includes(String(status)))throw new BadRequestException('Nhà cung cấp hoặc trạng thái không hợp lệ.');
+    const exists=await this.prisma.supplier.findFirst({where:{id,kitchenId}});
+    if(!exists)throw new NotFoundException('Nhà cung cấp không thuộc bếp.');
+    return this.prisma.supplier.update({where:{id},data:{status:status as 'ACTIVE'|'INACTIVE'}});
+  }
   async lots(user:AuthUser,kitchenId:string) {
     await this.permitted(user,kitchenId);
     const lots=await this.prisma.inventoryLot.findMany({where:{kitchenId},include:{ingredient:{select:{id:true,name:true,unit:true}},supplier:{select:{id:true,name:true,contactName:true,phone:true}}},orderBy:{receivedAt:'desc'},take:500});
