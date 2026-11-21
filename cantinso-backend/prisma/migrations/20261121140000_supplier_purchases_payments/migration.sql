@@ -25,7 +25,7 @@ ALTER TABLE "purchase_receipt_lines" ADD CONSTRAINT "purchase_receipt_lines_lot_
 CREATE TABLE "supplier_payments" (
  "id" UUID NOT NULL, "kitchen_id" UUID NOT NULL, "supplier_id" UUID NOT NULL,
  "receipt_id" UUID NOT NULL, "reference" TEXT NOT NULL, "amount" DECIMAL(18,0) NOT NULL,
- "method" TEXT NOT NULL, "note" TEXT, "paid_at" TIMESTAMP(3) NOT NULL,
+ "method" TEXT NOT NULL, "note" TEXT, "reversed_at" TIMESTAMP(3), "reversed_by_id" UUID, "reversal_reason" TEXT, "paid_at" TIMESTAMP(3) NOT NULL,
  "created_by_id" UUID NOT NULL, "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
  CONSTRAINT "supplier_payments_pkey" PRIMARY KEY ("id")
 );
