@@ -51,3 +51,5 @@ export const archiveSupplierDocument=(kitchenId:string,supplierId:string,id:stri
 
 export const changeSupplyLotStatus=(kitchenId:string,lotId:string,status:'AVAILABLE'|'QUARANTINED',note:string)=>request<{lotId:string;status:string}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/status',{method:'PATCH',body:JSON.stringify({status,note})})
 export const moveSupplyLot=(kitchenId:string,lotId:string,location:string,note:string)=>request<{lotId:string;location:string}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/location',{method:'PATCH',body:JSON.stringify({location,note})})
+
+export const importSupplySuppliers=(kitchenId:string,rows:unknown[])=>request<{imported:number;financialDataImported:false}>(kitchenPath(kitchenId)+'/suppliers/import',{method:'POST',body:JSON.stringify(rows)})
