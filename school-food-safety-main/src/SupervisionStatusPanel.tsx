@@ -19,6 +19,7 @@ import type { CheckAction, CheckId, CheckStatus, SupervisionMealType, Supervisio
 import type { IngredientReceiptLine } from './lib/supervisionStatus'
 import { supervisionIngredientCatalog } from './lib/inventory'
 import Select from './components/ui/Select'
+import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions } from './lib/supervisionUnits'
 
 const labels: Record<CheckStatus, string> = {
   not_reported: 'Chưa cập nhật', reported: 'Chờ BGH xác nhận',
@@ -51,8 +52,8 @@ function IngredientReceiptDetails({ lines, serviceDate }: { lines: readonly Ingr
 }
 
 type Editing = { id: CheckId; action: CheckAction }
-type IngredientDraftRow = { id: string; itemId: string; quantity: string }
-const createIngredientRow = (itemId = '', quantity = ''): IngredientDraftRow => ({ id: crypto.randomUUID(), itemId, quantity })
+type IngredientDraftRow = { id: string; itemId: string; quantity: string; unit: string }
+const createIngredientRow = (itemId = '', quantity = '', unit = ''): IngredientDraftRow => ({ id: crypto.randomUUID(), itemId, quantity, unit })
 export default function SupervisionStatusPanel({ school, date, mealType, role }: {
   school: School
   date: string
@@ -109,7 +110,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
     const previousIngredients = checks.find(item => item.id === id)?.history.filter(item => item.action === 'report').at(-1)?.ingredientReceipts
     setIngredientRows(id === 'ingredient_receipt' && action === 'report'
       ? Array.isArray(previousIngredients) && previousIngredients.length > 0
-        ? previousIngredients.map(item => createIngredientRow(item.itemId, String(item.quantity)))
+        ? previousIngredients.map(item => createIngredientRow(item.itemId, String(item.displayQuantity ?? item.quantity), item.displayUnit ?? item.unit))
         : [createIngredientRow()]
       : [])
   }
@@ -120,7 +121,15 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
       if (serverMode && (serverQuery.isLoading || contextQuery.isLoading)) throw Error('Dữ liệu giám sát chưa tải xong.')
       if (serverMode && (serverQuery.isError || contextQuery.isError)) throw Error('Không tải được dữ liệu trường và kho thực tế.')
       const ingredientReceipts = editing.id === 'ingredient_receipt' && editing.action === 'report'
-        ? ingredientRows.filter(row => row.itemId).map(row => ({ itemId: row.itemId, quantity: Number(row.quantity) }))
+        ? ingredientRows.filter(row => row.itemId).map(row => {
+            const ingredient = ingredientCatalog.find(item => item.itemId === row.itemId)
+            const unit = row.unit || ingredient?.unit || ''
+            const quantity = Number(row.quantity)
+            if (!ingredient || !receiptUnitOptions(ingredient.unit).includes(unit)) throw Error('Đơn vị nhận nguyên liệu không phù hợp với lô đã chọn.')
+            const baseQuantity = convertReceiptQuantity(quantity, unit, ingredient.unit)
+            if (baseQuantity === null || baseQuantity <= 0 || (serverMode && baseQuantity > (ingredient.quantityAvailable ?? 0) + 0.000000001)) throw Error('Số lượng thực nhận vượt số đã xuất hoặc không hợp lệ.')
+            return serverMode ? { itemId: row.itemId, quantity, unit } : { itemId: row.itemId, quantity: baseQuantity }
+          })
         : undefined
       if (serverMode) {
         await writeServerSupervision(scope,{action:editing.action==='report'?'check_report':editing.action==='confirm'?'check_confirm':'check_revision',itemId:editing.id,note,evidenceRef,ingredientReceipts})
@@ -210,7 +219,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                     </div>
                     <div className="supervision-ingredient-picker">
                       <label>Nguyên liệu <span aria-hidden="true">*</span>
-                        <Select label={`Nguyên liệu dòng ${index + 1}`} required searchable value={row.itemId} placeholder="Tìm và chọn từ kho" searchPlaceholder="Tên, mã lô, nhà cung cấp…" options={options} onValueChange={itemId => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, itemId, quantity: item.quantity || '1' } : item))}/>
+                        <Select label={`Nguyên liệu dòng ${index + 1}`} required searchable value={row.itemId} placeholder="Tìm và chọn từ kho" searchPlaceholder="Tên, mã lô, nhà cung cấp…" options={options} onValueChange={itemId => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, itemId, unit: ingredientCatalog.find(ingredient=>ingredient.itemId===itemId)?.unit ?? '', quantity: '1' } : item))}/>
                       </label>
                     </div>
                     {selectedIngredient && <div className="supervision-ingredient-selected">
@@ -220,7 +229,23 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                         <div><dt>Người cấp / liên hệ</dt><dd>{selectedIngredient.supplierContact}</dd></div>
                         <div><dt>Hạn sử dụng</dt><dd>{formatDate(selectedIngredient.expiresAt)} <em className={expiredAtService ? 'expired' : ''}>{expiredAtService ? 'Quá hạn tại ngày bữa ăn' : 'Còn hạn tại ngày bữa ăn'}</em></dd></div>
                       </dl>
-                      <label>Số lượng thực nhận ({selectedIngredient.unit}) <input required type="number" inputMode="decimal" min="0.001" max={serverMode ? (contextQuery.data?.lots.find(lot=>lot.itemId===row.itemId)?.quantityAvailable ?? 5000) : 5000} step="0.001" aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
+                      <div className="supervision-ingredient-quantity" style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(105px,135px)',gap:12,alignItems:'end'}}>
+                        <label>Số lượng thực nhận <input required type="number" inputMode="decimal" min="0.000001" step="any" max={serverMode ? (convertReceiptQuantity(selectedIngredient.quantityAvailable ?? 0, selectedIngredient.unit, row.unit || selectedIngredient.unit) ?? undefined) : undefined} aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
+                        <label>Đơn vị
+                          <select aria-label={`Đơn vị thực nhận ${selectedIngredient.ingredientName}`} value={row.unit || selectedIngredient.unit} onChange={event=>{
+                            const targetUnit=event.target.value
+                            setIngredientRows(current => current.map(item=>{
+                              if(item.id!==row.id) return item
+                              const previousUnit=item.unit || selectedIngredient.unit
+                              const converted=convertReceiptQuantity(Number(item.quantity),previousUnit,targetUnit)
+                              return {...item,unit:targetUnit,quantity:item.quantity&&converted!==null?String(converted):item.quantity}
+                            }))
+                          }}>
+                            {receiptUnitOptions(selectedIngredient.unit).map(unit=><option key={unit} value={unit}>{unit}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                      {serverMode && <small className="muted">Đã cấp cho bữa này: {formatReceiptQuantity(selectedIngredient.quantityAvailable ?? 0)} {selectedIngredient.unit}. Hệ thống tự quy đổi khi lưu; không thay đổi tồn kho lần nữa.</small>}
                     </div>}
                   </article>
                 })}
