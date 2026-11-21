@@ -94,6 +94,34 @@ export class SupplyService {
     try{return await this.prisma.supplier.create({data:{...data,kitchenId}});}
     catch(error){if(error instanceof Prisma.PrismaClientKnownRequestError && error.code==='P2002') throw new ConflictException('Mã nhà cung cấp đã tồn tại.');throw error;}
   }
+  async importSuppliers(user:AuthUser,kitchenId:string,input:unknown){
+    await this.permitted(user,kitchenId,true);
+    if(!Array.isArray(input)||input.length<1||input.length>100)throw new BadRequestException('Danh sách cần từ 1 đến 100 nhà cung cấp.');
+    const rows=input.map(item=>{
+      if(!item||typeof item!=='object')throw new BadRequestException('Dòng nhà cung cấp không hợp lệ.');
+      const row=item as Record<string,unknown>;
+      return {
+        kitchenId,
+        code:str(row.code,'Mã nhà cung cấp',50),
+        name:str(row.name,'Tên nhà cung cấp',200),
+        contactName:str(row.contactName??row.contact,'Người liên hệ',150,false)||null,
+        taxCode:str(row.taxCode,'Mã số thuế',60,false)||null,
+        phone:str(row.phone,'Điện thoại',40,false)||null,
+        email:str(row.email,'Email',150,false)||null,
+        address:str(row.address,'Địa chỉ',300,false)||null,
+        note:str(row.note,'Ghi chú',500,false)||null,
+      };
+    });
+    if(new Set(rows.map(row=>row.code)).size!==rows.length)throw new BadRequestException('Danh sách có mã nhà cung cấp trùng nhau.');
+    try{
+      const result=await this.prisma.supplier.createMany({data:rows});
+      return {imported:result.count,financialDataImported:false};
+    }catch(error){
+      if(error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2002')
+        throw new ConflictException('Có mã nhà cung cấp đã tồn tại trong bếp. Hãy kiểm tra trước khi nhập.');
+      throw error;
+    }
+  }
   async supplierStatus(user:AuthUser,kitchenId:string,id:string,status:unknown) {
     await this.permitted(user,kitchenId,true);
     if(!uuid(id) || !['ACTIVE','INACTIVE'].includes(String(status)))throw new BadRequestException('Nhà cung cấp hoặc trạng thái không hợp lệ.');
