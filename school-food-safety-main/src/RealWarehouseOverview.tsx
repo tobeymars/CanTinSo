@@ -2,7 +2,6 @@ import { Boxes, ClipboardList, Clock3, PackageCheck, ShieldAlert, Truck, Wallet 
 import type { SupplyFinance,SupplyLot,SupplyMovement,SupplyMinimum } from './lib/supplyApi'
 import { convertReceiptQuantity, readableStockQuantity } from './lib/supervisionUnits'
 
-const number=(n:number)=>n.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const currency=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
 export default function RealWarehouseOverview({lots,movements,finance,minimums,onOpen}:{
