@@ -144,7 +144,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     {error&&<p className="error" role="alert">{error}</p>}
     {notice&&<p role="status" className="supervision-status-message">{notice}</p>}
     {activeId&&mode==='suppliers'&&<>
-      {finance.data&&<RealSupplierFinance kitchenId={activeId} finance={finance.data} canEdit={canEdit} busy={busy} execute={execute}/>}
+      {finance.data&&<RealSupplierFinance key={activeId} kitchenId={activeId} finance={finance.data} canEdit={canEdit} busy={busy} execute={execute}/>}
       {canEdit&&<form onSubmit={submitVendor} style={{display:'grid',gap:10}}>
         <h3><Truck size={18}/>{editingVendor?'Sửa nhà cung cấp':'Thêm nhà cung cấp'}</h3>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10}}>
@@ -179,7 +179,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <button type="button" className="outline" disabled={supplierPage<=1} onClick={()=>setSupplierPage(page=>Math.max(1,page-1))}>Trước</button>
         <button type="button" className="outline" disabled={supplierPage>=supplierPages} onClick={()=>setSupplierPage(page=>Math.min(supplierPages,page+1))}>Sau</button>
       </div>
-      {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<RealSupplierDocuments kitchenId={activeId} supplierId={viewingSupplier} supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''} receipts={(finance.data?.receipts??[]).map(item=>({id:item.id,number:item.number,supplierId:item.supplier.id}))} canEdit={canEdit} busy={busy} execute={execute}/>}
+      {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<RealSupplierDocuments key={viewingSupplier} kitchenId={activeId} supplierId={viewingSupplier} supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''} receipts={(finance.data?.receipts??[]).map(item=>({id:item.id,number:item.number,supplierId:item.supplier.id}))} canEdit={canEdit} busy={busy} execute={execute}/>}
     </>}
     {activeId&&mode==='warehouse'&&<>
       <nav style={{display:'flex',gap:8,flexWrap:'wrap'}} aria-label="Quản lý kho">
@@ -214,7 +214,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       </>}
       {section==='receipts'&&<>
         <h3><PackagePlus size={18}/>Tiếp nhận lô nguyên liệu mới</h3>
-        <RealPurchaseReceipt kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>setSection('stock')}/>
+        <RealPurchaseReceipt key={activeId} kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>setSection('stock')}/>
       </>}
       {section==='trace'&&<>
         <h3>Truy xuất nguồn gốc và nhật ký nhập / xuất</h3>
