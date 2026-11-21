@@ -3,12 +3,11 @@ import type { FormEvent } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { createSupplyPurchase } from './lib/supplyApi'
 import type { SupplyIngredient,SupplySupplier } from './lib/supplyApi'
-import { convertReceiptQuantity, receiptUnitOptions, formatReceiptQuantity } from './lib/supervisionUnits'
+import { convertReceiptQuantity, receiptUnitOptions, formatReceiptQuantity, preferredReceiptUnit } from './lib/supervisionUnits'
 
 type Line={key:number;ingredientId:string;lotCode:string;quantity:string;unit:string;unitPrice:string;expiryDate:string;storageLocation:string}
 const blank=(key:number):Line=>({key,ingredientId:'',lotCode:'',quantity:'',unit:'',unitPrice:'',expiryDate:'',storageLocation:''})
 const cash=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
-const preferredUnit=(base:string)=>base.trim().toLowerCase()==='g'?'kg':base
 export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,canEdit,busy,execute,onSaved}:{
   kitchenId:string;ingredients:SupplyIngredient[];suppliers:SupplySupplier[];canEdit:boolean;busy:boolean;
   execute:(action:()=>Promise<unknown>,success:string)=>Promise<void>;onSaved:()=>void;
@@ -54,7 +53,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
     </div>
     <div className="table-scroll"><table className="management-table"><thead><tr><th>Nguyên liệu</th><th>Mã lô</th><th>Số lượng</th><th>Đơn vị nhập</th><th>Quy đổi về kho</th><th>Đơn giá / đơn vị nhập (VND)</th><th>Thành tiền</th><th>Hạn dùng</th><th>Vị trí</th><th></th></tr></thead><tbody>
       {lines.map((line,index)=><tr key={line.key}>
-        <td><select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:preferredUnit(ingredients.find(item=>item.id===e.target.value)?.unit??''),quantity:''})}><option value="">Chọn nguyên liệu</option>{ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></td>
+        <td><select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:preferredReceiptUnit(ingredients.find(item=>item.id===e.target.value)?.unit??''),quantity:''})}><option value="">Chọn nguyên liệu</option>{ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></td>
         <td><input aria-label={'Mã lô dòng '+(index+1)} required maxLength={100} value={line.lotCode} onChange={e=>change(line.key,{lotCode:e.target.value})}/></td>
         <td><input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.000001" step="any" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})}/></td>
         <td><select required aria-label={'Đơn vị nhập dòng '+(index+1)} value={line.unit} onChange={e=>{
