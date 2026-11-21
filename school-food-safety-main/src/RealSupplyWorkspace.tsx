@@ -9,6 +9,7 @@ import {
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
 import './WarehouseManagement.css'
+import './RealSupplyWorkspace.css'
 import RealSupplierFinance from './RealSupplierFinance'
 import RealPurchaseReceipt from './RealPurchaseReceipt'
 import RealSupplierDocuments from './RealSupplierDocuments'
@@ -128,12 +129,12 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   }
   const isLoading=kitchenQuery.isLoading||(!!activeId&&(suppliers.isLoading|| (mode==='warehouse'&&lots.isLoading)))
   const failure=kitchenQuery.error||suppliers.error||lots.error||ingredients.error||movements.error||finance.error||schoolQuery.error||minimums.error
-  return <section className="card" style={{padding:24,display:'grid',gap:18}}>
-    <div className="card-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+  return <section className="card supply-workspace">
+    <div className="card-header supply-workspace__header">
       <div><span className="section-kicker">DỮ LIỆU POSTGRESQL · THEO BẾP</span>
         <h2>{mode==='suppliers'?'Nhà cung cấp của bếp':'Quản lý kho bếp'}</h2>
         <p className="muted">Một bếp trung tâm sử dụng chung kho cho các trường được phân công. Hồ sơ giám sát đọc trực tiếp nguồn dữ liệu này.</p></div>
-      <div style={{display:'flex',gap:8}}>
+      <div className="supply-header-actions">
         {activeId&&mode==='warehouse'&&<button type="button" className="outline" onClick={exportWarehouseCsv}>Xuất báo cáo CSV</button>}
         <button type="button" className="outline" onClick={()=>void refresh()} disabled={!activeId}><RefreshCw size={16}/>Làm mới</button>
       </div>
@@ -147,9 +148,9 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     {notice&&<p role="status" className="supervision-status-message">{notice}</p>}
     {activeId&&mode==='suppliers'&&<>
       {finance.data&&<RealSupplierFinance key={activeId} kitchenId={activeId} finance={finance.data} canEdit={canEdit} busy={busy} execute={execute}/>}
-      {canEdit&&<form onSubmit={submitVendor} style={{display:'grid',gap:10}}>
+      {canEdit&&<form className="supply-panel supply-vendor-form" onSubmit={submitVendor}>
         <h3><Truck size={18}/>{editingVendor?'Sửa nhà cung cấp':'Thêm nhà cung cấp'}</h3>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10}}>
+        <div className="supply-form-grid">
           <label>Mã nhà cung cấp *<input required maxLength={50} value={vendor.code} onChange={e=>setVendor(v=>({...v,code:e.target.value}))}/></label>
           <label>Tên nhà cung cấp *<input required maxLength={200} value={vendor.name} onChange={e=>setVendor(v=>({...v,name:e.target.value}))}/></label>
           <label>Người liên hệ<input maxLength={150} value={vendor.contactName} onChange={e=>setVendor(v=>({...v,contactName:e.target.value}))}/></label>
@@ -159,18 +160,18 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <label>Địa chỉ<input value={vendor.address} onChange={e=>setVendor(v=>({...v,address:e.target.value}))}/></label>
           <label>Ghi chú<input maxLength={500} value={vendor.note} onChange={e=>setVendor(v=>({...v,note:e.target.value}))}/></label>
         </div>
-        <div style={{display:'flex',gap:10}}><button className="primary" type="submit" disabled={busy}><Plus size={16}/>{editingVendor?'Lưu thay đổi':'Thêm nhà cung cấp'}</button>{editingVendor&&<button className="outline" type="button" onClick={()=>{setEditingVendor(null);setVendor(emptySupplier())}}>Hủy sửa</button>}</div>
+        <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy}><Plus size={16}/>{editingVendor?'Lưu thay đổi':'Thêm nhà cung cấp'}</button>{editingVendor&&<button className="outline" type="button" onClick={()=>{setEditingVendor(null);setVendor(emptySupplier())}}>Hủy sửa</button>}</div>
       </form>}
-      <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',justifyContent:'space-between'}}>
+      <div className="supply-section-heading">
         <h3>Danh sách nhà cung cấp ({suppliers.data?.length??0})</h3>
         <div style={{display:'flex',gap:8}}>
           {canEdit&&<><input type="file" hidden ref={importRef} accept=".json,application/json" onChange={event=>{void importSupplierFile(event.target.files?.[0]);event.target.value=''}}/><button className="outline" type="button" onClick={()=>importRef.current?.click()}>Import JSON</button></>}
           <button className="outline" type="button" onClick={exportSupplierList}>Xuất CSV</button>
         </div>
       </div>
-      <div className="management-toolbar" style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>{setSupplierSearch(e.target.value);setSupplierPage(1)}}/></label>{canEdit&&<label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>{setSupplierDebtOnly(e.target.checked);setSupplierPage(1)}}/>Còn công nợ</label>}</div>
+      <div className="management-toolbar supply-filterbar"><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>{setSupplierSearch(e.target.value);setSupplierPage(1)}}/></label>{canEdit&&<label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>{setSupplierDebtOnly(e.target.checked);setSupplierPage(1)}}/>Còn công nợ</label>}</div>
       {suppliers.data?.length===0&&<p className="muted">Chưa có nhà cung cấp. Bếp cần tạo trước khi nhập lô nguyên liệu.</p>}
-      <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th>Còn phải trả</th><th>Chức năng</th></tr></thead><tbody>
+      <div className="supply-table-scroll"><table className="supply-table supply-table--suppliers"><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th>Còn phải trả</th><th>Chức năng</th></tr></thead><tbody>
         {visibleSuppliers.map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{canEdit?(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0).toLocaleString('vi-VN')+' đ':'Chỉ bếp được xem'}</td><td><div style={{display:'flex',gap:6}}><button type="button" className="outline" onClick={()=>setViewingSupplier(current=>current===item.id?null:item.id)}>Hồ sơ</button>{canEdit&&<div style={{display:'flex',gap:6}}>
           <button className="outline" type="button" onClick={()=>editVendor(item)}>Sửa</button>
           <button className="outline" type="button" disabled={busy} onClick={()=>void execute(()=>updateSupplySupplierStatus(activeId,item.id,item.status==='ACTIVE'?'INACTIVE':'ACTIVE'),item.status==='ACTIVE'?'Đã ngừng sử dụng nhà cung cấp.':'Đã kích hoạt nhà cung cấp.')}>{item.status==='ACTIVE'?'Ngừng dùng':'Kích hoạt'}</button>
@@ -184,11 +185,11 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<RealSupplierDocuments key={viewingSupplier} kitchenId={activeId} supplierId={viewingSupplier} supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''} receipts={(finance.data?.receipts??[]).map(item=>({id:item.id,number:item.number,supplierId:item.supplier.id}))} canEdit={canEdit} busy={busy} execute={execute}/>}
     </>}
     {activeId&&mode==='warehouse'&&<>
-      <nav style={{display:'flex',gap:8,flexWrap:'wrap'}} aria-label="Quản lý kho">
+      <nav className="supply-tabs" aria-label="Quản lý kho">
         {([['overview','Tổng quan'],['stock','Tồn kho'],['receipts','Nhập kho'],['issues','Xuất kho'],['transfers','Chuyển vị trí'],['lots','Lô hàng'],['trace','Truy xuất nguồn gốc']] as const).map(([id,label])=><button type="button" key={id} className={section===id?'primary':'outline'} onClick={()=>setSection(id)}>{label}</button>)}
       </nav>
       {section==='overview'&&<RealWarehouseOverview lots={lots.data??[]} movements={movements.data??[]} finance={finance.data} minimums={minimums.data??[]} onOpen={setSection}/>}
-      {section==='stock'&&canEdit&&<form className="card" onSubmit={e=>{e.preventDefault();if(!thresholdIngredient)return;void execute(async()=>{await setSupplyMinimum(activeId,thresholdIngredient,Number(thresholdQty),thresholdUnit||ingredients.data?.find(row=>row.id===thresholdIngredient)?.unit||'');setThresholdIngredient('');setThresholdQty('');setThresholdUnit('')},'Đã cập nhật định mức tồn kho của bếp.')}} style={{padding:14,display:'flex',flexWrap:'wrap',gap:10,alignItems:'end'}}>
+      {section==='stock'&&canEdit&&<form className="card supply-panel supply-minimum-form" onSubmit={e=>{e.preventDefault();if(!thresholdIngredient)return;void execute(async()=>{await setSupplyMinimum(activeId,thresholdIngredient,Number(thresholdQty),thresholdUnit||ingredients.data?.find(row=>row.id===thresholdIngredient)?.unit||'');setThresholdIngredient('');setThresholdQty('');setThresholdUnit('')},'Đã cập nhật định mức tồn kho của bếp.')}} style={{padding:14,display:'flex',flexWrap:'wrap',gap:10,alignItems:'end'}}>
         <label>Nguyên liệu cần đặt định mức<select required value={thresholdIngredient} onChange={e=>{setThresholdIngredient(e.target.value);const base=ingredients.data?.find(item=>item.id===e.target.value)?.unit??''
           const preferred=preferredReceiptUnit(base)
           const stored=minimums.data?.find(item=>item.ingredientId===e.target.value)?.minimumQty
@@ -208,14 +209,14 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <h3><Boxes size={19}/>{section==='issues'?'Chọn lô để xuất kho':'Tồn kho theo lô'} ({matchedLots.length})</h3>
         <label>Tìm mã lô / nguyên liệu / nhà cung cấp <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Nhập từ khóa để lọc…"/></label>
         {lots.data?.length===0&&<p className="muted">Bếp chưa có lô nguyên liệu thật. Hãy tạo nhà cung cấp và nhập kho.</p>}
-        <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Lô</th><th>Nguyên liệu</th><th>Nhà cung cấp</th><th>Tồn</th><th>Hạn dùng</th><th>Trạng thái</th><th></th></tr></thead><tbody>
+        <div className="supply-table-scroll"><table className="supply-table supply-table--lots"><thead><tr><th>Lô</th><th>Nguyên liệu</th><th>Nhà cung cấp</th><th>Tồn</th><th>Hạn dùng</th><th>Trạng thái</th><th></th></tr></thead><tbody>
         {matchedLots.map(lot=><tr key={lot.id}><td><strong>{lot.lotCode}</strong><small style={{display:'block'}}>{lot.storageLocation||'Chưa cập nhật vị trí'}</small></td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td><strong>{readableStockQuantity(lot.remainingQty,lot.unit)}</strong>{readableStockQuantity(lot.remainingQty,lot.unit)!==fmt(lot.remainingQty)+' '+lot.unit&&<small style={{display:'block'}}>Số liệu kho: {fmt(lot.remainingQty)} {lot.unit}</small>}</td><td>{date(lot.expiryDate)}</td><td>{expired(lot.expiryDate)?'Hết hạn':lot.status==='AVAILABLE'?'Có thể xuất':lot.status==='DEPLETED'?'Đã hết':'Cách ly / tạm ngưng'}</td><td><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
           {canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue({...emptyIssue(),unit:preferredReceiptUnit(lot.unit,lot.remainingQty)})}}>Xuất lô</button>}
           {canEdit&&lot.status!=='DEPLETED'&&<button type="button" className="outline" onClick={()=>{setMoveLot(lot);setNewLocation(lot.storageLocation??'');setMoveReason('');setSection('transfers')}}>Chuyển vị trí</button>}
           {canEdit&&(lot.status==='AVAILABLE'||lot.status==='QUARANTINED')&&<button type="button" className="outline" onClick={()=>{setStatusLot(lot);setStatusReason('')}}>{lot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'}</button>}
         </div></td></tr>)}
         </tbody></table></div>
-        {issueLot&&canEdit&&<form onSubmit={submitIssue} style={{display:'grid',gap:10}}>
+        {issueLot&&canEdit&&<form className="supply-panel supply-issue-form" onSubmit={submitIssue}>
           <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({readableStockQuantity(issueLot.remainingQty,issueLot.unit)} còn lại)</h3>
           <div style={{display:'grid',gridTemplateColumns:'minmax(160px,1fr) minmax(95px,140px)',gap:10}}>
             <label>Số lượng xuất *<input type="number" required min="0.000001" step="any" max={convertReceiptQuantity(issueLot.remainingQty,issueLot.unit,issue.unit||issueLot.unit)??undefined} value={issue.quantity} onChange={e=>setIssue(v=>({...v,quantity:e.target.value}))}/></label>
@@ -229,7 +230,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <label>Ngày sử dụng *<input type="date" required value={issue.serviceDate} onChange={e=>setIssue(v=>({...v,serviceDate:e.target.value}))}/></label>
           <label>Bữa sử dụng *<select value={issue.mealType} onChange={e=>setIssue(v=>({...v,mealType:e.target.value as typeof issue.mealType}))}><option value="BREAKFAST">Bữa sáng</option><option value="LUNCH">Bữa trưa</option><option value="SNACK">Bữa xế</option></select></label>
           <label>Lý do / chứng từ xuất *<input required maxLength={500} value={issue.note} onChange={e=>setIssue(v=>({...v,note:e.target.value}))}/></label>
-          <div style={{display:'flex',gap:10}}><button className="primary" type="submit" disabled={busy}>Xác nhận xuất kho</button><button className="outline" type="button" onClick={()=>setIssueLot(null)}>Hủy</button></div>
+          <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy}>Xác nhận xuất kho</button><button className="outline" type="button" onClick={()=>setIssueLot(null)}>Hủy</button></div>
         </form>}
       </>}
       {section==='receipts'&&<>
@@ -240,21 +241,21 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <h3>Truy xuất nguồn gốc và nhật ký nhập / xuất</h3>
         <label>Tìm mã lô hoặc nguyên liệu <input value={movementSearch} onChange={e=>setMovementSearch(e.target.value)} placeholder="Mã lô / nguyên liệu / diễn giải"/></label>
         {movements.data?.length===0&&<p className="muted">Chưa có nhật ký.</p>}
-        <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Thời điểm</th><th>Nguyên liệu</th><th>Mã lô</th><th>Loại</th><th>Nội dung</th></tr></thead><tbody>
+        <div className="supply-table-scroll"><table className="supply-table supply-table--events"><thead><tr><th>Thời điểm</th><th>Nguyên liệu</th><th>Mã lô</th><th>Loại</th><th>Nội dung</th></tr></thead><tbody>
         {matchedMovements.map(item=><tr key={item.id}><td>{date(item.occurredAt)}</td><td>{item.lot.ingredient.name}</td><td>{item.lot.lotCode}</td><td>{item.eventType==='RECEIVED'?'Nhập kho':item.eventType==='ISSUED'?'Xuất kho':item.eventType}</td><td>{item.description}</td></tr>)}
         </tbody></table></div>
       </>}
-      {section==='transfers'&&<div style={{display:'grid',gap:12}}>
+      {section==='transfers'&&<div className="supply-panel supply-transfer-section">
         <h3>Chuyển vị trí bảo quản nội bộ</h3>
         <p className="muted">Chỉ thay đổi vị trí bảo quản của nguyên lô trong cùng bếp và lưu nhật ký; không phải chuyển hàng giữa hai bếp.</p>
         {canEdit&&<label>Chọn lô hàng <select value={moveLot?.id??''} onChange={e=>{const lot=lots.data?.find(row=>row.id===e.target.value)??null;setMoveLot(lot);setNewLocation(lot?.storageLocation??'')}}><option value="">Chọn lô cần chuyển</option>{lots.data?.filter(row=>row.status!=='DEPLETED').map(row=><option key={row.id} value={row.id}>{row.lotCode} · {row.ingredient.name}</option>)}</select></label>}
-        {moveLot&&canEdit&&<form onSubmit={confirmMove} style={{display:'grid',gap:10}}>
+        {moveLot&&canEdit&&<form className="supply-form-grid" onSubmit={confirmMove}>
           <label>Vị trí mới *<input required maxLength={120} value={newLocation} onChange={e=>setNewLocation(e.target.value)}/></label>
           <label>Lý do / chứng từ *<input required maxLength={500} value={moveReason} onChange={e=>setMoveReason(e.target.value)}/></label>
           <button className="primary" type="submit" disabled={busy}>Xác nhận chuyển vị trí</button>
         </form>}
       </div>}
-      {statusLot&&canEdit&&<form onSubmit={confirmStatus} className="card" style={{padding:16,display:'grid',gap:8}}>
+      {statusLot&&canEdit&&<form onSubmit={confirmStatus} className="card supply-panel supply-status-form">
         <h3>{statusLot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'} · {statusLot.lotCode}</h3>
         <label>Lý do và căn cứ *<input required maxLength={500} value={statusReason} onChange={e=>setStatusReason(e.target.value)}/></label>
         <div style={{display:'flex',gap:10}}><button type="submit" className="primary" disabled={busy}>Lưu trạng thái</button><button type="button" className="outline" onClick={()=>setStatusLot(null)}>Hủy</button></div>
