@@ -48,3 +48,6 @@ export const getSupplierDocuments=(kitchenId:string,supplierId:string)=>request<
 export const uploadSupplierDocument=(kitchenId:string,supplierId:string,input:{category:string;filename:string;mimeType:string;base64:string;documentNumber:string;issuer:string;issuedAt:string;expiresAt:string})=>request<SupplierDocument>(docPath(kitchenId,supplierId),{method:'POST',body:JSON.stringify(input)})
 export const downloadSupplierDocument=(kitchenId:string,supplierId:string,id:string)=>request<{filename:string;mimeType:string;base64:string}>(docPath(kitchenId,supplierId)+'/'+encodeURIComponent(id))
 export const archiveSupplierDocument=(kitchenId:string,supplierId:string,id:string)=>request<{id:string;isArchived:boolean}>(docPath(kitchenId,supplierId)+'/'+encodeURIComponent(id),{method:'DELETE'})
+
+export const changeSupplyLotStatus=(kitchenId:string,lotId:string,status:'AVAILABLE'|'QUARANTINED',note:string)=>request<{lotId:string;status:string}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/status',{method:'PATCH',body:JSON.stringify({status,note})})
+export const moveSupplyLot=(kitchenId:string,lotId:string,location:string,note:string)=>request<{lotId:string;location:string}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/location',{method:'PATCH',body:JSON.stringify({location,note})})
