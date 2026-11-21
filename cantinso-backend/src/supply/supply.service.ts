@@ -26,7 +26,7 @@ const dateValue = (value: unknown) => {
 export class SupplyService {
   constructor(private readonly prisma:PrismaService) {}
   private isOperator(user:AuthUser) {return ['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role);}
-  private async permitted(user:AuthUser, kitchenId:string, write=false) {
+  async permitted(user:AuthUser, kitchenId:string, write=false) {
     if (!uuid(kitchenId)) throw new BadRequestException('Mã bếp không hợp lệ.');
     const kitchen=await this.prisma.kitchen.findUnique({where:{id:kitchenId},select:{id:true,name:true,type:true,schoolId:true,wardId:true,isActive:true}});
     if (!kitchen || !kitchen.isActive) throw new NotFoundException('Không tìm thấy bếp hoạt động.');
