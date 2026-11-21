@@ -11,11 +11,6 @@ const code=(v:unknown,label:string,max=100,required=true)=>{
   return value;
 };
 const uuid=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-const quantity=(v:unknown)=>{
-  const n=Number(v);
-  if(v===null||v===undefined||v===''||!Number.isFinite(n)||n<=0||n>100000000||Math.round(n*1000)!==n*1000)throw new BadRequestException('Số lượng không hợp lệ (tối đa 3 chữ số thập phân).');
-  return n;
-};
 const money=(v:unknown,allowZero=false)=>{
   const n=Number(v);
   if(v===null||v===undefined||v===''||!Number.isSafeInteger(n)||n<0||n>1000000000000||(!allowZero&&n===0))throw new BadRequestException('Giá trị tiền phải là số nguyên VND hợp lệ.');
