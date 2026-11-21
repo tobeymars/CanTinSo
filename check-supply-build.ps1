@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 function Check($label) {
     if ($LASTEXITCODE -ne 0) {
-        throw "$label thất bại (exit code $LASTEXITCODE). Dừng trước khi chạy migration."
+        throw "$label FAILED (exit code $LASTEXITCODE). STOP before migration."
     }
 }
 Set-Location (Join-Path $root 'cantinso-backend')
@@ -20,4 +20,4 @@ Set-Location (Join-Path $root 'school-food-safety-main')
 Write-Host '[4/4] Frontend build'
 npm run build
 Check 'Frontend build'
-Write-Host 'BUILD THÀNH CÔNG. Migration chưa được tự động áp dụng.' -ForegroundColor Green
+Write-Host 'BUILD OK. Migrations were NOT applied automatically.' -ForegroundColor Green
