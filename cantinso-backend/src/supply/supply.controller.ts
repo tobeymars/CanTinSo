@@ -20,6 +20,11 @@ export class SupplyController {
   @Patch(':kitchenId/suppliers/:supplierId')
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
   updateSupplier(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('supplierId') supplierId:string,@Body() body:unknown){return this.service.saveSupplier(user,kitchenId,body,supplierId);}
+  @Patch(':kitchenId/suppliers/:supplierId/status')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  supplierStatus(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('supplierId') supplierId:string,@Body() body:{status?:string}){
+    return this.service.supplierStatus(user,kitchenId,supplierId,body?.status);
+  }
   @Get(':kitchenId/lots') lots(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.lots(user,kitchenId);}
   @Post(':kitchenId/receipts')
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
