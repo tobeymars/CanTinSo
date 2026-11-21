@@ -13,9 +13,10 @@ import RealSupplierFinance from './RealSupplierFinance'
 import RealPurchaseReceipt from './RealPurchaseReceipt'
 import RealSupplierDocuments from './RealSupplierDocuments'
 import RealWarehouseOverview from './RealWarehouseOverview'
+import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions } from './lib/supervisionUnits'
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:'',note:''})
-const emptyIssue=()=>({quantity:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
+const emptyIssue=()=>({quantity:'',unit:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
 const fmt=(value:number)=>value.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const date=(value?:string|null)=>value?new Date(value).toLocaleDateString('vi-VN'):'Chưa có'
 const expired=(value?:string|null)=>!!value&&value.slice(0,10)<new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
@@ -52,6 +53,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [statusReason,setStatusReason]=useState('')
   const [thresholdIngredient,setThresholdIngredient]=useState('')
   const [thresholdQty,setThresholdQty]=useState('')
+  const [thresholdUnit,setThresholdUnit]=useState('')
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
@@ -110,7 +112,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   function submitIssue(e:FormEvent){
     e.preventDefault()
     if(!issueLot)return
-    void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{quantity:Number(issue.quantity),note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType});setIssueLot(null);setIssue(emptyIssue())},'Đã xuất kho và cập nhật tồn lô.')
+    void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{quantity:Number(issue.quantity),unit:issue.unit||issueLot.unit,note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType});setIssueLot(null);setIssue(emptyIssue())},'Đã xuất kho và cập nhật tồn lô.')
   }
   const filteredSuppliers=(suppliers.data??[]).filter(item=>{const query=supplierSearch.toLocaleLowerCase('vi');return (item.code+' '+item.name+' '+(item.phone??'')).toLocaleLowerCase('vi').includes(query)&&(!supplierDebtOnly||(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0)>0)})
   const supplierPages=Math.max(1,Math.ceil(filteredSuppliers.length/10))
@@ -186,9 +188,16 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         {([['overview','Tổng quan'],['stock','Tồn kho'],['receipts','Nhập kho'],['issues','Xuất kho'],['transfers','Chuyển vị trí'],['lots','Lô hàng'],['trace','Truy xuất nguồn gốc']] as const).map(([id,label])=><button type="button" key={id} className={section===id?'primary':'outline'} onClick={()=>setSection(id)}>{label}</button>)}
       </nav>
       {section==='overview'&&<RealWarehouseOverview lots={lots.data??[]} movements={movements.data??[]} finance={finance.data} minimums={minimums.data??[]} onOpen={setSection}/>}
-      {section==='stock'&&canEdit&&<form className="card" onSubmit={e=>{e.preventDefault();if(!thresholdIngredient)return;void execute(async()=>{await setSupplyMinimum(activeId,thresholdIngredient,Number(thresholdQty));setThresholdIngredient('');setThresholdQty('')},'Đã cập nhật định mức tồn kho của bếp.')}} style={{padding:14,display:'flex',flexWrap:'wrap',gap:10,alignItems:'end'}}>
-        <label>Nguyên liệu cần đặt định mức<select required value={thresholdIngredient} onChange={e=>{setThresholdIngredient(e.target.value);setThresholdQty(String(minimums.data?.find(item=>item.ingredientId===e.target.value)?.minimumQty??''))}}><option value="">Chọn nguyên liệu</option>{ingredients.data?.map(item=><option key={item.id} value={item.id}>{item.name} · {item.unit}</option>)}</select></label>
-        <label>Tồn tối thiểu (0 = tắt cảnh báo)<input required type="number" min="0" step="0.001" value={thresholdQty} onChange={e=>setThresholdQty(e.target.value)}/></label>
+      {section==='stock'&&canEdit&&<form className="card" onSubmit={e=>{e.preventDefault();if(!thresholdIngredient)return;void execute(async()=>{await setSupplyMinimum(activeId,thresholdIngredient,Number(thresholdQty),thresholdUnit||ingredients.data?.find(row=>row.id===thresholdIngredient)?.unit||'');setThresholdIngredient('');setThresholdQty('');setThresholdUnit('')},'Đã cập nhật định mức tồn kho của bếp.')}} style={{padding:14,display:'flex',flexWrap:'wrap',gap:10,alignItems:'end'}}>
+        <label>Nguyên liệu cần đặt định mức<select required value={thresholdIngredient} onChange={e=>{setThresholdIngredient(e.target.value);setThresholdQty(String(minimums.data?.find(item=>item.ingredientId===e.target.value)?.minimumQty??''));setThresholdUnit(ingredients.data?.find(item=>item.id===e.target.value)?.unit??'')}}><option value="">Chọn nguyên liệu</option>{ingredients.data?.map(item=><option key={item.id} value={item.id}>{item.name} · {item.unit}</option>)}</select></label>
+        <label>Tồn tối thiểu (0 = tắt cảnh báo)<input required type="number" min="0" step="any" value={thresholdQty} onChange={e=>setThresholdQty(e.target.value)}/></label>
+        <label>Đơn vị định mức<select value={thresholdUnit} onChange={e=>{
+          const base=ingredients.data?.find(item=>item.id===thresholdIngredient)?.unit??''
+          const previous=thresholdUnit||base
+          const value=convertReceiptQuantity(Number(thresholdQty),previous,e.target.value)
+          setThresholdUnit(e.target.value)
+          if(thresholdQty&&value!==null)setThresholdQty(String(value))
+        }}>{receiptUnitOptions(ingredients.data?.find(item=>item.id===thresholdIngredient)?.unit??'').map(unit=><option key={unit} value={unit}>{unit}</option>)}</select></label>
         <button className="primary" type="submit" disabled={busy}>Lưu định mức</button>
       </form>}
       {(section==='stock'||section==='lots'||section==='issues')&&<>
@@ -197,14 +206,21 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         {lots.data?.length===0&&<p className="muted">Bếp chưa có lô nguyên liệu thật. Hãy tạo nhà cung cấp và nhập kho.</p>}
         <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Lô</th><th>Nguyên liệu</th><th>Nhà cung cấp</th><th>Tồn</th><th>Hạn dùng</th><th>Trạng thái</th><th></th></tr></thead><tbody>
         {matchedLots.map(lot=><tr key={lot.id}><td><strong>{lot.lotCode}</strong><small style={{display:'block'}}>{lot.storageLocation||'Chưa cập nhật vị trí'}</small></td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td>{fmt(lot.remainingQty)} {lot.unit}</td><td>{date(lot.expiryDate)}</td><td>{expired(lot.expiryDate)?'Hết hạn':lot.status==='AVAILABLE'?'Có thể xuất':lot.status==='DEPLETED'?'Đã hết':'Cách ly / tạm ngưng'}</td><td><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-          {canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue(emptyIssue())}}>Xuất lô</button>}
+          {canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue({...emptyIssue(),unit:lot.unit})}}>Xuất lô</button>}
           {canEdit&&lot.status!=='DEPLETED'&&<button type="button" className="outline" onClick={()=>{setMoveLot(lot);setNewLocation(lot.storageLocation??'');setMoveReason('');setSection('transfers')}}>Chuyển vị trí</button>}
           {canEdit&&(lot.status==='AVAILABLE'||lot.status==='QUARANTINED')&&<button type="button" className="outline" onClick={()=>{setStatusLot(lot);setStatusReason('')}}>{lot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'}</button>}
         </div></td></tr>)}
         </tbody></table></div>
         {issueLot&&canEdit&&<form onSubmit={submitIssue} style={{display:'grid',gap:10}}>
           <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({fmt(issueLot.remainingQty)} {issueLot.unit} còn lại)</h3>
-          <label>Số lượng xuất *<input type="number" required min="0.001" step="0.001" max={issueLot.remainingQty} value={issue.quantity} onChange={e=>setIssue(v=>({...v,quantity:e.target.value}))}/></label>
+          <div style={{display:'grid',gridTemplateColumns:'minmax(160px,1fr) minmax(95px,140px)',gap:10}}>
+            <label>Số lượng xuất *<input type="number" required min="0.000001" step="any" max={convertReceiptQuantity(issueLot.remainingQty,issueLot.unit,issue.unit||issueLot.unit)??undefined} value={issue.quantity} onChange={e=>setIssue(v=>({...v,quantity:e.target.value}))}/></label>
+            <label>Đơn vị<select value={issue.unit||issueLot.unit} onChange={e=>setIssue(v=>{
+              const converted=convertReceiptQuantity(Number(v.quantity),v.unit||issueLot.unit,e.target.value)
+              return {...v,unit:e.target.value,quantity:v.quantity&&converted!==null?String(converted):v.quantity}
+            })}>{receiptUnitOptions(issueLot.unit).map(unit=><option key={unit} value={unit}>{unit}</option>)}</select></label>
+          </div>
+          <small className="muted">Tồn có thể xuất: {formatReceiptQuantity(issueLot.remainingQty)} {issueLot.unit}. Hệ thống quy đổi trước khi trừ tồn.</small>
           <label>Trường được cấp nguyên liệu *<select required value={issue.schoolId} onChange={e=>setIssue(v=>({...v,schoolId:e.target.value}))}><option value="">Chọn trường nhận</option>{schoolQuery.data?.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           <label>Ngày sử dụng *<input type="date" required value={issue.serviceDate} onChange={e=>setIssue(v=>({...v,serviceDate:e.target.value}))}/></label>
           <label>Bữa sử dụng *<select value={issue.mealType} onChange={e=>setIssue(v=>({...v,mealType:e.target.value as typeof issue.mealType}))}><option value="BREAKFAST">Bữa sáng</option><option value="LUNCH">Bữa trưa</option><option value="SNACK">Bữa xế</option></select></label>
