@@ -50,7 +50,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
         <td><input aria-label={'Mã lô dòng '+(index+1)} required maxLength={100} value={line.lotCode} onChange={e=>change(line.key,{lotCode:e.target.value})}/></td>
         <td><input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.001" step="0.001" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})}/></td>
         <td>{ingredients.find(item=>item.id===line.ingredientId)?.unit??'—'}</td>
-        <td><input aria-label={'Đơn giá dòng '+(index+1)} type="number" required min="0" step="1" value={line.unitPrice} onChange={e=>change(line.key,{unitPrice:e.target.value})}/></td>
+        <td><input aria-label={'Đơn giá dòng '+(index+1)} type="number" required min="1" step="1" value={line.unitPrice} onChange={e=>change(line.key,{unitPrice:e.target.value})}/></td>
         <td><strong>{cash(Math.round((Number(line.quantity)||0)*(Number(line.unitPrice)||0)))}</strong></td>
         <td><input aria-label={'Hạn dùng dòng '+(index+1)} type="date" value={line.expiryDate} onChange={e=>change(line.key,{expiryDate:e.target.value})}/></td>
         <td><input aria-label={'Vị trí dòng '+(index+1)} maxLength={120} value={line.storageLocation} onChange={e=>change(line.key,{storageLocation:e.target.value})}/></td>
