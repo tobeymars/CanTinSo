@@ -35,7 +35,7 @@ export type SupplyFinance = {
   receipts:{id:string;number:string;invoiceNumber:string|null;reference:string|null;description:string|null;createdAt:string;total:number;paid:number;debt:number;
     supplier:{id:string;name:string;code:string};
     lines:{id:string;quantity:number;unitPrice:number;amount:number;lot:{id:string;lotCode:string;ingredient:{name:string;unit:string}}}[]}[]
-  payments:{id:string;reference:string;amount:number;method:string;paidAt:string;note:string|null;receipt:{id:string;number:string};supplier:{id:string;name:string}}[]
+  payments:{id:string;reference:string;amount:number;method:string;paidAt:string;note:string|null;reversedAt:string|null;reversalReason:string|null;receipt:{id:string;number:string};supplier:{id:string;name:string}}[]
 }
 export type SupplyPurchaseLine={ingredientId:string;lotCode:string;quantity:number;unitPrice:number;expiryDate:string;storageLocation:string}
 export const getSupplyFinance=(id:string)=>request<SupplyFinance>(kitchenPath(id)+'/finance')
@@ -53,3 +53,5 @@ export const changeSupplyLotStatus=(kitchenId:string,lotId:string,status:'AVAILA
 export const moveSupplyLot=(kitchenId:string,lotId:string,location:string,note:string)=>request<{lotId:string;location:string}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/location',{method:'PATCH',body:JSON.stringify({location,note})})
 
 export const importSupplySuppliers=(kitchenId:string,rows:unknown[])=>request<{imported:number;financialDataImported:false}>(kitchenPath(kitchenId)+'/suppliers/import',{method:'POST',body:JSON.stringify(rows)})
+
+export const reverseSupplyPayment=(kitchenId:string,paymentId:string,reason:string)=>request<{id:string;reversed:true}>(kitchenPath(kitchenId)+'/payments/'+encodeURIComponent(paymentId)+'/reverse',{method:'POST',body:JSON.stringify({reason})})
