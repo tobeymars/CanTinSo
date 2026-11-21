@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucide-react'
 import type { ViewRole } from './lib/store'
 import {
   getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,
-  issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,
+  issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,importSupplySuppliers,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
 import './WarehouseManagement.css'
@@ -21,6 +21,7 @@ const date=(value?:string|null)=>value?new Date(value).toLocaleDateString('vi-VN
 const expired=(value?:string|null)=>!!value&&value.slice(0,10)<new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
 export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'warehouse';role:ViewRole}){
   const qc=useQueryClient()
+  const importRef=useRef<HTMLInputElement>(null)
   const canEdit=role==='central_kitchen'||role==='school_kitchen'
   const kitchenQuery=useQuery({queryKey:['real-supply-kitchens'],queryFn:getSupplyKitchens})
   const [kitchenId,setKitchenId]=useState('')
@@ -65,6 +66,23 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     try{await work();await refresh();setNotice(success)}
     catch(e){setError(e instanceof Error?e.message:'Không thể lưu dữ liệu.')}
     finally{setBusy(false)}
+  }
+  function exportSupplierList(){
+    const rows=[['Mã','Tên','Người liên hệ','Điện thoại','Email','Mã số thuế','Địa chỉ','Ghi chú','Trạng thái'],...(suppliers.data??[]).map(row=>[row.code,row.name,row.contactName??'',row.phone??'',row.email??'',row.taxCode??'',row.address??'',row.note??'',row.status])];
+    const csv='\uFEFF'+rows.map(row=>row.map(value=>'"'+value.replaceAll('"','""')+'"').join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    const link=document.createElement('a');link.href=url;link.download='nha-cung-cap.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }
+  async function importSupplierFile(file?:File){
+    if(!file)return;
+    if(file.size>1024*1024){setError('Tệp import vượt giới hạn 1 MB.');return}
+    try{
+      const parsed:unknown=JSON.parse(await file.text())
+      const list=Array.isArray(parsed)?parsed:parsed&&typeof parsed==='object'&&'suppliers' in parsed?(parsed as {suppliers:unknown}).suppliers:null;
+      if(!Array.isArray(list)||!list.length||list.length>100)throw Error('Chỉ nhận JSON mảng từ 1 đến 100 nhà cung cấp.');
+      if(!window.confirm('Nhập '+list.length+' nhà cung cấp vào kho bếp? Chỉ nhập danh tính/liên hệ/ghi chú. Công nợ, giao dịch DEMO và tệp đính kèm KHÔNG được nhập.'))return
+      await execute(()=>importSupplySuppliers(activeId,list),'Đã nhập danh sách nhà cung cấp thật; không nhập công nợ DEMO.')
+    }catch(error){setError(error instanceof Error?error.message:'Tệp JSON không hợp lệ.')}
   }
   function editVendor(item:SupplySupplier){
     setEditingVendor(item.id);setVendor({code:item.code,name:item.name,taxCode:item.taxCode??'',contactName:item.contactName??'',phone:item.phone??'',email:item.email??'',address:item.address??'',note:item.note??''})
@@ -120,7 +138,13 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         </div>
         <div style={{display:'flex',gap:10}}><button className="primary" type="submit" disabled={busy}><Plus size={16}/>{editingVendor?'Lưu thay đổi':'Thêm nhà cung cấp'}</button>{editingVendor&&<button className="outline" type="button" onClick={()=>{setEditingVendor(null);setVendor(emptySupplier())}}>Hủy sửa</button>}</div>
       </form>}
-      <h3>Danh sách nhà cung cấp ({suppliers.data?.length??0})</h3>
+      <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',justifyContent:'space-between'}}>
+        <h3>Danh sách nhà cung cấp ({suppliers.data?.length??0})</h3>
+        <div style={{display:'flex',gap:8}}>
+          {canEdit&&<><input type="file" hidden ref={importRef} accept=".json,application/json" onChange={event=>{void importSupplierFile(event.target.files?.[0]);event.target.value=''}}/><button className="outline" type="button" onClick={()=>importRef.current?.click()}>Import JSON</button></>}
+          <button className="outline" type="button" onClick={exportSupplierList}>Xuất CSV</button>
+        </div>
+      </div>
       <div className="management-toolbar" style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>setSupplierSearch(e.target.value)}/></label><label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>setSupplierDebtOnly(e.target.checked)}/>Còn công nợ</label></div>
       {suppliers.data?.length===0&&<p className="muted">Chưa có nhà cung cấp. Bếp cần tạo trước khi nhập lô nguyên liệu.</p>}
       <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th>Còn phải trả</th><th>Chức năng</th></tr></thead><tbody>
