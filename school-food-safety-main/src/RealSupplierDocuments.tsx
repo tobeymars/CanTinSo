@@ -19,12 +19,14 @@ const toBase64=(file:File)=>new Promise<string>((resolve,reject)=>{
  reader.onerror=()=>reject(new Error('Không đọc được chứng từ.'))
  reader.readAsDataURL(file)
 })
-export default function RealSupplierDocuments({kitchenId,supplierId,supplierName,canEdit,busy,execute}:{
+export default function RealSupplierDocuments({kitchenId,supplierId,supplierName,canEdit,busy,execute,receipts}:{
  kitchenId:string;supplierId:string;supplierName:string;canEdit:boolean;busy:boolean;
+ receipts:{id:string;number:string;supplierId:string}[];
  execute:(action:()=>Promise<unknown>,success:string)=>Promise<void>
 }){
  const docs=useQuery({queryKey:['supply-documents',kitchenId,supplierId],queryFn:()=>getSupplierDocuments(kitchenId,supplierId),enabled:!!kitchenId&&!!supplierId})
  const [file,setFile]=useState<File|null>(null)
+ const [receiptId,setReceiptId]=useState('')
  const [category,setCategory]=useState('registration')
  const [documentNumber,setDocumentNumber]=useState('')
  const [issuer,setIssuer]=useState('')
@@ -35,9 +37,9 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
   if(file.size>2*1024*1024){setFileError('Chứng từ vượt giới hạn 2 MB.');return}
   void execute(async()=>{
    const base64=await toBase64(file)
-   await uploadSupplierDocument(kitchenId,supplierId,{category,filename:file.name,mimeType:file.type,base64,documentNumber,issuer,issuedAt,expiresAt})
+   await uploadSupplierDocument(kitchenId,supplierId,{category,receiptId,filename:file.name,mimeType:file.type,base64,documentNumber,issuer,issuedAt,expiresAt})
    await docs.refetch()
-   setFile(null);setDocumentNumber('');setIssuer('');setIssuedAt('');setExpiresAt('');setFileError('')
+   setFile(null);setReceiptId('');setDocumentNumber('');setIssuer('');setIssuedAt('');setExpiresAt('');setFileError('')
   },'Đã lưu chứng từ nhà cung cấp. Hồ sơ chưa mặc nhiên được xác minh.')
  }
  async function download(id:string){
@@ -54,10 +56,10 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
   <header className="card-header"><div><span className="section-kicker">HỒ SƠ NHÀ CUNG CẤP</span><h3><Paperclip size={18}/>{supplierName}</h3><p className="muted">Chứng từ được lưu theo nhà cung cấp và bếp, không dùng dữ liệu DEMO. Tệp đính kèm chưa đồng nghĩa đã xác minh pháp lý.</p></div></header>
   {docs.isLoading&&<p role="status">Đang tải hồ sơ…</p>}
   {docs.isError&&<p className="error" role="alert">{docs.error.message}</p>}
-  <div className="table-scroll"><table className="management-table"><thead><tr><th>Loại hồ sơ</th><th>Tên tệp</th><th>Số hồ sơ</th><th>Đơn vị cấp</th><th>Ngày hết hạn</th><th></th></tr></thead><tbody>
+  <div className="table-scroll"><table className="management-table"><thead><tr><th>Loại hồ sơ</th><th>Tên tệp</th><th>Số hồ sơ</th><th>Phiếu nhập</th><th>Đơn vị cấp</th><th>Ngày hết hạn</th><th></th></tr></thead><tbody>
    {records.map(row=><tr key={row.id}>
      <td>{kinds.find(kind=>kind.id===row.category)?.label??row.category}</td>
-     <td><FileText size={14}/>{row.filename}</td><td>{row.documentNumber||'—'}</td><td>{row.issuer||'—'}</td>
+     <td><FileText size={14}/>{row.filename}</td><td>{row.documentNumber||'—'}</td><td>{receipts.find(item=>item.id===row.receiptId)?.number??'Chưa liên kết'}</td><td>{row.issuer||'—'}</td>
      <td>{row.expiresAt?<span>{new Date(row.expiresAt).toLocaleDateString('vi-VN')} {row.expiresAt.slice(0,10)<today()?'· Đã hết hiệu lực':''}</span>:'Chưa khai báo'}</td>
      <td><div style={{display:'flex',gap:6}}>
        <button type="button" className="outline" onClick={()=>void download(row.id)}><Download size={14}/>Tải</button>
@@ -70,6 +72,7 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
     <h4>Thêm hồ sơ / chứng từ</h4>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:10}}>
      <label>Loại hồ sơ<select value={category} onChange={e=>setCategory(e.target.value)}>{kinds.map(kind=><option key={kind.id} value={kind.id}>{kind.label}</option>)}</select></label>
+     <label>Gắn với phiếu nhập<select value={receiptId} onChange={e=>setReceiptId(e.target.value)}><option value="">Không liên kết</option>{receipts.filter(item=>item.supplierId===supplierId).map(item=><option key={item.id} value={item.id}>{item.number}</option>)}</select></label>
      <label>Số hồ sơ<input maxLength={120} value={documentNumber} onChange={e=>setDocumentNumber(e.target.value)}/></label>
      <label>Đơn vị cấp<input maxLength={200} value={issuer} onChange={e=>setIssuer(e.target.value)}/></label>
      <label>Ngày cấp<input type="date" value={issuedAt} onChange={e=>setIssuedAt(e.target.value)}/></label>
