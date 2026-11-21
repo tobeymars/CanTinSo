@@ -856,6 +856,9 @@ model SupplierPayment {
   amount Decimal @db.Decimal(18, 0)
   method String
   note String?
+  reversedAt DateTime? @map("reversed_at")
+  reversedById String? @map("reversed_by_id") @db.Uuid
+  reversalReason String? @map("reversal_reason")
   paidAt DateTime @map("paid_at")
   createdById String @map("created_by_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
