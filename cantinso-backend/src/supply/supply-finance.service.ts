@@ -16,6 +16,14 @@ const money=(v:unknown,allowZero=false)=>{
   if(v===null||v===undefined||v===''||!Number.isSafeInteger(n)||n<0||n>1000000000000||(!allowZero&&n===0))throw new BadRequestException('Giá trị tiền phải là số nguyên VND hợp lệ.');
   return n;
 };
+const unitPriceMoney=(v:unknown)=>{
+  const value=Number(v);
+  if(v===null||v===undefined||v===''||!Number.isFinite(value)||value<=0||value>1000000000000)
+    throw new BadRequestException('Đơn giá trên đơn vị mua phải là số dương.');
+  const decimal=new Prisma.Decimal(String(v));
+  if(decimal.decimalPlaces()>6)throw new BadRequestException('Đơn giá chỉ hỗ trợ tối đa 6 chữ số thập phân.');
+  return decimal.toNumber();
+};
 const parseDate=(v:unknown)=>{
   if(v===null||v===undefined||v==='')return null;
   if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new BadRequestException('Ngày không đúng YYYY-MM-DD.');
@@ -73,7 +81,7 @@ export class SupplyFinanceService {
       const ingredient=ingredients.find(item=>item.id===line.ingredientId)!;
       const lotCode=code(line?.lotCode,'Mã lô',100);
       const entered=canonicalQuantity(line?.quantity,line?.unit,ingredient.unit);
-      const unitPrice=money(line?.unitPrice);
+      const unitPrice=unitPriceMoney(line?.unitPrice);
       const amount=Number(new Prisma.Decimal(entered.enteredQuantity).mul(unitPrice).toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP));
       if(!Number.isSafeInteger(amount)||amount>1000000000000)throw new BadRequestException('Thành tiền vượt giới hạn.');
       return {ingredientId:line.ingredientId as string,lotCode,quantity:entered.quantity,enteredQuantity:entered.enteredQuantity,enteredUnit:entered.enteredUnit,unitPrice,amount,expiryDate:parseDate(line?.expiryDate),storageLocation:code(line?.storageLocation,'Vị trí lưu',120,false)||null};
