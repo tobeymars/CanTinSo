@@ -272,9 +272,7 @@ model Student {
   hikvisionEnrollments HikvisionStudentEnrollment[]
 
   @@unique([schoolId, code])
-  @@unique([kitchenId, code])
   @@index([schoolId, name])
-  @@index([kitchenId, name])
   @@index([classroomId, status])
   @@map("students")
 }
@@ -322,7 +320,9 @@ model Supplier {
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
   @@unique([schoolId, code])
+  @@unique([kitchenId, code])
   @@index([schoolId, name])
+  @@index([kitchenId, name])
   @@map("suppliers")
 }
 
