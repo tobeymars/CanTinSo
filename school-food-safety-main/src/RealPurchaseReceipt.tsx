@@ -8,6 +8,7 @@ import { convertReceiptQuantity, receiptUnitOptions, formatReceiptQuantity } fro
 type Line={key:number;ingredientId:string;lotCode:string;quantity:string;unit:string;unitPrice:string;expiryDate:string;storageLocation:string}
 const blank=(key:number):Line=>({key,ingredientId:'',lotCode:'',quantity:'',unit:'',unitPrice:'',expiryDate:'',storageLocation:''})
 const cash=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
+const preferredUnit=(base:string)=>base.trim().toLowerCase()==='g'?'kg':base
 export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,canEdit,busy,execute,onSaved}:{
   kitchenId:string;ingredients:SupplyIngredient[];suppliers:SupplySupplier[];canEdit:boolean;busy:boolean;
   execute:(action:()=>Promise<unknown>,success:string)=>Promise<void>;onSaved:()=>void;
@@ -25,6 +26,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
     event.preventDefault()
     void execute(async()=>{
       for(const line of lines){
+        if(Number(line.unitPrice)<=0||Math.abs(Number(line.unitPrice)*1000000-Math.round(Number(line.unitPrice)*1000000))>0.0000001)throw new Error('Đơn giá phải lớn hơn 0 và có tối đa 6 chữ số thập phân.')
         const base=ingredients.find(item=>item.id===line.ingredientId)?.unit
         const normalized=base?convertReceiptQuantity(Number(line.quantity),line.unit||base,base):null
         if(normalized===null||normalized<=0||Math.abs(normalized*1000-Math.round(normalized*1000))>0.0000001)throw new Error('Số lượng sau quy đổi phải có tối đa 3 chữ số thập phân theo đơn vị kho.')
@@ -38,7 +40,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
   if(!canEdit)return <p className="muted">Bạn chỉ có quyền xem phiếu nhập, không được tạo chứng từ.</p>
   return <form onSubmit={submit} style={{display:'grid',gap:16}}>
     <h3>Phiếu nhập nguyên liệu · nhiều dòng hàng</h3>
-    <p className="muted">Mỗi dòng sinh một lô trong cùng bếp; tổng tiền ghi nhận phải trả cho nhà cung cấp. Thanh toán được lập riêng và có thể chia nhiều lần.</p>
+    <p className="muted">Có thể chọn kg/g hoặc lít/ml. Đơn giá tính trên đúng đơn vị đã chọn; hệ thống quy đổi tồn kho riêng. Khi đổi đơn vị, cả số lượng và đơn giá được quy đổi để giữ nguyên thành tiền (tối đa 6 chữ số thập phân cho đơn giá).</p>
     <div className="management-form-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}>
       <label>Số phiếu nhập *<input required maxLength={60} value={number} onChange={e=>setNumber(e.target.value)} placeholder="NK-2026-0001"/></label>
       <label>Nhà cung cấp *<select required value={supplierId} onChange={e=>setSupplierId(e.target.value)}><option value="">Chọn nhà cung cấp</option>{suppliers.filter(item=>item.status==='ACTIVE').map(item=><option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
@@ -52,13 +54,19 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
     </div>
     <div className="table-scroll"><table className="management-table"><thead><tr><th>Nguyên liệu</th><th>Mã lô</th><th>Số lượng</th><th>Đơn vị nhập</th><th>Quy đổi về kho</th><th>Đơn giá / đơn vị nhập (VND)</th><th>Thành tiền</th><th>Hạn dùng</th><th>Vị trí</th><th></th></tr></thead><tbody>
       {lines.map((line,index)=><tr key={line.key}>
-        <td><select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:ingredients.find(item=>item.id===e.target.value)?.unit??'',quantity:''})}><option value="">Chọn nguyên liệu</option>{ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></td>
+        <td><select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:preferredUnit(ingredients.find(item=>item.id===e.target.value)?.unit??''),quantity:''})}><option value="">Chọn nguyên liệu</option>{ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></td>
         <td><input aria-label={'Mã lô dòng '+(index+1)} required maxLength={100} value={line.lotCode} onChange={e=>change(line.key,{lotCode:e.target.value})}/></td>
         <td><input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.000001" step="any" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})}/></td>
         <td><select required aria-label={'Đơn vị nhập dòng '+(index+1)} value={line.unit} onChange={e=>{
           const base=ingredients.find(item=>item.id===line.ingredientId)?.unit??''
           const converted=convertReceiptQuantity(Number(line.quantity),line.unit||base,e.target.value)
-          change(line.key,{unit:e.target.value,quantity:line.quantity&&converted!==null?String(converted):line.quantity})
+          const factor=convertReceiptQuantity(1,line.unit||base,e.target.value)
+          const changedPrice=line.unitPrice&&factor?Number(line.unitPrice)/factor:null
+          change(line.key,{
+            unit:e.target.value,
+            quantity:line.quantity&&converted!==null?String(converted):line.quantity,
+            unitPrice:changedPrice!==null&&Number.isFinite(changedPrice)?String(Number(changedPrice.toFixed(6))):line.unitPrice,
+          })
         }}><option value="" disabled>Chọn đơn vị</option>{receiptUnitOptions(ingredients.find(item=>item.id===line.ingredientId)?.unit??'').map(unit=><option key={unit} value={unit}>{unit}</option>)}</select></td>
         <td>{(()=>{
           const base=ingredients.find(item=>item.id===line.ingredientId)?.unit
@@ -66,7 +74,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
           const normalized=convertReceiptQuantity(Number(line.quantity),line.unit||base,base)
           return normalized===null?'Không quy đổi được':formatReceiptQuantity(normalized)+' '+base
         })()}</td>
-        <td><input aria-label={'Đơn giá dòng '+(index+1)} type="number" required min="1" step="1" value={line.unitPrice} onChange={e=>change(line.key,{unitPrice:e.target.value})}/></td>
+        <td><input aria-label={'Đơn giá dòng '+(index+1)} type="number" required min="0.000001" step="any" value={line.unitPrice} onChange={e=>change(line.key,{unitPrice:e.target.value})}/></td>
         <td><strong>{cash(Math.round((Number(line.quantity)||0)*(Number(line.unitPrice)||0)))}</strong></td>
         <td><input aria-label={'Hạn dùng dòng '+(index+1)} type="date" value={line.expiryDate} onChange={e=>change(line.key,{expiryDate:e.target.value})}/></td>
         <td><input aria-label={'Vị trí dòng '+(index+1)} maxLength={120} value={line.storageLocation} onChange={e=>change(line.key,{storageLocation:e.target.value})}/></td>
