@@ -157,6 +157,42 @@ export class SupplyService {
       return {lotId,quantity,remainingQty:current-quantity};
     });
   }
+  async lotStatus(user:AuthUser,kitchenId:string,lotId:string,body:any){
+    await this.permitted(user,kitchenId,true);
+    if(!uuid(lotId))throw new BadRequestException('Mã lô không hợp lệ.');
+    const status=body?.status;
+    if(!['AVAILABLE','QUARANTINED'].includes(status))throw new BadRequestException('Trạng thái lô không hợp lệ.');
+    const reason=str(body?.note,'Lý do thay đổi trạng thái',500);
+    return this.prisma.$transaction(async tx=>{
+      const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId}});
+      if(!lot)throw new NotFoundException('Không tìm thấy lô thuộc bếp.');
+      if(lot.status===status)throw new ConflictException('Lô đã ở trạng thái này.');
+      if(status==='AVAILABLE' && (lot.remainingQty.lte(0)||lot.expiryDate&&lot.expiryDate.getTime()<Date.now()-86400000))
+        throw new ConflictException('Không thể mở cách ly lô hết hạn hoặc đã hết tồn.');
+      if(lot.status!=='AVAILABLE'&&lot.status!=='QUARANTINED')
+        throw new ConflictException('Không thể thay đổi trạng thái của lô này.');
+      const changed=await tx.inventoryLot.updateMany({where:{id:lotId,kitchenId,status:lot.status},data:{status}});
+      if(changed.count!==1)throw new ConflictException('Trạng thái lô đã thay đổi, vui lòng tải lại.');
+      await tx.traceEvent.create({data:{lotId,eventType:status==='QUARANTINED'?'REJECTED':'INSPECTED',actorId:user.sub,description:reason,metadata:{status,previousStatus:lot.status}}});
+      return {lotId,status};
+    });
+  }
+  async moveLot(user:AuthUser,kitchenId:string,lotId:string,body:any){
+    await this.permitted(user,kitchenId,true);
+    if(!uuid(lotId))throw new BadRequestException('Mã lô không hợp lệ.');
+    const location=str(body?.location,'Vị trí kho mới',120);
+    const reason=str(body?.note,'Lý do chuyển vị trí',500);
+    return this.prisma.$transaction(async tx=>{
+      const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},select:{id:true,storageLocation:true,status:true}});
+      if(!lot)throw new NotFoundException('Không tìm thấy lô thuộc bếp.');
+      if(lot.storageLocation===location)throw new ConflictException('Lô đã ở vị trí này.');
+      if(lot.status==='DEPLETED')throw new ConflictException('Lô đã hết hàng, không thể chuyển.');
+      const changed=await tx.inventoryLot.updateMany({where:{id:lotId,kitchenId,storageLocation:lot.storageLocation},data:{storageLocation:location}});
+      if(changed.count!==1)throw new ConflictException('Vị trí vừa thay đổi. Hãy tải lại.');
+      await tx.traceEvent.create({data:{lotId,eventType:'STORED',actorId:user.sub,location,description:reason,metadata:{oldLocation:lot.storageLocation,newLocation:location}}});
+      return {lotId,location};
+    });
+  }
   async movements(user:AuthUser,kitchenId:string){
     await this.permitted(user,kitchenId);
     return this.prisma.traceEvent.findMany({where:{lot:{kitchenId}},include:{lot:{select:{lotCode:true,ingredient:{select:{name:true}}}}},orderBy:{occurredAt:'desc'},take:200});
