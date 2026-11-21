@@ -146,9 +146,25 @@ export class SupervisionService {
           if(ids.some((id:string)=>!issued.has(id)))throw new BadRequestException('Lô chưa được xuất cho trường, ngày và bữa đang kiểm thực.');
           const normalized = body.ingredientReceipts.map((line:any)=>{
             const lot=lots.find(item=>item.id===line.itemId)!;
-            const quantity=Number(line.quantity);
-            if (!Number.isFinite(quantity) || quantity <= 0 || quantity > (issued.get(lot.id)??0))
-              throw new BadRequestException('Số lượng nguyên liệu không hợp lệ.');
+            const displayQuantity=Number(line.quantity);
+            const displayUnit=typeof line.unit==='string'&&line.unit.trim()?line.unit.trim():lot.unit;
+            const unitKey=(unit:string)=>unit.toLowerCase();
+            const factor=(unit:string):number|null=>{
+              const key=unitKey(unit);
+              if(key==='mg')return 0.001;
+              if(key==='g'||key==='ml')return 1;
+              if(key==='kg'||key==='l'||key==='lít'||key==='lit')return 1000;
+              return null;
+            };
+            const group=(unit:string)=>['mg','g','kg'].includes(unitKey(unit))?'mass':['ml','l','lít','lit'].includes(unitKey(unit))?'volume':null;
+            const sameUnit=unitKey(displayUnit)===unitKey(lot.unit);
+            if(!sameUnit && (!group(displayUnit)||group(displayUnit)!==group(lot.unit)))
+              throw new BadRequestException('Đơn vị thực nhận không tương thích với lô nguyên liệu.');
+            const quantity= sameUnit ? displayQuantity : displayQuantity*(factor(displayUnit)!/factor(lot.unit)!);
+            const normalizedQuantity=Math.round(quantity*1000)/1000;
+            if (!Number.isFinite(displayQuantity)||displayQuantity<=0||!Number.isFinite(quantity)||normalizedQuantity<=0||
+                Math.abs(quantity-normalizedQuantity)>0.0000001||normalizedQuantity>(issued.get(lot.id)??0)+0.0000001)
+              throw new BadRequestException('Số lượng thực nhận không hợp lệ hoặc vượt số đã xuất; chỉ lưu tối đa ba chữ số thập phân theo đơn vị kho.');
             if (lot.expiryDate && lot.expiryDate.getTime() < s.serviceDate.getTime())
               throw new BadRequestException('Lô hết hạn tại ngày bữa ăn.');
             if (lot.receivedAt > new Date(date+'T23:59:59.999Z'))
