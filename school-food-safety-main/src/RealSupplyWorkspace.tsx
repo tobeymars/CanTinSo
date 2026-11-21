@@ -131,17 +131,17 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const failure=kitchenQuery.error||suppliers.error||lots.error||ingredients.error||movements.error||finance.error||schoolQuery.error||minimums.error
   return <section className="card supply-workspace">
     <div className="card-header supply-workspace__header">
-      <div><span className="section-kicker">DỮ LIỆU POSTGRESQL · THEO BẾP</span>
+      <div><span className="section-kicker">QUẢN LÝ VẬN HÀNH</span>
         <h2>{mode==='suppliers'?'Nhà cung cấp của bếp':'Quản lý kho bếp'}</h2>
-        <p className="muted">Một bếp trung tâm sử dụng chung kho cho các trường được phân công. Hồ sơ giám sát đọc trực tiếp nguồn dữ liệu này.</p></div>
+        <p className="muted">Theo dõi nhà cung cấp, nguyên liệu và hoạt động kho của bếp.</p></div>
       <div className="supply-header-actions">
         {activeId&&mode==='warehouse'&&<button type="button" className="outline" onClick={exportWarehouseCsv}>Xuất báo cáo CSV</button>}
         <button type="button" className="outline" onClick={()=>void refresh()} disabled={!activeId}><RefreshCw size={16}/>Làm mới</button>
       </div>
     </div>
     {kitchens.length>1&&<label>Chọn bếp cần xem <select value={activeId} onChange={e=>setKitchenId(e.target.value)}>{kitchens.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}</select></label>}
-    {activeId&&<p className="muted"><strong>Kho: {kitchens.find(k=>k.id===activeId)?.name}</strong> · {canEdit?'Có quyền cập nhật':'Chỉ xem'} · Không sử dụng dữ liệu DEMO</p>}
-    {isLoading&&<p role="status">Đang tải dữ liệu kho từ máy chủ…</p>}
+    {activeId&&<p className="muted"><strong>Kho: {kitchens.find(k=>k.id===activeId)?.name}</strong> · {canEdit?'Có quyền cập nhật':'Chỉ xem'}</p>}
+    {isLoading&&<p role="status">Đang tải thông tin…</p>}
     {failure&&<p className="error" role="alert">{failure instanceof Error?failure.message:'Không tải được dữ liệu kho.'}</p>}
     {!isLoading&&!failure&&!activeId&&<div className="empty-state">Tài khoản chưa được phân quyền xem bếp nào.</div>}
     {error&&<p className="error" role="alert">{error}</p>}
