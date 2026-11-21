@@ -35,7 +35,7 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
   {Icon:Clock3,title:'Lô hết hạn trong 7 ngày',value:String(expiring.length),detail:'Cần ưu tiên kiểm tra / FEFO',target:'lots' as const},
   {Icon:ShieldAlert,title:'Nguyên liệu dưới định mức',value:String(low.length),detail:'Theo ngưỡng của từng bếp',target:'stock' as const},
   {Icon:ShieldAlert,title:'Lô quá hạn',value:String(expired.length),detail:'Không được xuất sử dụng',target:'lots' as const},
-  {Icon:Truck,title:'Phiếu nhập có giá',value:String(finance?.receipts.length??0),detail:'Lấy từ PostgreSQL',target:'receipts' as const},
+  {Icon:Truck,title:'Phiếu nhập có giá',value:String(finance?.receipts.length??0),detail:'Phiếu nhập đã ghi nhận',target:'receipts' as const},
   {Icon:ClipboardList,title:'Nhật ký nhập / xuất',value:String(receiptEvents.length+issueEvents.length),detail:'200 sự kiện gần nhất',target:'trace' as const},
  ];
  const totals=new Map<string,{unit:string;name:string;quantity:number}>()
