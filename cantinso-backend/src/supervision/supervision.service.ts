@@ -39,7 +39,7 @@ export class SupervisionService {
   }
   async context(user: AuthUser, schoolId: string, date: string, mealType: string) {
     const scope = await this.scope(user, schoolId, date, mealType);
-    const [plan, lots, kitchen, legalDocuments] = await Promise.all([
+    const [plan, lots, kitchen, legalDocuments, issues] = await Promise.all([
       this.prisma.mealPlan.findUnique({
         where: {schoolId_serviceDate_mealType: {schoolId:scope.schoolId,serviceDate:scope.serviceDate,mealType:scope.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
         include: {
@@ -67,17 +67,24 @@ export class SupervisionService {
       }),
       this.prisma.kitchen.findUnique({where:{id:scope.kitchenId},select:{id:true,name:true,type:true}}),
       this.prisma.kitchenLegalDocument.findMany({where:{kitchenId:scope.kitchenId},select:{id:true,title:true,status:true,expiresAt:true},orderBy:{updatedAt:'desc'}}),
+      this.prisma.traceEvent.findMany({where:{eventType:'ISSUED' as const,lot:{kitchenId:scope.kitchenId},AND:[
+          {metadata:{path:['schoolId'],equals:scope.schoolId}},
+          {metadata:{path:['serviceDate'],equals:date}},
+          {metadata:{path:['mealType'],equals:mealType}},
+        ]},select:{lotId:true,metadata:true}}),
     ]);
+    const issued = new Map<string,number>();
+    for(const row of issues){const amount=Number(asObject(row.metadata).quantity);if(Number.isFinite(amount)&&amount>0)issued.set(row.lotId,(issued.get(row.lotId)??0)+amount);}
     return {
       schoolId:scope.schoolId,serviceDate:date,mealType,kitchen,
       legalDocuments:legalDocuments.map(doc=>({...doc,expiresAt:doc.expiresAt?.toISOString().slice(0,10)??null})),
       menu:plan ? {id:plan.id,servings:plan.servings,status:plan.revisions[0]?.status ?? plan.status,
         dishes:plan.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name})) ?? []} : null,
-      lots:lots.map(lot=>({
+      lots:lots.filter(lot=>issued.has(lot.id)).map(lot=>({
         itemId:lot.id,ingredientName:lot.ingredient.name,lotCode:lot.lotCode,
         supplierName:lot.supplier.name,supplierContact:lot.supplier.contactName || lot.supplier.phone || '',
         expiresAt:lot.expiryDate?.toISOString().slice(0,10) ?? null,
-        quantityAvailable:Number(lot.remainingQty),unit:lot.unit,status:lot.status,
+        quantityAvailable:issued.get(lot.id)??0,unit:lot.unit,status:lot.status,
         receivedAt:lot.receivedAt.toISOString(),
       })),
     };
@@ -122,10 +129,24 @@ export class SupervisionService {
             include:{ingredient:{select:{name:true}},supplier:{select:{name:true,contactName:true,phone:true}}},
           });
           if (lots.length !== ids.length) throw new BadRequestException('Lô nguyên liệu không thuộc bếp phục vụ trường đang giám sát.');
+          const issues=await tx.traceEvent.findMany({where:{
+            lotId:{in:ids},eventType:'ISSUED',
+            AND:[
+              {metadata:{path:['schoolId'],equals:s.schoolId}},
+              {metadata:{path:['serviceDate'],equals:date}},
+              {metadata:{path:['mealType'],equals:mealType}},
+            ],
+          },select:{lotId:true,metadata:true}});
+          const issued=new Map<string,number>();
+          for(const row of issues){
+            const amount=Number(asObject(row.metadata).quantity);
+            if(Number.isFinite(amount)&&amount>0)issued.set(row.lotId,(issued.get(row.lotId)??0)+amount);
+          }
+          if(ids.some((id:string)=>!issued.has(id)))throw new BadRequestException('Lô chưa được xuất cho trường, ngày và bữa đang kiểm thực.');
           const normalized = body.ingredientReceipts.map((line:any)=>{
             const lot=lots.find(item=>item.id===line.itemId)!;
             const quantity=Number(line.quantity);
-            if (!Number.isFinite(quantity) || quantity <= 0 || quantity > Number(lot.quantity))
+            if (!Number.isFinite(quantity) || quantity <= 0 || quantity > (issued.get(lot.id)??0))
               throw new BadRequestException('Số lượng nguyên liệu không hợp lệ.');
             if (lot.receivedAt > new Date(date+'T23:59:59.999Z'))
               throw new BadRequestException('Lô chưa được tiếp nhận tại ngày bữa ăn.');
