@@ -37,9 +37,9 @@ const roleNames: Partial<Record<ViewRole, string>> = {
 /** Bếp tại trường không có bước tiếp nhận chuyến giao trong giao diện tác nghiệp.
  * Không xóa dữ liệu ARRIVED lịch sử: các vai trò khác vẫn đọc được khi có quyền.
  */
-export const stagesForSchool = (mode: School['mode'], role?: ViewRole): JourneyStatus[] =>
+export const stagesForSchool = (mode: School['mode'], _role?: ViewRole): JourneyStatus[] =>
   mode === 'CENTRAL_KITCHEN'
-    ? role === 'school_kitchen' ? ['DISPATCHED', 'PLATED', 'READY'] : allStages
+    ? allStages
     : ['PLATED', 'READY']
 
 function readAll(): SavedJourney[] {

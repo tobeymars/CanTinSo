@@ -5,6 +5,12 @@ import { AuthModule } from "./auth/auth.module";
 import { StudentsModule } from "./students/students.module";
 import { AttendanceModule } from "./attendance/attendance.module";
 import { UsersModule } from "./users/users.module";
+import { SchoolsModule } from "./schools/schools.module";
+import { DishesModule } from "./dishes/dishes.module";
+import { MealPlansModule } from "./meal-plans/meal-plans.module";
+import { SupervisionModule } from "./supervision/supervision.module";
+import { SupplyModule } from "./supply/supply.module";
+import { KitchenLegalModule } from "./kitchen-legal/kitchen-legal.module";
 
 @Module({
   imports: [
@@ -14,6 +20,12 @@ import { UsersModule } from "./users/users.module";
     StudentsModule,
     AttendanceModule,
     UsersModule,
+    SchoolsModule,
+    DishesModule,
+    MealPlansModule,
+    KitchenLegalModule,
+    SupervisionModule,
+    SupplyModule,
   ],
 })
 export class AppModule {}

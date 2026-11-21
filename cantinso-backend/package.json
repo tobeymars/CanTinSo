@@ -4,12 +4,14 @@
   "private": true,
   "scripts": {
     "build": "nest build",
+    "test:units": "tsx --test src/supply/quantity-units.spec.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:seed:annex7": "tsx prisma/seed-annex7.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

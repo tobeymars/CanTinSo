@@ -1,0 +1,262 @@
+/* CanTinSo real supply workspace — layout isolated from existing DEMO pages.
+ * Allow long Vietnamese labels, document names and monetary values to remain readable.
+ * Containers may scroll horizontally on narrow displays; cells NEVER truncate data.
+ */
+.supply-workspace {
+  --supply-ink: #14263f;
+  --supply-muted: #52657e;
+  --supply-line: #dfe7f0;
+  --supply-tint: #f4f8fd;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: clamp(14px,2vw,28px) !important;
+  display: grid;
+  align-content: start;
+  gap: 22px;
+  color: var(--text, #14263f);
+  overflow: visible;
+  line-height: 1.55;
+  font-size: 14px;
+}
+.supply-workspace *, .supply-workspace *::before, .supply-workspace *::after {box-sizing:border-box}
+.supply-workspace :is(h2,h3,h4,p){margin-block:0;overflow-wrap:anywhere}
+.supply-workspace h2{font-size:clamp(22px,2vw,29px);line-height:1.25;letter-spacing:-.035em}
+.supply-workspace h3{font-size:17px;line-height:1.4;font-weight:750;color:var(--supply-ink)}
+.supply-workspace h4{font-size:15px;line-height:1.4}
+.supply-workspace .muted{color:var(--supply-muted);line-height:1.65}
+.supply-workspace .section-kicker{display:block;margin-bottom:7px;letter-spacing:.1em;font-size:11px;font-weight:750}
+.supply-workspace__header{display:flex;align-items:flex-start!important;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.supply-workspace__header>div:first-child{flex:1 1 330px;min-width:0}
+.supply-workspace__header p{margin-top:9px;max-width:75ch}
+.supply-header-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.supply-workspace :is(button.primary,button.outline){
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:40px;max-width:100%;padding:9px 13px;line-height:1.35;
+  text-align:center;white-space:normal;word-break:normal;overflow-wrap:anywhere;
+  font-size:13px;font-weight:650;border-radius:10px;cursor:pointer;
+}
+.supply-workspace button:focus-visible,.supply-workspace :is(input,select,textarea):focus-visible{outline:3px solid #7facf4;outline-offset:2px}
+.supply-workspace button:disabled{opacity:.48;cursor:not-allowed}
+.supply-workspace button svg{flex:none}
+.supply-workspace label{
+  display:grid;gap:7px;min-width:0;align-content:start;
+  font-size:12.5px;line-height:1.5;font-weight:650;color:var(--supply-ink);
+}
+.supply-workspace label:has(>input[type="checkbox"]){display:flex;align-items:center;gap:8px}
+.supply-workspace :is(input:not([type="checkbox"]):not([type="file"]),select,textarea){
+  width:100%;max-width:100%;min-width:0;min-height:43px;margin:0;
+  padding:10px 12px;border:1px solid #cbd7e6;border-radius:10px;
+  background:var(--surface,#fff);color:var(--text,#14263f);
+  font:inherit;font-size:14px;font-weight:500;line-height:1.4;
+  text-overflow:clip;
+}
+.supply-workspace input[type="file"]{width:100%;max-width:100%;font-size:13px;padding:9px;min-width:0;border:1px dashed #b9c9dc;border-radius:9px}
+.supply-workspace input[type="checkbox"]{width:17px;height:17px;flex:none;accent-color:#245ec5}
+.supply-workspace :is(input,select,textarea)::placeholder{color:#75859b;opacity:1}
+.supply-workspace select{padding-right:26px}
+.supply-workspace :is(input,select,textarea):disabled{background:#f3f5f9}
+.supply-form-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:14px 18px!important;align-items:start}
+.supply-form-grid>.supply-wide{grid-column:1/-1}
+.supply-form-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px}
+.supply-panel{min-width:0;max-width:100%;display:grid;gap:16px;padding:clamp(15px,2vw,22px);border:1px solid var(--supply-line);border-radius:16px;background:var(--surface,#fff);box-shadow:0 2px 8px #19365708}
+.supply-vendor-form{background:var(--supply-tint)}
+.supply-panel>h3:has(svg),.supply-workspace h3:has(>svg){display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.supply-panel svg{flex-shrink:0}
+.supply-section-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.supply-section-heading>div{display:flex;gap:8px;flex-wrap:wrap}
+.supply-filterbar{display:flex!important;gap:12px!important;flex-wrap:wrap;align-items:end!important;min-width:0;padding:12px 14px!important;border-radius:12px;border:1px solid var(--supply-line);background:var(--supply-tint)}
+.supply-filterbar label{min-width:min(240px,100%)!important;font-size:12px!important}
+.supply-filterbar label:not(.management-check){flex:1}
+.supply-filterbar .management-check{display:flex!important;align-items:center;gap:8px!important;padding:0 4px 11px!important;min-width:0!important;white-space:normal}
+.supply-filterbar input{font-size:14px!important}
+.supply-tabs{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;padding:8px;border:1px solid var(--supply-line);background:var(--supply-tint);border-radius:13px;min-width:0}
+.supply-tabs button{flex:1 1 116px;max-width:230px;min-height:43px}
+.supply-table-scroll{
+  display:block;width:100%;min-width:0;max-width:100%;overflow-x:auto;overflow-y:visible;
+  border:1px solid var(--supply-line);border-radius:13px;background:var(--surface,#fff);
+  scrollbar-width:thin;scrollbar-color:#aebed0 transparent;
+}
+.supply-workspace .supply-table{
+  width:100%!important;min-width:0!important;border-collapse:separate;border-spacing:0;
+  table-layout:auto;text-align:left;font-size:13px;color:var(--supply-ink)
+}
+.supply-table :is(th,td){
+  padding:12px 13px!important;vertical-align:top!important;line-height:1.55!important;
+  max-width:none!important;overflow:visible!important;text-overflow:clip!important;
+  white-space:normal!important;overflow-wrap:anywhere;word-break:normal
+}
+.supply-table th{
+  background:var(--supply-tint);color:#375271;font-weight:750;font-size:12px;
+  border-bottom:1px solid var(--supply-line);white-space:normal!important;
+}
+.supply-table td{border-bottom:1px solid #ebf0f6}
+.supply-table tr:last-child td{border-bottom:0}
+.supply-table tbody tr:hover{background:#f8fbff}
+.supply-table td :is(strong,small){white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+.supply-table td strong{font-weight:720}
+.supply-table td small{display:block;color:var(--supply-muted);font-size:12px;margin-top:4px}
+.supply-table td button{min-height:34px!important;padding:7px 10px!important}
+.supply-table td>div:has(>button),.supply-table td>div:has(>div>button){display:flex;flex-wrap:wrap;align-items:flex-start;gap:7px!important;min-width:165px}
+.supply-table td>div>div{display:flex;flex-wrap:wrap;gap:6px!important}
+.supply-table--suppliers{min-width:780px!important}
+.supply-table--suppliers th:nth-child(2),.supply-table--suppliers td:nth-child(2){min-width:170px}
+.supply-table--suppliers th:nth-child(6),.supply-table--suppliers td:nth-child(6){min-width:190px}
+.supply-table--lots{min-width:820px!important}
+.supply-table--lots th:nth-child(7),.supply-table--lots td:nth-child(7){min-width:220px}
+.supply-table--events{min-width:700px!important}
+.supply-table--events td:last-child{min-width:210px;white-space:normal}
+.supply-workspace .management-pagination{display:flex!important;justify-content:flex-end;align-items:center;gap:10px!important;flex-wrap:wrap;padding:11px 0;font-size:12px}
+.supply-workspace .management-pagination button{width:auto;height:auto;min-height:37px}
+.supply-finance,.supply-overview{display:grid;gap:18px;min-width:0}
+.supply-finance-kpis,.supply-overview-kpis{
+  display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))!important;
+  align-items:stretch;gap:12px!important;
+}
+.supply-finance-kpis article,
+.supply-overview-kpi{
+  display:flex!important;flex-direction:column;align-items:flex-start;justify-content:flex-start;
+  min-width:0;min-height:156px;gap:9px!important;padding:18px!important;
+  border:1px solid var(--supply-line);border-radius:14px;
+  background:var(--surface,#fff);box-shadow:0 2px 8px #19365708;
+  text-align:left!important;color:var(--supply-ink);
+}
+.supply-finance-kpis article>svg,.supply-overview-kpi>svg{flex:none;width:23px;height:23px;color:#2762b2}
+.supply-finance-kpis article>span,.supply-overview-kpi>span{
+  display:block;font-size:12px!important;line-height:1.5;color:var(--supply-muted);
+}
+.supply-finance-kpis article>strong,.supply-overview-kpi>strong{
+  display:block;font-size:clamp(19px,1.7vw,25px)!important;line-height:1.25;letter-spacing:-.035em;
+  font-weight:800;max-width:100%;overflow-wrap:anywhere;word-break:break-word;
+}
+.supply-finance-kpis article>small,.supply-overview-kpi>small{
+  display:block;font-size:12px!important;line-height:1.5;color:var(--supply-muted);
+  overflow-wrap:anywhere;
+}
+.supply-overview-kpi:hover{border-color:#98b6e2;box-shadow:0 6px 18px #184c9119}
+.supply-finance-panel,.supply-payment-panel{gap:16px}
+.supply-finance-panel>.card-header,.supply-documents>.card-header,.supply-overview .card-header{
+  display:flex;align-items:start;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  padding:0!important;margin:0!important;
+}
+.supply-finance-panel>.card-header>div:last-child{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.supply-finance-panel .supply-table{min-width:760px!important}
+.supply-finance-panel .supply-table :is(td,th){max-width:none!important;white-space:normal!important}
+.supply-finance-panel .supply-table td:last-child{min-width:150px}
+.supply-finance-panel .supply-table td:last-child form{display:grid;gap:10px;min-width:210px}
+.supply-finance-panel .supply-table td:last-child form button{width:100%}
+.supply-finance-panel .supply-table td:last-child p{font-size:12px;line-height:1.7}
+.supply-finance-panel .supply-table td:last-child p+p{border-top:1px solid var(--supply-line);padding-top:8px}
+.supply-payment-panel .supply-form-grid{align-items:end}
+.supply-documents h3{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.supply-documents .supply-table{min-width:880px!important}
+.supply-documents .supply-table td:nth-child(2){min-width:190px;overflow-wrap:anywhere}
+.supply-documents-form{display:grid;gap:15px;padding-top:15px;border-top:1px solid var(--supply-line)}
+.supply-overview .supply-table{min-width:460px!important}
+.supply-warning-panel{background:#fffaf0;border-color:#f1ddb5}
+.supply-minimum-form{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));align-items:end!important;gap:12px!important;padding:18px!important}
+.supply-minimum-form>label{min-width:0}
+.supply-issue-form{max-width:760px;background:var(--supply-tint)}
+.supply-issue-form>div:has(label){min-width:0}
+.supply-transfer-section{max-width:820px}
+.supply-transfer-section form{padding:0;border:0}
+.supply-status-form{max-width:760px;background:#fff9f1}
+.supply-status-form>div:has(button){display:flex;gap:8px;flex-wrap:wrap}
+.supply-purchase-form{display:grid;gap:20px}
+.supply-purchase-meta{padding:18px;border-radius:14px;border:1px solid var(--supply-line);background:var(--supply-tint)}
+.supply-purchase-form>.supply-section-heading{margin-top:2px}
+.supply-receipt-lines{display:grid;gap:16px}
+.supply-receipt-line{display:grid;gap:17px;min-width:0;border:1px solid var(--supply-line);border-radius:15px;padding:18px;background:var(--surface,#fff);box-shadow:0 2px 8px #1936570a}
+.supply-receipt-line__head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:13px;border-bottom:1px solid var(--supply-line)}
+.supply-receipt-line__head>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.supply-receipt-line__head strong{font-size:15px;overflow-wrap:anywhere}
+.supply-step{display:inline-flex;padding:5px 10px;border-radius:40px;background:#e9f1ff;color:#2259a9;font-size:12px;font-weight:750}
+.supply-receipt-line .supply-form-grid--receipt{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important}
+.supply-receipt-line .supply-wide{grid-column:span 2}
+.supply-receipt-line__summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px 16px;border:1px solid #cbdbea;border-radius:12px;background:var(--supply-tint)}
+.supply-receipt-line__summary>div{display:grid;gap:4px;min-width:0}
+.supply-receipt-line__summary span{font-size:12px;color:var(--supply-muted)}
+.supply-receipt-line__summary strong{font-size:17px;line-height:1.35;overflow-wrap:anywhere}
+.supply-form-footer{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:15px;padding:17px;border:1px solid var(--supply-line);border-radius:12px;background:var(--supply-tint)}
+.supply-form-footer strong{font-size:18px;overflow-wrap:anywhere}
+@media(max-width:1100px){
+ .supply-receipt-line .supply-form-grid--receipt{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .supply-receipt-line .supply-wide{grid-column:1/-1}
+}
+@media(max-width:720px){
+ .supply-workspace{gap:16px;padding:14px!important}
+ .supply-workspace__header{gap:12px}
+ .supply-header-actions{width:100%}
+ .supply-header-actions button{flex:1}
+ .supply-form-grid,.supply-receipt-line .supply-form-grid--receipt{grid-template-columns:1fr!important}
+ .supply-form-grid>.supply-wide,.supply-receipt-line .supply-wide{grid-column:auto}
+ .supply-filterbar{align-items:stretch!important}
+ .supply-filterbar label{width:100%}
+ .supply-tabs button{flex:1 1 calc(50% - 8px);max-width:none}
+ .supply-finance-kpis,.supply-overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .supply-finance-kpis article,.supply-overview-kpi{padding:13px!important;min-height:150px}
+ .supply-finance-kpis article>strong,.supply-overview-kpi>strong{font-size:18px!important}
+ .supply-panel,.supply-receipt-line{padding:14px}
+ .supply-receipt-line__summary{grid-template-columns:1fr}
+ .supply-form-footer{justify-content:stretch}
+ .supply-form-footer>button{flex:1}
+ .supply-issue-form>div:has(label){grid-template-columns:1fr!important}
+}
+@media(max-width:420px){
+ .supply-finance-kpis,.supply-overview-kpis{grid-template-columns:1fr!important}
+ .supply-workspace :is(button.primary,button.outline){font-size:12px}
+ .supply-tabs button{flex:1 1 100%}
+}
+
+/* Expanded invoice details sit below the table, not inside a 150px actions cell. */
+.supply-receipt-detail{
+ display:grid;gap:16px;margin-top:4px;padding:18px;
+ border:1px solid #c8d9ef;border-radius:14px;background:#f6faff;
+ min-width:0;
+}
+.supply-receipt-detail>.supply-section-heading>div{
+ display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0;
+}
+.supply-receipt-detail__rows{display:grid;gap:9px}
+.supply-receipt-detail__line{
+ display:grid;grid-template-columns:minmax(170px,1.5fr) repeat(3,minmax(120px,1fr));
+ gap:12px;align-items:start;padding:14px;border:1px solid #e3eaf4;
+ border-radius:10px;background:var(--surface,#fff)
+}
+.supply-receipt-detail__line>div{display:grid;gap:3px;min-width:0}
+.supply-receipt-detail__line :is(strong,small,span){overflow-wrap:anywhere;white-space:normal}
+.supply-receipt-detail__line strong{font-size:13.5px;line-height:1.55}
+.supply-receipt-detail__line span,.supply-receipt-detail__line small{
+ font-size:12px;line-height:1.5;color:var(--supply-muted)
+}
+.supply-receipt-detail__total{
+ display:flex;justify-content:flex-end;align-items:center;gap:15px;flex-wrap:wrap;
+ padding:14px 3px 0;border-top:1px solid #c8d9ef;
+}
+.supply-receipt-detail__total strong{font-size:21px;overflow-wrap:anywhere}
+@media(max-width:900px){
+ .supply-receipt-detail__line{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:580px){
+ .supply-receipt-detail{padding:12px}
+ .supply-receipt-detail__line{grid-template-columns:1fr;gap:10px}
+ .supply-receipt-detail__total{justify-content:space-between}
+}
+
+/* Existing DEMO card/table rules must never clip these authenticated sections. */
+.supply-workspace .management-table-card.supply-panel {overflow:visible!important}
+.supply-workspace .management-table-card .supply-table-scroll,
+.supply-workspace .supply-table-scroll {overflow-x:auto!important;overflow-y:visible}
+.supply-workspace .management-kpis.supply-finance-kpis article,
+.supply-workspace .warehouse-kpis.supply-overview-kpis .supply-overview-kpi{
+ display:flex!important;min-width:0;white-space:normal;overflow:visible
+}
+.supply-workspace .supply-table td,
+.supply-workspace .supply-table th {
+ max-width:none!important;white-space:normal!important;
+ overflow:visible!important;text-overflow:clip!important;
+}
+.supply-workspace .supply-table td .outline,
+.supply-workspace .supply-table td .primary{
+ max-width:100%;white-space:normal!important;text-overflow:clip!important;
+}

@@ -20,6 +20,11 @@ enum UserRole {
   SCHOOL_KITCHEN
 }
 
+enum KitchenType {
+  SCHOOL
+  CENTRAL
+}
+
 enum StudentStatus {
   ACTIVE
   PAUSED
@@ -58,6 +63,7 @@ enum MealType {
 }
 
 enum TraceEventType {
+  ISSUED
   RECEIVED
   INSPECTED
   STORED
@@ -65,6 +71,51 @@ enum TraceEventType {
   COOKED
   SERVED
   REJECTED
+}
+
+enum DishStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DishVersionStatus {
+  DRAFT
+  SUBMITTED
+  WITHDRAWN
+}
+
+enum DishApprovalStatus {
+  PENDING
+  APPROVED
+  RETURNED
+  REJECTED
+  WITHDRAWN
+}
+
+enum DishApprovalEventType {
+  SUBMITTED
+  APPROVED
+  RETURNED
+  REJECTED
+  WITHDRAWN
+}
+
+enum MealPlanRevisionStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+  REJECTED
+  SUPERSEDED
+}
+
+enum MealPlanApprovalEventType {
+  SUBMITTED
+  APPROVED
+  RETURNED
+  REJECTED
+  SUPERSEDED
 }
 
 model User {
@@ -76,23 +127,36 @@ model User {
   isActive     Boolean  @default(true) @map("is_active")
   schoolId     String?  @map("school_id") @db.Uuid
   wardId       String?  @map("ward_id") @db.Uuid
-  school       School?  @relation(fields: [schoolId], references: [id])
+  school       School?  @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   ward         Ward?    @relation(fields: [wardId], references: [id])
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  kitchenId    String?  @map("kitchen_id") @db.Uuid
+  kitchen      Kitchen? @relation(fields: [kitchenId], references: [id])
+
+  createdDishVersions       DishVersion[]           @relation("DishVersionCreatedBy")
+  decidedDishApprovals      DishApproval[]          @relation("DishApprovalDecidedBy")
+  dishApprovalEvents        DishApprovalEvent[]     @relation("DishApprovalEventActor")
+  proposedMealPlanRevisions MealPlanRevision[]      @relation("MealPlanRevisionProposedBy")
+  decidedMealPlanRevisions  MealPlanRevision[]      @relation("MealPlanRevisionDecidedBy")
+  mealPlanApprovalEvents    MealPlanApprovalEvent[] @relation("MealPlanApprovalEventActor")
+  issuedDishQrs             DishQr[] @relation("DishQrIssuedBy")
+  revokedDishQrs            DishQr[] @relation("DishQrRevokedBy")
+  createdAt                 DateTime                @default(now()) @map("created_at")
+  updatedAt                 DateTime                @updatedAt @map("updated_at")
 
   @@index([schoolId, role])
+  @@index([kitchenId, role])
   @@map("users")
 }
 
 model Ward {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
   name      String
-  code      String?  @unique
+  code      String?   @unique
   schools   School[]
   users     User[]
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  kitchens  Kitchen[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("wards")
 }
@@ -103,13 +167,21 @@ model School {
   code                 String?                      @unique
   wardId               String?                      @map("ward_id") @db.Uuid
   ward                 Ward?                        @relation(fields: [wardId], references: [id])
+  address              String?
+  contactName          String?                       @map("contact_name")
+  phone                String?
   users                User[]
+  onSiteKitchen        Kitchen?                     @relation("SchoolOnSiteKitchen")
+  kitchenAssignments   KitchenSchoolAssignment[]
   classrooms           Classroom[]
   students             Student[]
   attendanceEvents     AttendanceEvent[]
   suppliers            Supplier[]
   inventoryLots        InventoryLot[]
   mealPlans            MealPlan[]
+  dishQrs              DishQr[]
+  dishApprovals        DishApproval[]
+  supervisionMeals     SupervisionMeal[]
   foodSafetyChecks     FoodSafetyCheck[]
   hikvisionEnrollments HikvisionStudentEnrollment[]
   createdAt            DateTime                     @default(now()) @map("created_at")
@@ -117,6 +189,56 @@ model School {
 
   @@index([wardId])
   @@map("schools")
+}
+
+model Kitchen {
+  id          String                    @id @default(uuid()) @db.Uuid
+  code        String                    @unique
+  name        String
+  type        KitchenType               @default(CENTRAL)
+  schoolId    String?                   @unique @map("school_id") @db.Uuid
+  school      School?                   @relation("SchoolOnSiteKitchen", fields: [schoolId], references: [id], onDelete: Restrict)
+  wardId      String?                   @map("ward_id") @db.Uuid
+  ward        Ward?                     @relation(fields: [wardId], references: [id], onDelete: Restrict)
+  address     String?
+  contactName String?                   @map("contact_name")
+  phone       String?
+  capacity    Int?
+  isActive    Boolean                   @default(true) @map("is_active")
+  users       User[]
+  dishes      Dish[]
+  mealPlans   MealPlan[]
+  legalDocuments KitchenLegalDocument[]
+  suppliers Supplier[]
+  inventoryLots InventoryLot[]
+  stockMinimums KitchenStockMinimum[]
+  purchaseReceipts PurchaseReceipt[]
+  supplierPayments SupplierPayment[]
+  supervisionMeals SupervisionMeal[]
+  dishQrs     DishQr[]
+  schools     KitchenSchoolAssignment[]
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @updatedAt @map("updated_at")
+
+  @@index([wardId, type, isActive])
+  @@map("kitchens")
+}
+
+model KitchenSchoolAssignment {
+  id        String    @id @default(uuid()) @db.Uuid
+  kitchenId String    @map("kitchen_id") @db.Uuid
+  schoolId  String    @map("school_id") @db.Uuid
+  isActive  Boolean   @default(true) @map("is_active")
+  startsAt  DateTime  @default(now()) @map("starts_at")
+  endsAt    DateTime? @map("ends_at")
+  kitchen   Kitchen   @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@unique([kitchenId, schoolId, startsAt])
+  @@index([schoolId, isActive])
+  @@index([kitchenId, isActive])
+  @@map("kitchen_school_assignments")
 }
 
 model Classroom {
@@ -134,22 +256,22 @@ model Classroom {
 }
 
 model Student {
-  school             School                     @relation(fields: [schoolId], references: [id])
-  id               String            @id @default(uuid()) @db.Uuid
-  code             String
-  name             String
-  classroomId      String?           @map("classroom_id") @db.Uuid
-  gender           Gender?
-  birthDate        DateTime?         @map("birth_date") @db.Date
-  guardian         String?
-  phone            String?
-  status           StudentStatus     @default(ACTIVE)
-  schoolId         String            @map("school_id") @db.Uuid
-  notes            String?
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
-  classroom        Classroom?        @relation(fields: [classroomId], references: [id], onDelete: SetNull)
-  attendanceEvents AttendanceEvent[]
+  school               School                       @relation(fields: [schoolId], references: [id])
+  id                   String                       @id @default(uuid()) @db.Uuid
+  code                 String
+  name                 String
+  classroomId          String?                      @map("classroom_id") @db.Uuid
+  gender               Gender?
+  birthDate            DateTime?                    @map("birth_date") @db.Date
+  guardian             String?
+  phone                String?
+  status               StudentStatus                @default(ACTIVE)
+  schoolId             String                       @map("school_id") @db.Uuid
+  notes                String?
+  createdAt            DateTime                     @default(now()) @map("created_at")
+  updatedAt            DateTime                     @updatedAt @map("updated_at")
+  classroom            Classroom?                   @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  attendanceEvents     AttendanceEvent[]
   hikvisionEnrollments HikvisionStudentEnrollment[]
 
   @@unique([schoolId, code])
@@ -183,7 +305,9 @@ model AttendanceEvent {
 }
 
 model Supplier {
-  school      School         @relation(fields: [schoolId], references: [id])
+  school      School?        @relation(fields: [schoolId], references: [id])
+  kitchen     Kitchen?       @relation(fields: [kitchenId], references: [id])
+  kitchenId   String?        @map("kitchen_id") @db.Uuid
   id          String         @id @default(uuid()) @db.Uuid
   code        String
   name        String
@@ -193,35 +317,46 @@ model Supplier {
   email       String?
   address     String?
   status      SupplierStatus @default(ACTIVE)
-  schoolId    String         @map("school_id") @db.Uuid
+  schoolId    String?        @map("school_id") @db.Uuid
   lots        InventoryLot[]
+  purchaseReceipts PurchaseReceipt[]
+  payments SupplierPayment[]
+  documents SupplierDocument[]
+  note String? 
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
   @@unique([schoolId, code])
+  @@unique([kitchenId, code])
   @@index([schoolId, name])
+  @@index([kitchenId, name])
   @@map("suppliers")
 }
 
 model Ingredient {
-  id        String         @id @default(uuid()) @db.Uuid
-  code      String         @unique
-  name      String
-  unit      String
-  category  String?
-  lots      InventoryLot[]
-  createdAt DateTime       @default(now()) @map("created_at")
+  id              String           @id @default(uuid()) @db.Uuid
+  code            String           @unique
+  name            String
+  unit            String
+  category        String?
+  lots            InventoryLot[]
+  dishIngredients DishIngredient[]
+  nutritionProfiles IngredientNutritionProfile[]
+  stockMinimums KitchenStockMinimum[]
+  createdAt       DateTime         @default(now()) @map("created_at")
 
   @@map("ingredients")
 }
 
 model InventoryLot {
-  school          School       @relation(fields: [schoolId], references: [id])
+  school          School?      @relation(fields: [schoolId], references: [id])
+  kitchen         Kitchen?     @relation(fields: [kitchenId], references: [id])
+  kitchenId       String?      @map("kitchen_id") @db.Uuid
   id              String       @id @default(uuid()) @db.Uuid
   lotCode         String       @map("lot_code")
   ingredientId    String       @map("ingredient_id") @db.Uuid
   supplierId      String       @map("supplier_id") @db.Uuid
-  schoolId        String       @map("school_id") @db.Uuid
+  schoolId        String?      @map("school_id") @db.Uuid
   quantity        Decimal      @db.Decimal(12, 3)
   remainingQty    Decimal      @map("remaining_qty") @db.Decimal(12, 3)
   unit            String
@@ -232,36 +367,51 @@ model InventoryLot {
   supplier        Supplier     @relation(fields: [supplierId], references: [id])
   ingredient      Ingredient   @relation(fields: [ingredientId], references: [id])
   traceEvents     TraceEvent[]
+  purchaseReceiptLine PurchaseReceiptLine?
 
   @@unique([schoolId, lotCode])
+  @@unique([kitchenId, lotCode])
   @@index([schoolId, status, expiryDate])
+  @@index([kitchenId, status, expiryDate])
   @@map("inventory_lots")
 }
 
 model Dish {
   id            String         @id @default(uuid()) @db.Uuid
-  code          String         @unique
+  // Nullable during expand/backfill; make NOT NULL after verified ownership backfill.
+  kitchenId     String?        @map("kitchen_id") @db.Uuid
+  code          String         @unique // retain legacy global uniqueness until cutover
   name          String
   category      String?
-  recipe        Json?
-  mealPlanItems MealPlanItem[]
+  status        DishStatus     @default(DRAFT)
+  recipe        Json? // legacy snapshot; remove only after API/UI cutover
+  kitchen       Kitchen?       @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  versions      DishVersion[]
+  mealPlanItems MealPlanItem[] // legacy relation retained for compatibility
   createdAt     DateTime       @default(now()) @map("created_at")
 
+  @@index([kitchenId, status, name])
   @@map("dishes")
 }
 
 model MealPlan {
-  school      School       @relation(fields: [schoolId], references: [id])
-  id          String         @id @default(uuid()) @db.Uuid
-  schoolId    String         @map("school_id") @db.Uuid
-  serviceDate DateTime       @map("service_date") @db.Date
-  mealType    MealType       @map("meal_type")
-  servings    Int
-  status      String         @default("DRAFT")
-  items       MealPlanItem[]
-  createdAt   DateTime       @default(now()) @map("created_at")
+  school      School             @relation(fields: [schoolId], references: [id])
+  id          String             @id @default(uuid()) @db.Uuid
+  schoolId    String             @map("school_id") @db.Uuid
+  // Nullable during expand/backfill; required after kitchen ownership is verified.
+  kitchenId   String?            @map("kitchen_id") @db.Uuid
+  kitchen     Kitchen?           @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  serviceDate DateTime           @map("service_date") @db.Date
+  mealType    MealType           @map("meal_type")
+  servings    Int // legacy aggregate; remove after revision cutover
+  status      String             @default("DRAFT") // legacy status; revision is target workflow source
+  items       MealPlanItem[] // legacy relation retained for compatibility
+  revisions   MealPlanRevision[]
+  dishQrs     DishQr[]
+  createdAt   DateTime           @default(now()) @map("created_at")
 
   @@unique([schoolId, serviceDate, mealType])
+  @@index([kitchenId, serviceDate])
   @@map("meal_plans")
 }
 
@@ -308,23 +458,457 @@ model TraceEvent {
   @@map("trace_events")
 }
 
-
 model HikvisionStudentEnrollment {
-  school        School   @relation(fields: [schoolId], references: [id])
-  id            String   @id @default(uuid()) @db.Uuid
-  schoolId      String   @map("school_id") @db.Uuid
-  studentId     String   @map("student_id") @db.Uuid
-  deviceId      String   @map("device_id")
-  employeeNo    String   @map("employee_no")
-  userCreatedAt DateTime? @map("user_created_at")
+  school         School    @relation(fields: [schoolId], references: [id])
+  id             String    @id @default(uuid()) @db.Uuid
+  schoolId       String    @map("school_id") @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  deviceId       String    @map("device_id")
+  employeeNo     String    @map("employee_no")
+  userCreatedAt  DateTime? @map("user_created_at")
   faceUploadedAt DateTime? @map("face_uploaded_at")
-  lastError     String?  @map("last_error")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([deviceId, employeeNo])
   @@unique([deviceId, studentId])
   @@index([schoolId, lastError])
   @@map("hikvision_student_enrollments")
+}
+
+model DishVersion {
+  id                String                 @id @default(uuid()) @db.Uuid
+  dishId            String                 @map("dish_id") @db.Uuid
+  versionNo         Int                    @map("version_no")
+  status            DishVersionStatus      @default(DRAFT)
+  recipeSnapshot    Json                   @map("recipe_snapshot")
+  nutritionSnapshot Json?                  @map("nutrition_snapshot")
+  allergenSnapshot  Json?                  @map("allergen_snapshot")
+  createdById       String                 @map("created_by_id") @db.Uuid
+  submittedAt       DateTime?              @map("submitted_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  dish              Dish                   @relation(fields: [dishId], references: [id], onDelete: Restrict)
+  createdBy         User                   @relation("DishVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  ingredients       DishIngredient[]
+  approvals         DishApproval[]
+  mealPlanItems     MealPlanRevisionItem[]
+
+  @@unique([dishId, versionNo])
+  @@index([dishId, status])
+  @@map("dish_versions")
+}
+
+model DishIngredient {
+  id              String      @id @default(uuid()) @db.Uuid
+  dishVersionId   String      @map("dish_version_id") @db.Uuid
+  ingredientId    String      @map("ingredient_id") @db.Uuid
+  quantity        Decimal     @db.Decimal(14, 3)
+  unitCode        String      @map("unit_code")
+  preparationNote String?     @map("preparation_note")
+  dishVersion     DishVersion @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
+  ingredient      Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  // One ingredient appears once per recipe version; use preparationNote for preparation details.
+  @@unique([dishVersionId, ingredientId])
+  @@index([ingredientId])
+  @@map("dish_ingredients")
+}
+
+model DishApproval {
+  id            String              @id @default(uuid()) @db.Uuid
+  schoolId      String              @map("school_id") @db.Uuid
+  dishVersionId String              @map("dish_version_id") @db.Uuid
+  status        DishApprovalStatus  @default(PENDING)
+  submittedAt   DateTime            @default(now()) @map("submitted_at")
+  decidedAt     DateTime?           @map("decided_at")
+  decidedById   String?             @map("decided_by_id") @db.Uuid
+  decisionNote  String?             @map("decision_note")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  school        School              @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  dishVersion   DishVersion         @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
+  decidedBy     User?               @relation("DishApprovalDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  events        DishApprovalEvent[]
+
+  @@unique([schoolId, dishVersionId])
+  @@index([schoolId, status, updatedAt])
+  @@map("dish_approvals")
+}
+
+model DishApprovalEvent {
+  id             String                @id @default(uuid()) @db.Uuid
+  dishApprovalId String                @map("dish_approval_id") @db.Uuid
+  eventType      DishApprovalEventType @map("event_type")
+  actorId        String                @map("actor_id") @db.Uuid
+  actorRole      UserRole              @map("actor_role")
+  note           String?
+  occurredAt     DateTime              @default(now()) @map("occurred_at")
+  dishApproval   DishApproval          @relation(fields: [dishApprovalId], references: [id], onDelete: Restrict)
+  actor          User                  @relation("DishApprovalEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([dishApprovalId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@map("dish_approval_events")
+}
+
+model MealPlanRevision {
+  id           String                     @id @default(uuid()) @db.Uuid
+  mealPlanId   String                     @map("meal_plan_id") @db.Uuid
+  revisionNo   Int                        @map("revision_no")
+  status       MealPlanRevisionStatus     @default(DRAFT)
+  proposedById String                     @map("proposed_by_id") @db.Uuid
+  submittedAt  DateTime?                  @map("submitted_at")
+  decidedAt    DateTime?                  @map("decided_at")
+  decidedById  String?                    @map("decided_by_id") @db.Uuid
+  decisionNote String?                    @map("decision_note")
+  createdAt    DateTime                   @default(now()) @map("created_at")
+  updatedAt    DateTime                   @updatedAt @map("updated_at")
+  mealPlan     MealPlan                   @relation(fields: [mealPlanId], references: [id], onDelete: Restrict)
+  proposedBy   User                       @relation("MealPlanRevisionProposedBy", fields: [proposedById], references: [id], onDelete: Restrict)
+  decidedBy    User?                      @relation("MealPlanRevisionDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  ageGroups    MealPlanRevisionAgeGroup[]
+  items        MealPlanRevisionItem[]
+  events       MealPlanApprovalEvent[]
+  dishQrs      DishQr[]
+
+  @@unique([mealPlanId, revisionNo])
+  @@index([mealPlanId, status])
+  @@index([proposedById, createdAt])
+  @@map("meal_plan_revisions")
+}
+
+model MealPlanAgeGroup {
+  id           String                        @id @default(uuid()) @db.Uuid
+  code         String                        @unique
+  name         String
+  minAgeMonths Int?                          @map("min_age_months")
+  maxAgeMonths Int?                          @map("max_age_months")
+  sortOrder    Int                           @default(0) @map("sort_order")
+  isActive     Boolean                       @default(true) @map("is_active")
+  revisionRows MealPlanRevisionAgeGroup[]
+  portionRows  MealPlanItemAgeGroupPortion[]
+  dishQrs      DishQr[]
+
+  @@map("meal_plan_age_groups")
+}
+
+model MealPlanRevisionAgeGroup {
+  id              String           @id @default(uuid()) @db.Uuid
+  revisionId      String           @map("revision_id") @db.Uuid
+  ageGroupId      String           @map("age_group_id") @db.Uuid
+  plannedServings Int              @map("planned_servings")
+  notes           String?
+  revision        MealPlanRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  ageGroup        MealPlanAgeGroup @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+
+  @@unique([revisionId, ageGroupId])
+  @@index([ageGroupId])
+  @@map("meal_plan_revision_age_groups")
+}
+
+model MealPlanRevisionItem {
+  id            String                        @id @default(uuid()) @db.Uuid
+  revisionId    String                        @map("revision_id") @db.Uuid
+  dishVersionId String                        @map("dish_version_id") @db.Uuid
+  mealSlot      String                        @map("meal_slot")
+  sequence      Int                           @default(0)
+  isDefault     Boolean                       @default(true) @map("is_default")
+  note          String?
+  revision      MealPlanRevision              @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  dishVersion   DishVersion                   @relation(fields: [dishVersionId], references: [id], onDelete: Restrict)
+  portions      MealPlanItemAgeGroupPortion[]
+  dishQrs       DishQr[]
+
+  @@unique([revisionId, mealSlot, dishVersionId])
+  @@index([dishVersionId])
+  @@map("meal_plan_revision_items")
+}
+
+model MealPlanItemAgeGroupPortion {
+  id             String               @id @default(uuid()) @db.Uuid
+  revisionItemId String               @map("revision_item_id") @db.Uuid
+  ageGroupId     String               @map("age_group_id") @db.Uuid
+  portionFactor  Decimal              @default(1) @map("portion_factor") @db.Decimal(10, 4)
+  unitCode       String               @map("unit_code")
+  overrideReason String?              @map("override_reason")
+  revisionItem   MealPlanRevisionItem @relation(fields: [revisionItemId], references: [id], onDelete: Restrict)
+  ageGroup       MealPlanAgeGroup     @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+
+  @@unique([revisionItemId, ageGroupId])
+  @@index([ageGroupId])
+  @@map("meal_plan_item_age_group_portions")
+}
+
+model MealPlanApprovalEvent {
+  id         String                    @id @default(uuid()) @db.Uuid
+  revisionId String                    @map("revision_id") @db.Uuid
+  eventType  MealPlanApprovalEventType @map("event_type")
+  actorId    String                    @map("actor_id") @db.Uuid
+  actorRole  UserRole                  @map("actor_role")
+  note       String?
+  occurredAt DateTime                  @default(now()) @map("occurred_at")
+  revision   MealPlanRevision          @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  actor      User                      @relation("MealPlanApprovalEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([revisionId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@map("meal_plan_approval_events")
+}
+
+
+model NutritionReference {
+  id            String                      @id @default(uuid()) @db.Uuid
+  code          String                      @unique
+  title         String
+  issuingBody   String                      @map("issuing_body")
+  documentNo    String                      @map("document_no")
+  issuedAt      DateTime                    @map("issued_at") @db.Date
+  effectiveAt   DateTime                    @map("effective_at") @db.Date
+  appendix      String
+  sourceUrl     String                      @map("source_url")
+  version       Int                         @default(1)
+  profiles      IngredientNutritionProfile[]
+  createdAt     DateTime                    @default(now()) @map("created_at")
+
+  @@unique([documentNo, appendix, version])
+  @@map("nutrition_references")
+}
+
+model IngredientNutritionProfile {
+  id                   String            @id @default(uuid()) @db.Uuid
+  ingredientId         String            @map("ingredient_id") @db.Uuid
+  nutritionReferenceId String            @map("nutrition_reference_id") @db.Uuid
+  sourceRowNo          Int?              @map("source_row_no")
+  sourceCategory       String            @map("source_category")
+  edibleRatePercent    Decimal           @map("edible_rate_percent") @db.Decimal(6, 2)
+  energyKcal           Decimal?          @map("energy_kcal") @db.Decimal(12, 4)
+  proteinG             Decimal?          @map("protein_g") @db.Decimal(12, 4)
+  fatG                 Decimal?          @map("fat_g") @db.Decimal(12, 4)
+  carbohydrateG        Decimal?          @map("carbohydrate_g") @db.Decimal(12, 4)
+  fiberG               Decimal?          @map("fiber_g") @db.Decimal(12, 4)
+  calciumMg            Decimal?          @map("calcium_mg") @db.Decimal(12, 4)
+  ironMg               Decimal?          @map("iron_mg") @db.Decimal(12, 4)
+  zincMg               Decimal?          @map("zinc_mg") @db.Decimal(12, 4)
+  vitaminARaeMcg       Decimal?          @map("vitamin_a_rae_mcg") @db.Decimal(12, 4)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  ingredient           Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  nutritionReference   NutritionReference @relation(fields: [nutritionReferenceId], references: [id], onDelete: Restrict)
+
+  @@unique([ingredientId, nutritionReferenceId])
+  @@index([nutritionReferenceId, sourceCategory])
+  @@index([ingredientId])
+  @@map("ingredient_nutrition_profiles")
+}
+
+model DishQr {
+  id             String    @id @default(uuid()) @db.Uuid
+  publicToken    String    @unique @map("public_token")
+  schoolId       String    @map("school_id") @db.Uuid
+  kitchenId      String    @map("kitchen_id") @db.Uuid
+  mealPlanId     String    @map("meal_plan_id") @db.Uuid
+  revisionId     String    @map("revision_id") @db.Uuid
+  revisionItemId String    @map("revision_item_id") @db.Uuid
+  ageGroupId     String    @map("age_group_id") @db.Uuid
+  issuedById     String    @map("issued_by_id") @db.Uuid
+  issuedAt       DateTime  @default(now()) @map("issued_at")
+  revokedAt      DateTime? @map("revoked_at")
+  revokedById    String?   @map("revoked_by_id") @db.Uuid
+  revokeReason   String?   @map("revoke_reason")
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  kitchen        Kitchen   @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  mealPlan       MealPlan  @relation(fields: [mealPlanId], references: [id], onDelete: Restrict)
+  revision       MealPlanRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  revisionItem   MealPlanRevisionItem @relation(fields: [revisionItemId], references: [id], onDelete: Restrict)
+  ageGroup       MealPlanAgeGroup @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+  issuedBy       User      @relation("DishQrIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  revokedBy      User?     @relation("DishQrRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@unique([revisionId, revisionItemId, ageGroupId])
+  @@index([schoolId, issuedAt])
+  @@index([kitchenId, issuedAt])
+  @@map("dish_qrs")
+}
+
+model KitchenLegalDocument {
+  id String @id @default(uuid()) @db.Uuid
+  kitchenId String @map("kitchen_id") @db.Uuid
+  kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  title String
+  category String
+  applicability String @default("conditional")
+  status String @default("missing")
+  documentNumber String? @map("document_number")
+  issuer String?
+  issuedAt DateTime? @map("issued_at") @db.Date
+  expiresAt DateTime? @map("expires_at") @db.Date
+  publicSummary String @default("") @map("public_summary")
+  note String @default("")
+  createdById String @map("created_by_id") @db.Uuid
+  updatedById String @map("updated_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  attachments KitchenLegalAttachment[]
+  events KitchenLegalEvent[]
+  @@index([kitchenId, category])
+  @@index([expiresAt])
+  @@map("kitchen_legal_documents")
+}
+
+model KitchenLegalAttachment {
+  id String @id @default(uuid()) @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  document KitchenLegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  name String
+  mimeType String @map("mime_type")
+  size Int
+  data Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([documentId])
+  @@map("kitchen_legal_attachments")
+}
+
+model KitchenLegalEvent {
+  id String @id @default(uuid()) @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  document KitchenLegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actorId String @map("actor_id") @db.Uuid
+  action String
+  details Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([documentId, createdAt])
+  @@map("kitchen_legal_events")
+}
+
+
+model SupervisionMeal {
+  id String @id @default(uuid()) @db.Uuid
+  schoolId String @map("school_id") @db.Uuid
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  kitchenId String @map("kitchen_id") @db.Uuid
+  kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  serviceDate DateTime @map("service_date") @db.Date
+  mealType String @map("meal_type")
+  checks Json @default("{}")
+  stages Json @default("{}")
+  approvals Json @default("[]")
+  events SupervisionEvent[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([schoolId, serviceDate, mealType])
+  @@index([kitchenId, serviceDate])
+  @@map("supervision_meals")
+}
+
+model SupervisionEvent {
+  id String @id @default(uuid()) @db.Uuid
+  mealId String @map("meal_id") @db.Uuid
+  meal SupervisionMeal @relation(fields: [mealId], references: [id], onDelete: Restrict)
+  actorId String @map("actor_id") @db.Uuid
+  actorRole String @map("actor_role")
+  action String
+  itemId String @map("item_id")
+  payload Json
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([mealId, createdAt])
+  @@map("supervision_events")
+}
+
+model PurchaseReceipt {
+  id String @id @default(uuid()) @db.Uuid
+  kitchenId String @map("kitchen_id") @db.Uuid
+  supplierId String @map("supplier_id") @db.Uuid
+  number String
+  invoiceNumber String? @map("invoice_number")
+  reference String?
+  description String?
+  total Decimal @db.Decimal(18, 0)
+  createdById String @map("created_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  lines PurchaseReceiptLine[]
+  payments SupplierPayment[]
+  documents SupplierDocument[]
+  @@unique([kitchenId, number])
+  @@index([supplierId, createdAt])
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptLine {
+  id String @id @default(uuid()) @db.Uuid
+  receiptId String @map("receipt_id") @db.Uuid
+  lotId String @unique @map("lot_id") @db.Uuid
+  quantity Decimal @db.Decimal(12, 3)
+  unitPrice Decimal @map("unit_price") @db.Decimal(24, 6)
+  enteredQuantity Decimal? @map("entered_quantity") @db.Decimal(15,6)
+  enteredUnit String? @map("entered_unit")
+  amount Decimal @db.Decimal(18, 0)
+  receipt PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  lot InventoryLot @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  @@index([receiptId])
+  @@map("purchase_receipt_lines")
+}
+
+model SupplierPayment {
+  id String @id @default(uuid()) @db.Uuid
+  kitchenId String @map("kitchen_id") @db.Uuid
+  supplierId String @map("supplier_id") @db.Uuid
+  receiptId String @map("receipt_id") @db.Uuid
+  reference String
+  amount Decimal @db.Decimal(18, 0)
+  method String
+  note String?
+  reversedAt DateTime? @map("reversed_at")
+  reversedById String? @map("reversed_by_id") @db.Uuid
+  reversalReason String? @map("reversal_reason")
+  paidAt DateTime @map("paid_at")
+  createdById String @map("created_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  receipt PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  @@unique([kitchenId, reference])
+  @@index([supplierId, paidAt])
+  @@index([receiptId, paidAt])
+  @@map("supplier_payments")
+}
+
+model SupplierDocument {
+  id String @id @default(uuid()) @db.Uuid
+  supplierId String @map("supplier_id") @db.Uuid
+  category String
+  receiptId String? @map("receipt_id") @db.Uuid
+  receipt PurchaseReceipt? @relation(fields:[receiptId],references:[id],onDelete:Restrict)
+  filename String
+  mimeType String @map("mime_type")
+  size Int
+  data Bytes
+  documentNumber String? @map("document_number")
+  issuer String?
+  issuedAt DateTime? @map("issued_at") @db.Date
+  expiresAt DateTime? @map("expires_at") @db.Date
+  uploadedById String @map("uploaded_by_id") @db.Uuid
+  archivedById String? @map("archived_by_id") @db.Uuid
+  archivedAt DateTime? @map("archived_at")
+  isArchived Boolean @default(false) @map("is_archived")
+  createdAt DateTime @default(now()) @map("created_at")
+  supplier Supplier @relation(fields:[supplierId],references:[id],onDelete:Restrict)
+  @@index([supplierId, isArchived])
+  @@index([receiptId])
+  @@map("supplier_documents")
+}
+
+model KitchenStockMinimum {
+ id String @id @default(uuid()) @db.Uuid
+ kitchenId String @map("kitchen_id") @db.Uuid
+ ingredientId String @map("ingredient_id") @db.Uuid
+ minimumQty Decimal @map("minimum_qty") @db.Decimal(12,3)
+ updatedById String @map("updated_by_id") @db.Uuid
+ updatedAt DateTime @updatedAt @map("updated_at")
+ kitchen Kitchen @relation(fields:[kitchenId],references:[id],onDelete:Restrict)
+ ingredient Ingredient @relation(fields:[ingredientId],references:[id],onDelete:Restrict)
+ @@unique([kitchenId,ingredientId])
+ @@map("kitchen_stock_minimums")
 }

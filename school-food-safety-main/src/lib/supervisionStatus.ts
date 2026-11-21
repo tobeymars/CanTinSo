@@ -22,7 +22,7 @@ export type StatusHistory = {
   evidenceRef: string
   ingredientReceipts?: IngredientReceiptLine[]
 }
-export type IngredientReceiptLine = SupervisionIngredientOption & { quantity: number }
+export type IngredientReceiptLine = SupervisionIngredientOption & { quantity: number; displayQuantity?: number; displayUnit?: string }
 export type SupervisionEvidenceOption = { value: string; label: string; description: string; tag: string }
 export type CheckRecord = { id: CheckId; status: CheckStatus; history: StatusHistory[] }
 export const CHECK_DEFINITIONS: readonly { id: CheckId; label: string; description: string }[] = [

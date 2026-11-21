@@ -223,3 +223,31 @@
 @media(prefers-reduced-motion:reduce){.dish-info-trace-choice{transition:none}}
 
 .dish-ingredient-link{border:0!important;display:inline-flex;gap:6px;align-items:center;text-align:left;background:transparent!important;color:#164e91!important;font-size:inherit;font-weight:750;cursor:pointer;padding:6px!important;border-radius:7px}.dish-ingredient-link:hover,.dish-ingredient-link:focus-visible{background:#edf4ff!important;text-decoration:underline}.dish-ingredient-link svg:last-child{color:#7892b5}
+
+
+.dish-info-nutrition{display:grid;gap:13px;padding:16px;border:1px solid #d8e5f3;border-radius:13px;background:linear-gradient(145deg,#f8fbff,#fff)}
+.dish-info-nutrition>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.dish-info-nutrition>header h4{margin:5px 0 4px;color:#173d70;font-size:15px;font-weight:850}
+.dish-info-nutrition>header p{margin:0;color:#65758c;font-size:11px;line-height:1.5}
+.dish-info-nutrition-status{flex:none;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:800}
+.dish-info-nutrition-status.complete{background:#e5f5ec;color:#176747}
+.dish-info-nutrition-status.partial{background:#fff2dc;color:#8b5b12}
+.dish-info-nutrition-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.dish-info-nutrition-values>div{display:grid;gap:5px;min-width:0;padding:10px;border:1px solid #e1e8f0;border-radius:9px;background:#fff}
+.dish-info-nutrition-values>div.energy{grid-column:span 3;background:#edf5ff;border-color:#cbdcf1}
+.dish-info-nutrition-values small{font-size:10px;color:#667991}
+.dish-info-nutrition-values strong{font-size:16px;color:#1c3d69;font-weight:850;font-variant-numeric:tabular-nums}
+.dish-info-nutrition-values .energy strong{font-size:22px;color:#174a8b}
+.dish-info-nutrition-values em{font-size:10px;font-style:normal;font-weight:650;color:#72849b}
+.dish-info-nutrition-matched{display:grid;gap:7px}
+.dish-info-nutrition-matched>strong{font-size:11px;color:#294565}
+.dish-info-nutrition-matched ul,.dish-info-nutrition-warning ul{margin:0;padding-left:18px}
+.dish-info-nutrition-matched li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #edf1f5;color:#455b75;font-size:10px}
+.dish-info-nutrition-matched li span:last-child{color:#74849a;text-align:right}
+.dish-info-nutrition-warning{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid #f0d9a9;border-radius:9px;background:#fff9ec;color:#805a1b}
+.dish-info-nutrition-warning>svg{flex:none;margin-top:1px}
+.dish-info-nutrition-warning strong{font-size:11px}
+.dish-info-nutrition-warning ul{margin-top:5px;font-size:10px;line-height:1.5}
+.dish-info-nutrition-note{display:flex;align-items:flex-start;gap:7px;margin:0;color:#6c7d92;font-size:10px;line-height:1.55}
+.dish-info-nutrition-note svg{flex:none;margin-top:1px}
+@media(max-width:510px){.dish-info-nutrition{padding:12px}.dish-info-nutrition-values{grid-template-columns:repeat(2,minmax(0,1fr))}.dish-info-nutrition-values>div.energy{grid-column:span 2}.dish-info-nutrition-matched li{align-items:flex-start;flex-direction:column;gap:2px}}

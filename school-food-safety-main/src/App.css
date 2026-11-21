@@ -713,3 +713,50 @@ form .feedback-photo-picker.disabled{cursor:not-allowed;opacity:.6}
 .supervision-approval-history ol{padding-left:24px;margin-top:8px;color:var(--muted);line-height:1.75}
 .supervision-approval-disclaimer{font-size:11px;color:var(--muted);line-height:1.65;border-top:1px solid var(--border);padding-top:12px}
 @media(max-width:600px){.supervision-meal-approval .card-header{flex-direction:column}.supervision-meal-approval .card-header .primary{width:100%}.supervision-approval-pending ul{grid-template-columns:1fr}}
+
+
+/* School-admin hero: clear hierarchy for the assigned school */
+.school-picker-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  width: auto;
+  max-width: min(100%, 560px);
+  margin: 13px 0 5px;
+}
+.school-picker-locked strong {
+  display: block;
+  max-width: 100%;
+  color: #fff;
+  font-size: clamp(25px, 2.2vw, 34px);
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -0.8px;
+  overflow-wrap: anywhere;
+}
+.school-picker-locked span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #dce6ff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: .15px;
+}
+.school-picker-locked span svg {
+  flex: 0 0 auto;
+  color: #f0c36f;
+}
+.school-picker-locked + .hero-address {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #cbd8fa;
+}
+@media (max-width: 760px) {
+  .school-picker-locked { gap: 6px; margin: 12px 0 5px; }
+  .school-picker-locked strong { font-size: 27px; }
+  .school-picker-locked span { font-size: 12px; }
+}
