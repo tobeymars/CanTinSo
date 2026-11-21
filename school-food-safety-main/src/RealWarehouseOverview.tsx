@@ -1,0 +1,47 @@
+import { Boxes, ClipboardList, Clock3, PackageCheck, ShieldAlert, Truck, Wallet } from 'lucide-react'
+import type { SupplyFinance,SupplyLot,SupplyMovement } from './lib/supplyApi'
+
+const number=(n:number)=>n.toLocaleString('vi-VN',{maximumFractionDigits:3})
+const currency=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
+export default function RealWarehouseOverview({lots,movements,finance,onOpen}:{
+ lots:SupplyLot[];movements:SupplyMovement[];finance?:SupplyFinance;onOpen:(tab:'stock'|'receipts'|'issues'|'lots'|'trace')=>void
+}){
+ const now=today(),soon=new Date(now+'T00:00:00Z');soon.setUTCDate(soon.getUTCDate()+7)
+ const week=soon.toISOString().slice(0,10)
+ const expired=lots.filter(lot=>lot.expiryDate&&lot.expiryDate.slice(0,10)<now)
+ const expiring=lots.filter(lot=>lot.expiryDate&&lot.expiryDate.slice(0,10)>=now&&lot.expiryDate.slice(0,10)<=week)
+ const available=lots.filter(lot=>lot.status==='AVAILABLE'&&lot.remainingQty>0&&!expired.includes(lot))
+ const receiptEvents=movements.filter(event=>event.eventType==='RECEIVED')
+ const issueEvents=movements.filter(event=>event.eventType==='ISSUED')
+ const priced=new Map(finance?.receipts.flatMap(receipt=>receipt.lines.map(line=>[line.lot.id,line.unitPrice] as const))??[])
+ const valued=lots.filter(lot=>priced.has(lot.id))
+ const stockValue=valued.reduce((sum,lot)=>sum+Math.round(lot.remainingQty*(priced.get(lot.id)??0)),0)
+ const unpriced=lots.filter(lot=>!priced.has(lot.id))
+ const stats=[
+  {Icon:Boxes,title:'Lô trong kho',value:String(lots.length),detail:'Toàn bộ lô của bếp',target:'lots' as const},
+  {Icon:PackageCheck,title:'Lô có thể xuất',value:String(available.length),detail:'Chưa hết hạn và còn tồn',target:'stock' as const},
+  {Icon:Wallet,title:'Giá trị tồn đã định giá',value:currency(stockValue),detail:unpriced.length+' lô chưa có giá',target:'stock' as const},
+  {Icon:Clock3,title:'Lô hết hạn trong 7 ngày',value:String(expiring.length),detail:'Cần ưu tiên kiểm tra / FEFO',target:'lots' as const},
+  {Icon:ShieldAlert,title:'Lô quá hạn',value:String(expired.length),detail:'Không được xuất sử dụng',target:'lots' as const},
+  {Icon:Truck,title:'Phiếu nhập có giá',value:String(finance?.receipts.length??0),detail:'Lấy từ PostgreSQL',target:'receipts' as const},
+  {Icon:ClipboardList,title:'Nhật ký nhập / xuất',value:String(receiptEvents.length+issueEvents.length),detail:'200 sự kiện gần nhất',target:'trace' as const},
+ ];
+ const totals=new Map<string,{unit:string;name:string;quantity:number}>()
+ for(const lot of lots){const key=lot.ingredientId+'|'+lot.unit;const current=totals.get(key);if(current)current.quantity+=lot.remainingQty;else totals.set(key,{name:lot.ingredient.name,unit:lot.unit,quantity:lot.remainingQty})}
+ return <div style={{display:'grid',gap:18}}>
+  <div className="warehouse-kpis" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}>
+   {stats.map(({Icon,title,value,detail,target})=><button type="button" className="card" key={title} onClick={()=>onOpen(target)} style={{padding:16,textAlign:'left',display:'grid',gap:7}}>
+     <Icon size={20}/><span>{title}</span><strong style={{fontSize:'1.35rem'}}>{value}</strong><small>{detail}</small>
+   </button>)}
+  </div>
+  {expired.length>0&&<section className="card" style={{padding:16}}><strong>Chú ý: Có {expired.length} lô quá hạn</strong><p className="muted">Không được xuất các lô quá hạn. Kiểm tra và xử lý theo quy trình cách ly.</p><button type="button" className="outline" onClick={()=>onOpen('lots')}>Xem lô cần xử lý</button></section>}
+  <section className="card" style={{padding:16}}>
+   <header className="card-header"><div><div className="section-kicker">TỒN KHO THEO NGUYÊN LIỆU</div><h3>Danh sách tổng hợp</h3><p className="muted">Chỉ cộng số lượng cùng nguyên liệu và cùng đơn vị tính.</p></div></header>
+   <div className="table-scroll"><table className="management-table"><thead><tr><th>Nguyên liệu</th><th>Đơn vị</th><th>Tồn</th></tr></thead><tbody>
+    {[...totals.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi')).map((row,index)=><tr key={index}><td>{row.name}</td><td>{row.unit}</td><td>{number(row.quantity)}</td></tr>)}
+   </tbody></table></div>
+   {!totals.size&&<p className="muted">Chưa có nguyên liệu nào được nhập vào bếp.</p>}
+  </section>
+ </div>
+}
