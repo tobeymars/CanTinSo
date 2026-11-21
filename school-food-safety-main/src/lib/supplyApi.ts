@@ -26,7 +26,7 @@ export const getSupplyLots=(id:string)=>request<SupplyLot[]>(kitchenPath(id)+'/l
 export const getSupplyMovements=(id:string)=>request<SupplyMovement[]>(kitchenPath(id)+'/movements')
 export const saveSupplySupplier=(kitchenId:string,input:{code:string;name:string;taxCode:string;contactName:string;phone:string;email:string;address:string;note:string},id?:string)=>request<SupplySupplier>(kitchenPath(kitchenId)+'/suppliers'+(id?'/'+encodeURIComponent(id):''),{method:id?'PATCH':'POST',body:JSON.stringify(input)})
 export const receiveSupplyLot=(kitchenId:string,input:{lotCode:string;ingredientId:string;supplierId:string;quantity:number;expiryDate:string;storageLocation:string;note:string})=>request<SupplyLot>(kitchenPath(kitchenId)+'/receipts',{method:'POST',body:JSON.stringify(input)})
-export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'SNACK'})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
+export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;unit:string;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'SNACK'})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
 export const updateSupplySupplierStatus=(kitchenId:string,supplierId:string,status:'ACTIVE'|'INACTIVE')=>request<SupplySupplier>(kitchenPath(kitchenId)+'/suppliers/'+encodeURIComponent(supplierId)+'/status',{method:'PATCH',body:JSON.stringify({status})})
 
 export type SupplyFinance = {
@@ -34,10 +34,10 @@ export type SupplyFinance = {
   suppliers:{id:string;code:string;name:string;status:'ACTIVE'|'INACTIVE';totalPurchase:number;paid:number;debt:number;receipts:number}[]
   receipts:{id:string;number:string;invoiceNumber:string|null;reference:string|null;description:string|null;createdAt:string;total:number;paid:number;debt:number;
     supplier:{id:string;name:string;code:string};
-    lines:{id:string;quantity:number;unitPrice:number;amount:number;lot:{id:string;lotCode:string;ingredient:{name:string;unit:string}}}[]}[]
+    lines:{id:string;quantity:number;enteredQuantity:number|null;enteredUnit:string|null;unitPrice:number;amount:number;lot:{id:string;lotCode:string;ingredient:{name:string;unit:string}}}[]}[]
   payments:{id:string;reference:string;amount:number;method:string;paidAt:string;note:string|null;reversedAt:string|null;reversalReason:string|null;receipt:{id:string;number:string};supplier:{id:string;name:string}}[]
 }
-export type SupplyPurchaseLine={ingredientId:string;lotCode:string;quantity:number;unitPrice:number;expiryDate:string;storageLocation:string}
+export type SupplyPurchaseLine={ingredientId:string;lotCode:string;quantity:number;unit:string;unitPrice:number;expiryDate:string;storageLocation:string}
 export const getSupplyFinance=(id:string)=>request<SupplyFinance>(kitchenPath(id)+'/finance')
 export const createSupplyPurchase=(id:string,input:{number:string;supplierId:string;invoiceNumber:string;reference:string;description:string;lines:SupplyPurchaseLine[]})=>request<{id:string;number:string;total:number;lines:number}>(kitchenPath(id)+'/purchase-receipts',{method:'POST',body:JSON.stringify(input)})
 export const createSupplyPayment=(id:string,input:{receiptId:string;reference:string;amount:number;method:'BANK_TRANSFER'|'CASH'|'OTHER';paidAt:string;note:string})=>request<{id:string;reference:string;amount:number}>(kitchenPath(id)+'/payments',{method:'POST',body:JSON.stringify(input)})
@@ -58,4 +58,4 @@ export const reverseSupplyPayment=(kitchenId:string,paymentId:string,reason:stri
 
 export type SupplyMinimum={ingredientId:string;minimumQty:string;ingredient:{name:string;unit:string}}
 export const getSupplyMinimums=(kitchenId:string)=>request<SupplyMinimum[]>(kitchenPath(kitchenId)+'/minimums')
-export const setSupplyMinimum=(kitchenId:string,ingredientId:string,minimumQty:number)=>request<SupplyMinimum>(kitchenPath(kitchenId)+'/minimums/'+encodeURIComponent(ingredientId),{method:'PUT',body:JSON.stringify({minimumQty})})
+export const setSupplyMinimum=(kitchenId:string,ingredientId:string,minimumQty:number,unit:string)=>request<SupplyMinimum>(kitchenPath(kitchenId)+'/minimums/'+encodeURIComponent(ingredientId),{method:'PUT',body:JSON.stringify({minimumQty,unit})})
