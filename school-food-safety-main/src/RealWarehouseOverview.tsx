@@ -24,7 +24,7 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
  const stats=[
   {Icon:Boxes,title:'Lô trong kho',value:String(lots.length),detail:'Toàn bộ lô của bếp',target:'lots' as const},
   {Icon:PackageCheck,title:'Lô có thể xuất',value:String(available.length),detail:'Chưa hết hạn và còn tồn',target:'stock' as const},
-  {Icon:Wallet,title:'Giá trị tồn đã định giá',value:currency(stockValue),detail:unpriced.length+' lô chưa có giá',target:'stock' as const},
+  {Icon:Wallet,title:'Giá trị tồn đã định giá',value:finance?currency(stockValue):'Giới hạn quyền xem',detail:finance?unpriced.length+' lô chưa có giá':'Chỉ tài khoản bếp xem giá trị kho',target:'stock' as const},
   {Icon:Clock3,title:'Lô hết hạn trong 7 ngày',value:String(expiring.length),detail:'Cần ưu tiên kiểm tra / FEFO',target:'lots' as const},
   {Icon:ShieldAlert,title:'Nguyên liệu dưới định mức',value:String(low.length),detail:'Theo ngưỡng của từng bếp',target:'stock' as const},
   {Icon:ShieldAlert,title:'Lô quá hạn',value:String(expired.length),detail:'Không được xuất sử dụng',target:'lots' as const},
