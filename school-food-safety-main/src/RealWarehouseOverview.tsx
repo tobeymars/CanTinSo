@@ -1,6 +1,6 @@
 import { Boxes, ClipboardList, Clock3, PackageCheck, ShieldAlert, Truck, Wallet } from 'lucide-react'
 import type { SupplyFinance,SupplyLot,SupplyMovement,SupplyMinimum } from './lib/supplyApi'
-import { convertReceiptQuantity } from './lib/supervisionUnits'
+import { convertReceiptQuantity, readableStockQuantity } from './lib/supervisionUnits'
 
 const number=(n:number)=>n.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const currency=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
@@ -50,14 +50,14 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
   {incompatibleUnits.size>0&&<p role="alert" className="error">Có {incompatibleUnits.size} nguyên liệu chứa lô với đơn vị không thể quy đổi. Cần đối chiếu dữ liệu kho trước khi kết luận tồn tối thiểu.</p>}
   {low.length>0&&<section className="card" style={{padding:16}}>
     <strong>Nguyên liệu cần bổ sung</strong>
-    {low.map(row=><p key={row.ingredientId} className="muted">{row.ingredient.name}: còn {number(stockByIngredient.get(row.ingredientId)??0)} {row.ingredient.unit}, định mức {number(Number(row.minimumQty))} {row.ingredient.unit}</p>)}
+    {low.map(row=><p key={row.ingredientId} className="muted">{row.ingredient.name}: còn {readableStockQuantity(stockByIngredient.get(row.ingredientId)??0,row.ingredient.unit)}, định mức {readableStockQuantity(Number(row.minimumQty),row.ingredient.unit)}</p>)}
     <button type="button" className="outline" onClick={()=>onOpen('stock')}>Kiểm tra tồn kho</button>
   </section>}
   {expired.length>0&&<section className="card" style={{padding:16}}><strong>Chú ý: Có {expired.length} lô quá hạn</strong><p className="muted">Không được xuất các lô quá hạn. Kiểm tra và xử lý theo quy trình cách ly.</p><button type="button" className="outline" onClick={()=>onOpen('lots')}>Xem lô cần xử lý</button></section>}
   <section className="card" style={{padding:16}}>
    <header className="card-header"><div><div className="section-kicker">TỒN KHO THEO NGUYÊN LIỆU</div><h3>Danh sách tổng hợp</h3><p className="muted">Chỉ cộng số lượng cùng nguyên liệu và cùng đơn vị tính.</p></div></header>
    <div className="table-scroll"><table className="management-table"><thead><tr><th>Nguyên liệu</th><th>Đơn vị</th><th>Tồn</th></tr></thead><tbody>
-    {[...totals.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi')).map((row,index)=><tr key={index}><td>{row.name}</td><td>{row.unit}</td><td>{number(row.quantity)}</td></tr>)}
+    {[...totals.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi')).map((row,index)=><tr key={index}><td>{row.name}</td><td>{row.unit}</td><td>{readableStockQuantity(row.quantity,row.unit)}</td></tr>)}
    </tbody></table></div>
    {!totals.size&&<p className="muted">Chưa có nguyên liệu nào được nhập vào bếp.</p>}
   </section>
