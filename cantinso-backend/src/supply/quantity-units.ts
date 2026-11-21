@@ -35,7 +35,7 @@ export function canonicalQuantity(value:unknown, selected:unknown, canonical:str
   const countUnits=new Set(['chai','hộp','cái','quả','gói','lon','túi','thùng','bịch','viên','củ','chiếc','phần','suất']);
   if(countUnits.has(unitText(canonical))&&!Number.isInteger(number))
     throw new BadRequestException('Đơn vị '+canonical+' phải nhập số lượng nguyên. Muốn quy đổi ra g, kg hoặc lít cần có quy cách đóng gói riêng.');
-  const converted=unitText(from)===unitText(canonical)?number:number*a.factor/b.factor;
+  const converted=unitText(from)===unitText(canonical)?number:number*a!.factor/b!.factor;
   const scaled=converted*1000;
   if(!Number.isFinite(scaled)||converted>100000000||Math.abs(scaled-Math.round(scaled))>0.0000001)
     throw new BadRequestException('Số lượng sau quy đổi sang '+canonical+' phải có tối đa 3 chữ số thập phân.');
