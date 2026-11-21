@@ -250,7 +250,11 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                           </select>
                         </label>
                       </div>
-                      {serverMode && <small className="muted">Đã cấp cho bữa này: {formatReceiptQuantity(selectedIngredient.quantityAvailable ?? 0)} {selectedIngredient.unit}. Hệ thống tự quy đổi khi lưu; không thay đổi tồn kho lần nữa.</small>}
+                      {serverMode && <small className="muted">Đã cấp cho bữa này: {(()=>{
+                          const base=contextQuery.data?.lots.find(lot=>lot.itemId===selectedIngredient.itemId)?.quantityAvailable??0
+                          const shown=convertReceiptQuantity(base,selectedIngredient.unit,row.unit||selectedIngredient.unit)
+                          return formatReceiptQuantity(shown??base)+' '+(row.unit||selectedIngredient.unit)
+                        })()}. Số liệu kho gốc: {formatReceiptQuantity(contextQuery.data?.lots.find(lot=>lot.itemId===selectedIngredient.itemId)?.quantityAvailable??0)} {selectedIngredient.unit}. Hệ thống tự quy đổi khi lưu, không trừ kho lần thứ hai.</small>}
                     </div>}
                   </article>
                 })}
