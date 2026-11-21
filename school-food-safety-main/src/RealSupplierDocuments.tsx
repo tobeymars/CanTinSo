@@ -46,7 +46,7 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
   try{
    const result=await downloadSupplierDocument(kitchenId,supplierId,id)
    const bytes=Uint8Array.from(atob(result.base64),char=>char.charCodeAt(0))
-   const url=URL.createObjectURL(new Blob([bytes],{type:result.mimeType}))
+   const url=URL.createObjectURL(new Blob([bytes.slice().buffer as ArrayBuffer],{type:result.mimeType}))
    const element=document.createElement('a');element.href=url;element.download=result.filename;element.click()
    setTimeout(()=>URL.revokeObjectURL(url),2000);setFileError('')
   }catch(error){setFileError(error instanceof Error?error.message:'Không thể tải chứng từ.')}
