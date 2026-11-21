@@ -148,7 +148,7 @@ export class SupplyService {
     return this.prisma.$transaction(async tx=>{
       const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},select:{id:true,remainingQty:true,status:true,expiryDate:true}});
       if(!lot) throw new NotFoundException('Không tìm thấy lô thuộc bếp.');
-      if(lot.status!=='AVAILABLE' || (lot.expiryDate && lot.expiryDate.getTime()<Date.now()-86400000)) throw new ConflictException('Lô không đủ điều kiện xuất.');
+      if(lot.status!=='AVAILABLE' || (lot.expiryDate && lot.expiryDate.getTime()<Date.now()-86400000) || (lot.expiryDate && lot.expiryDate.getTime()<day.getTime())) throw new ConflictException('Lô đã hết hạn tại ngày sử dụng hoặc không đủ điều kiện xuất.');
       const current=Number(lot.remainingQty);
       if(current<quantity) throw new ConflictException('Không đủ số lượng tồn.');
       const changed=await tx.inventoryLot.updateMany({where:{id:lotId,kitchenId,status:'AVAILABLE',remainingQty:{gte:quantity}},data:{remainingQty:{decrement:quantity},...(current===quantity?{status:'DEPLETED' as const}:{})}});
