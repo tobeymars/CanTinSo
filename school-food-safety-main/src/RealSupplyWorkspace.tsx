@@ -4,11 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucide-react'
 import type { ViewRole } from './lib/store'
 import {
-  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,
+  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,
   issueSupplyLot,receiveSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
 import './WarehouseManagement.css'
+import RealSupplierFinance from './RealSupplierFinance'
+import RealPurchaseReceipt from './RealPurchaseReceipt'
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:''})
 const emptyReceipt=()=>({lotCode:'',ingredientId:'',supplierId:'',quantity:'',expiryDate:'',storageLocation:'',note:''})
@@ -24,6 +26,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const kitchens=kitchenQuery.data??[]
   const activeId=kitchens.some(item=>item.id===kitchenId)?kitchenId:kitchens[0]?.id??''
   const schoolQuery=useQuery({queryKey:['supply-schools',activeId],queryFn:()=>getSupplySchools(activeId),enabled:!!activeId&&mode==='warehouse'})
+  const finance=useQuery({queryKey:['supply-finance',activeId],queryFn:()=>getSupplyFinance(activeId),enabled:!!activeId})
   const suppliers=useQuery({queryKey:['supply-suppliers',activeId],queryFn:()=>getSupplySuppliers(activeId),enabled:!!activeId})
   const ingredients=useQuery({queryKey:['supply-ingredients',activeId],queryFn:()=>getSupplyIngredients(activeId),enabled:!!activeId&&mode==='warehouse'})
   const lots=useQuery({queryKey:['supply-lots',activeId],queryFn:()=>getSupplyLots(activeId),enabled:!!activeId&&mode==='warehouse'})
@@ -41,12 +44,13 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
+      qc.invalidateQueries({queryKey:['supply-finance',activeId]}),
       qc.invalidateQueries({queryKey:['supply-lots',activeId]}),
       qc.invalidateQueries({queryKey:['supply-movements',activeId]}),
       qc.invalidateQueries({queryKey:['supervision-context']}),
     ])
   }
-  async function execute(work:()=>Promise<unknown>,success:string){
+  async function execute(work:()=>Promise<unknown>,success:string):Promise<void>{
     setBusy(true);setError('');setNotice('')
     try{await work();await refresh();setNotice(success)}
     catch(e){setError(e instanceof Error?e.message:'Không thể lưu dữ liệu.')}
@@ -70,7 +74,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{quantity:Number(issue.quantity),note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType});setIssueLot(null);setIssue(emptyIssue())},'Đã xuất kho và cập nhật tồn lô.')
   }
   const isLoading=kitchenQuery.isLoading||(!!activeId&&(suppliers.isLoading|| (mode==='warehouse'&&lots.isLoading)))
-  const failure=kitchenQuery.error||suppliers.error||lots.error||ingredients.error||movements.error
+  const failure=kitchenQuery.error||suppliers.error||lots.error||ingredients.error||movements.error||finance.error||schoolQuery.error
   return <section className="card" style={{padding:24,display:'grid',gap:18}}>
     <div className="card-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
       <div><span className="section-kicker">DỮ LIỆU POSTGRESQL · THEO BẾP</span>
@@ -86,6 +90,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     {error&&<p className="error" role="alert">{error}</p>}
     {notice&&<p role="status" className="supervision-status-message">{notice}</p>}
     {activeId&&mode==='suppliers'&&<>
+      {finance.data&&<RealSupplierFinance kitchenId={activeId} finance={finance.data} canEdit={canEdit} busy={busy} execute={execute}/>}
       {canEdit&&<form onSubmit={submitVendor} style={{display:'grid',gap:10}}>
         <h3><Truck size={18}/>{editingVendor?'Sửa nhà cung cấp':'Thêm nhà cung cấp'}</h3>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10}}>
@@ -130,19 +135,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       </>}
       {section==='receipts'&&<>
         <h3><PackagePlus size={18}/>Tiếp nhận lô nguyên liệu mới</h3>
-        {!canEdit?<p className="muted">Tài khoản chỉ có quyền xem.</p>:<form onSubmit={submitReceipt} style={{display:'grid',gap:12}}>
-          <label>Nguyên liệu từ danh mục chung *<select required value={receipt.ingredientId} onChange={e=>setReceipt(v=>({...v,ingredientId:e.target.value}))}><option value="">Chọn nguyên liệu</option>{ingredients.data?.map(x=><option key={x.id} value={x.id}>{x.name} · {x.unit}</option>)}</select></label>
-          <label>Nhà cung cấp của bếp *<select required value={receipt.supplierId} onChange={e=>setReceipt(v=>({...v,supplierId:e.target.value}))}><option value="">Chọn nhà cung cấp</option>{suppliers.data?.filter(x=>x.status==='ACTIVE').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:10}}>
-            <label>Mã lô *<input required maxLength={100} value={receipt.lotCode} onChange={e=>setReceipt(v=>({...v,lotCode:e.target.value}))}/></label>
-            <label>Số lượng *<input required type="number" min="0.001" step="0.001" value={receipt.quantity} onChange={e=>setReceipt(v=>({...v,quantity:e.target.value}))}/></label>
-            <label>Ngày hết hạn<input type="date" value={receipt.expiryDate} onChange={e=>setReceipt(v=>({...v,expiryDate:e.target.value}))}/></label>
-            <label>Vị trí lưu kho<input maxLength={120} value={receipt.storageLocation} onChange={e=>setReceipt(v=>({...v,storageLocation:e.target.value}))}/></label>
-          </div>
-          <label>Ghi chú nhập kho<input maxLength={500} value={receipt.note} onChange={e=>setReceipt(v=>({...v,note:e.target.value}))}/></label>
-          <button className="primary" type="submit" disabled={busy||!suppliers.data?.some(x=>x.status==='ACTIVE')||!ingredients.data?.length}>Lưu phiếu nhập kho</button>
-          {!suppliers.data?.length&&<p className="muted">Cần tạo nhà cung cấp của bếp trước khi nhập kho.</p>}
-        </form>}
+        <RealPurchaseReceipt kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>setSection('stock')}/>
       </>}
       {section==='movements'&&<>
         <h3>Nhật ký nhập / xuất theo lô</h3>
