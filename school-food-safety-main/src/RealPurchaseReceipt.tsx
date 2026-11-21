@@ -60,11 +60,17 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
           const base=ingredients.find(item=>item.id===line.ingredientId)?.unit??''
           const converted=convertReceiptQuantity(Number(line.quantity),line.unit||base,e.target.value)
           const factor=convertReceiptQuantity(1,line.unit||base,e.target.value)
-          const changedPrice=line.unitPrice&&factor?Number(line.unitPrice)/factor:null
+          if(converted===null||factor===null||factor<=0)return
+          const changedPrice=line.unitPrice?Number(line.unitPrice)/factor:null
+          const rounded=changedPrice===null?null:Number(changedPrice.toFixed(6))
+          if(rounded!==null&&rounded<=0){window.alert('Đơn giá sau quy đổi quá nhỏ để lưu chính xác. Giữ đơn vị hiện tại.');return}
+          if(line.quantity&&rounded!==null&&Math.round(converted*rounded)!==Math.round(Number(line.quantity)*Number(line.unitPrice))){
+            window.alert('Đổi đơn vị có thể làm thay đổi thành tiền do làm tròn đơn giá. Giữ đơn vị hiện tại để bảo toàn chứng từ.');return
+          }
           change(line.key,{
             unit:e.target.value,
-            quantity:line.quantity&&converted!==null?String(converted):line.quantity,
-            unitPrice:changedPrice!==null&&Number.isFinite(changedPrice)?String(Number(changedPrice.toFixed(6))):line.unitPrice,
+            quantity:line.quantity?String(converted):line.quantity,
+            unitPrice:rounded!==null?String(rounded):line.unitPrice,
           })
         }}><option value="" disabled>Chọn đơn vị</option>{receiptUnitOptions(ingredients.find(item=>item.id===line.ingredientId)?.unit??'').map(unit=><option key={unit} value={unit}>{unit}</option>)}</select></td>
         <td>{(()=>{
