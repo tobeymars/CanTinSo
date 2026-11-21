@@ -53,7 +53,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
     </div>
     <div className="table-scroll"><table className="management-table"><thead><tr><th>Nguyên liệu</th><th>Mã lô</th><th>Số lượng</th><th>Đơn vị nhập</th><th>Quy đổi về kho</th><th>Đơn giá / đơn vị nhập (VND)</th><th>Thành tiền</th><th>Hạn dùng</th><th>Vị trí</th><th></th></tr></thead><tbody>
       {lines.map((line,index)=><tr key={line.key}>
-        <td><select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:preferredReceiptUnit(ingredients.find(item=>item.id===e.target.value)?.unit??''),quantity:''})}><option value="">Chọn nguyên liệu</option>{ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></td>
+        <td><select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:preferredReceiptUnit(ingredients.find(item=>item.id===e.target.value)?.unit??''),quantity:'',unitPrice:''})}><option value="">Chọn nguyên liệu</option>{ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></td>
         <td><input aria-label={'Mã lô dòng '+(index+1)} required maxLength={100} value={line.lotCode} onChange={e=>change(line.key,{lotCode:e.target.value})}/></td>
         <td><input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.000001" step="any" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})}/></td>
         <td><select required aria-label={'Đơn vị nhập dòng '+(index+1)} value={line.unit} onChange={e=>{
