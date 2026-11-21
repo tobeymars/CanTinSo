@@ -77,13 +77,13 @@ export class SupplyService {
   }
   async suppliers(user:AuthUser,kitchenId:string) {
     await this.permitted(user,kitchenId);
-    return this.prisma.supplier.findMany({where:{kitchenId},orderBy:{name:'asc'},select:{id:true,code:true,name:true,taxCode:true,contactName:true,phone:true,email:true,address:true,status:true,createdAt:true}});
+    return this.prisma.supplier.findMany({where:{kitchenId},orderBy:{name:'asc'},select:{id:true,code:true,name:true,taxCode:true,contactName:true,phone:true,email:true,address:true,note:true,status:true,createdAt:true}});
   }
   async saveSupplier(user:AuthUser,kitchenId:string,input:any,id?:string) {
     await this.permitted(user,kitchenId,true);
     const code=str(input?.code,'Mã nhà cung cấp',50);
     const name=str(input?.name,'Tên nhà cung cấp');
-    const data={code,name,taxCode:str(input?.taxCode,'Mã số thuế',60,false)||null,contactName:str(input?.contactName,'Người liên hệ',150,false)||null,phone:str(input?.phone,'Điện thoại',40,false)||null,email:str(input?.email,'Email',150,false)||null,address:str(input?.address,'Địa chỉ',300,false)||null};
+    const data={code,name,taxCode:str(input?.taxCode,'Mã số thuế',60,false)||null,contactName:str(input?.contactName,'Người liên hệ',150,false)||null,phone:str(input?.phone,'Điện thoại',40,false)||null,email:str(input?.email,'Email',150,false)||null,address:str(input?.address,'Địa chỉ',300,false)||null,note:str(input?.note,'Ghi chú',500,false)||null};
     if (id) {
       if (!uuid(id)) throw new BadRequestException('Mã nhà cung cấp không hợp lệ.');
       const exists=await this.prisma.supplier.findFirst({where:{id,kitchenId}});
