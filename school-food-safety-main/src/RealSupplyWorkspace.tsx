@@ -4,8 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucide-react'
 import type { ViewRole } from './lib/store'
 import {
-  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,
-  issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,importSupplySuppliers,
+  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,
+  issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,importSupplySuppliers,setSupplyMinimum,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
 import './WarehouseManagement.css'
@@ -28,6 +28,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const kitchens=kitchenQuery.data??[]
   const activeId=kitchens.some(item=>item.id===kitchenId)?kitchenId:kitchens[0]?.id??''
   const schoolQuery=useQuery({queryKey:['supply-schools',activeId],queryFn:()=>getSupplySchools(activeId),enabled:!!activeId&&mode==='warehouse'})
+  const minimums=useQuery({queryKey:['supply-minimums',activeId],queryFn:()=>getSupplyMinimums(activeId),enabled:!!activeId&&mode==='warehouse'})
   const finance=useQuery({queryKey:['supply-finance',activeId],queryFn:()=>getSupplyFinance(activeId),enabled:!!activeId})
   const suppliers=useQuery({queryKey:['supply-suppliers',activeId],queryFn:()=>getSupplySuppliers(activeId),enabled:!!activeId})
   const ingredients=useQuery({queryKey:['supply-ingredients',activeId],queryFn:()=>getSupplyIngredients(activeId),enabled:!!activeId&&mode==='warehouse'})
@@ -49,6 +50,8 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [moveReason,setMoveReason]=useState('')
   const [statusLot,setStatusLot]=useState<SupplyLot|null>(null)
   const [statusReason,setStatusReason]=useState('')
+  const [thresholdIngredient,setThresholdIngredient]=useState('')
+  const [thresholdQty,setThresholdQty]=useState('')
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
@@ -58,6 +61,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
       qc.invalidateQueries({queryKey:['supply-finance',activeId]}),
       qc.invalidateQueries({queryKey:['supply-lots',activeId]}),
+      qc.invalidateQueries({queryKey:['supply-minimums',activeId]}),
       qc.invalidateQueries({queryKey:['supply-movements',activeId]}),
       qc.invalidateQueries({queryKey:['supervision-context']}),
     ])
@@ -121,7 +125,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     void execute(async()=>{await changeSupplyLotStatus(activeId,statusLot.id,nextStatus,statusReason);setStatusLot(null);setStatusReason('')},nextStatus==='AVAILABLE'?'Đã mở cách ly lô.':'Đã cách ly lô và ghi rõ lý do.')
   }
   const isLoading=kitchenQuery.isLoading||(!!activeId&&(suppliers.isLoading|| (mode==='warehouse'&&lots.isLoading)))
-  const failure=kitchenQuery.error||suppliers.error||lots.error||ingredients.error||movements.error||finance.error||schoolQuery.error
+  const failure=kitchenQuery.error||suppliers.error||lots.error||ingredients.error||movements.error||finance.error||schoolQuery.error||minimums.error
   return <section className="card" style={{padding:24,display:'grid',gap:18}}>
     <div className="card-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
       <div><span className="section-kicker">DỮ LIỆU POSTGRESQL · THEO BẾP</span>
@@ -181,7 +185,12 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       <nav style={{display:'flex',gap:8,flexWrap:'wrap'}} aria-label="Quản lý kho">
         {([['overview','Tổng quan'],['stock','Tồn kho'],['receipts','Nhập kho'],['issues','Xuất kho'],['transfers','Chuyển vị trí'],['lots','Lô hàng'],['trace','Truy xuất nguồn gốc']] as const).map(([id,label])=><button type="button" key={id} className={section===id?'primary':'outline'} onClick={()=>setSection(id)}>{label}</button>)}
       </nav>
-      {section==='overview'&&<RealWarehouseOverview lots={lots.data??[]} movements={movements.data??[]} finance={finance.data} onOpen={setSection}/>}
+      {section==='overview'&&<RealWarehouseOverview lots={lots.data??[]} movements={movements.data??[]} finance={finance.data} minimums={minimums.data??[]} onOpen={setSection}/>}
+      {section==='stock'&&canEdit&&<form className="card" onSubmit={e=>{e.preventDefault();if(!thresholdIngredient)return;void execute(async()=>{await setSupplyMinimum(activeId,thresholdIngredient,Number(thresholdQty));setThresholdIngredient('');setThresholdQty('')},'Đã cập nhật định mức tồn kho của bếp.')}} style={{padding:14,display:'flex',flexWrap:'wrap',gap:10,alignItems:'end'}}>
+        <label>Nguyên liệu cần đặt định mức<select required value={thresholdIngredient} onChange={e=>{setThresholdIngredient(e.target.value);setThresholdQty(String(minimums.data?.find(item=>item.ingredientId===e.target.value)?.minimumQty??''))}}><option value="">Chọn nguyên liệu</option>{ingredients.data?.map(item=><option key={item.id} value={item.id}>{item.name} · {item.unit}</option>)}</select></label>
+        <label>Tồn tối thiểu (0 = tắt cảnh báo)<input required type="number" min="0" step="0.001" value={thresholdQty} onChange={e=>setThresholdQty(e.target.value)}/></label>
+        <button className="primary" type="submit" disabled={busy}>Lưu định mức</button>
+      </form>}
       {(section==='stock'||section==='lots'||section==='issues')&&<>
         <h3><Boxes size={19}/>{section==='issues'?'Chọn lô để xuất kho':'Tồn kho theo lô'} ({matchedLots.length})</h3>
         <label>Tìm mã lô / nguyên liệu / nhà cung cấp <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Nhập từ khóa để lọc…"/></label>
