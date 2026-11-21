@@ -20,9 +20,10 @@ export type SupplyLot={id:string;lotCode:string;ingredientId:string;supplierId:s
 export type SupplyMovement={id:string;eventType:string;occurredAt:string;description:string|null;metadata:unknown;lot:{lotCode:string;ingredient:{name:string}}}
 export const getSupplyKitchens=()=>request<SupplyKitchen[]>('/kitchens')
 export const getSupplySuppliers=(id:string)=>request<SupplySupplier[]>(kitchenPath(id)+'/suppliers')
+export const getSupplySchools=(id:string)=>request<{id:string;name:string}[]>(kitchenPath(id)+'/schools')
 export const getSupplyIngredients=(id:string)=>request<SupplyIngredient[]>(kitchenPath(id)+'/ingredients')
 export const getSupplyLots=(id:string)=>request<SupplyLot[]>(kitchenPath(id)+'/lots')
 export const getSupplyMovements=(id:string)=>request<SupplyMovement[]>(kitchenPath(id)+'/movements')
 export const saveSupplySupplier=(kitchenId:string,input:{code:string;name:string;taxCode:string;contactName:string;phone:string;email:string;address:string},id?:string)=>request<SupplySupplier>(kitchenPath(kitchenId)+'/suppliers'+(id?'/'+encodeURIComponent(id):''),{method:id?'PATCH':'POST',body:JSON.stringify(input)})
 export const receiveSupplyLot=(kitchenId:string,input:{lotCode:string;ingredientId:string;supplierId:string;quantity:number;expiryDate:string;storageLocation:string;note:string})=>request<SupplyLot>(kitchenPath(kitchenId)+'/receipts',{method:'POST',body:JSON.stringify(input)})
-export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;note:string})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
+export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'SNACK'})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
