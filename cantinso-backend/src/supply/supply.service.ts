@@ -2,18 +2,13 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/current-user.decorator';
 import { Prisma } from '@prisma/client';
+import { canonicalQuantity } from './quantity-units';
 
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const str = (value: unknown, label: string, max = 200, required = true) => {
   const v = typeof value === 'string' ? value.trim() : '';
   if (v.length > max || (required && !v)) throw new BadRequestException(label + ' không hợp lệ.');
   return v;
-};
-const qty = (value: unknown) => {
-  const n = Number(value);
-  if (value === null || value === undefined || value === '' || !Number.isFinite(n) || n <= 0 || n > 100000000 || Math.round(n*1000)!==n*1000)
-    throw new BadRequestException('Số lượng phải lớn hơn 0 và tối đa ba chữ số thập phân.');
-  return n;
 };
 const dateValue = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null;
@@ -140,11 +135,9 @@ export class SupplyService {
   async setMinimum(user:AuthUser,kitchenId:string,ingredientId:string,body:any){
     await this.permitted(user,kitchenId,true);
     if(!uuid(ingredientId))throw new BadRequestException('Nguyên liệu không hợp lệ.');
-    const item=await this.prisma.ingredient.findUnique({where:{id:ingredientId},select:{id:true}});
+    const item=await this.prisma.ingredient.findUnique({where:{id:ingredientId},select:{id:true,unit:true}});
     if(!item)throw new NotFoundException('Không tìm thấy nguyên liệu.');
-    const value=Number(body?.minimumQty);
-    if(body?.minimumQty===null||body?.minimumQty===undefined||body?.minimumQty===''||!Number.isFinite(value)||value<0||value>100000000||Math.round(value*1000)!==value*1000)
-      throw new BadRequestException('Định mức tồn phải từ 0 và tối đa 3 chữ số thập phân.');
+    const value=canonicalQuantity(body?.minimumQty,body?.unit,item.unit,{allowZero:true}).quantity;
     return this.prisma.kitchenStockMinimum.upsert({
       where:{kitchenId_ingredientId:{kitchenId,ingredientId}},
       create:{kitchenId,ingredientId,minimumQty:value,updatedById:user.sub},
@@ -159,19 +152,20 @@ export class SupplyService {
   async receipt(user:AuthUser,kitchenId:string,input:any) {
     await this.permitted(user,kitchenId,true);
     const lotCode=str(input?.lotCode,'Mã lô',100);
-    const quantity=qty(input?.quantity);
     if (!uuid(input?.ingredientId) || !uuid(input?.supplierId)) throw new BadRequestException('Phải chọn nguyên liệu và nhà cung cấp thực tế.');
     const [ingredient,supplier]=await Promise.all([
       this.prisma.ingredient.findUnique({where:{id:input.ingredientId}}),
       this.prisma.supplier.findFirst({where:{id:input.supplierId,kitchenId,status:'ACTIVE'}}),
     ]);
     if(!ingredient || !supplier) throw new BadRequestException('Nguyên liệu hoặc nhà cung cấp không hợp lệ.');
+    const entered=canonicalQuantity(input?.quantity,input?.unit,ingredient.unit);
+    const quantity=entered.quantity;
     const expiryDate=dateValue(input?.expiryDate);
     if (expiryDate && expiryDate.getTime()<Date.now()-86400000) throw new BadRequestException('Không nhập lô đã hết hạn.');
     try {
       return await this.prisma.$transaction(async tx=>{
         const lot=await tx.inventoryLot.create({data:{kitchenId,lotCode,ingredientId:ingredient.id,supplierId:supplier.id,quantity,remainingQty:quantity,unit:ingredient.unit,expiryDate,storageLocation:str(input?.storageLocation,'Vị trí lưu kho',120,false)||null}});
-        await tx.traceEvent.create({data:{lotId:lot.id,eventType:'RECEIVED',actorId:user.sub,description:str(input?.note,'Ghi chú',500,false)||'Nhập kho',metadata:{quantity,unit:ingredient.unit}}});
+        await tx.traceEvent.create({data:{lotId:lot.id,eventType:'RECEIVED',actorId:user.sub,description:str(input?.note,'Ghi chú',500,false)||'Nhập kho',metadata:{quantity,unit:ingredient.unit,enteredQuantity:entered.enteredQuantity,enteredUnit:entered.enteredUnit}}});
         return lot;
       });
     } catch(error){if(error instanceof Prisma.PrismaClientKnownRequestError && error.code==='P2002') throw new ConflictException('Mã lô đã tồn tại trong kho bếp.');throw error;}
@@ -179,7 +173,6 @@ export class SupplyService {
   async issue(user:AuthUser,kitchenId:string,lotId:string,input:any){
     await this.permitted(user,kitchenId,true);
     if(!uuid(lotId)) throw new BadRequestException('Mã lô không hợp lệ.');
-    const quantity=qty(input?.quantity);
     const reason=str(input?.note,'Lý do xuất kho',500);
     const schoolId=input?.schoolId;
     const serviceDate=input?.serviceDate;
@@ -196,14 +189,16 @@ export class SupplyService {
     }));
     if(!assigned)throw new ForbiddenException('Trường không thuộc bếp phục vụ tại ngày được chọn.');
     return this.prisma.$transaction(async tx=>{
-      const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},select:{id:true,remainingQty:true,status:true,expiryDate:true}});
+      const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},select:{id:true,remainingQty:true,status:true,expiryDate:true,unit:true}});
       if(!lot) throw new NotFoundException('Không tìm thấy lô thuộc bếp.');
       if(lot.status!=='AVAILABLE' || (lot.expiryDate && lot.expiryDate.getTime()<Date.now()-86400000) || (lot.expiryDate && lot.expiryDate.getTime()<day.getTime())) throw new ConflictException('Lô đã hết hạn tại ngày sử dụng hoặc không đủ điều kiện xuất.');
+      const entered=canonicalQuantity(input?.quantity,input?.unit,lot.unit);
+      const quantity=entered.quantity;
       const current=Number(lot.remainingQty);
       if(current<quantity) throw new ConflictException('Không đủ số lượng tồn.');
       const changed=await tx.inventoryLot.updateMany({where:{id:lotId,kitchenId,status:'AVAILABLE',remainingQty:{gte:quantity}},data:{remainingQty:{decrement:quantity},...(current===quantity?{status:'DEPLETED' as const}:{})}});
       if(changed.count!==1) throw new ConflictException('Tồn kho đã thay đổi; vui lòng tải lại.');
-      await tx.traceEvent.create({data:{lotId,eventType:'ISSUED',actorId:user.sub,description:reason,metadata:{kind:'ISSUE',quantity,schoolId,serviceDate,mealType}}});
+      await tx.traceEvent.create({data:{lotId,eventType:'ISSUED',actorId:user.sub,description:reason,metadata:{kind:'ISSUE',quantity,unit:lot.unit,enteredQuantity:entered.enteredQuantity,enteredUnit:entered.enteredUnit,schoolId,serviceDate,mealType}}});
       return {lotId,quantity,remainingQty:current-quantity};
     });
   }
