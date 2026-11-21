@@ -127,7 +127,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             const quantity = Number(row.quantity)
             if (!ingredient || !receiptUnitOptions(ingredient.unit).includes(unit)) throw Error('Đơn vị nhận nguyên liệu không phù hợp với lô đã chọn.')
             const baseQuantity = convertReceiptQuantity(quantity, unit, ingredient.unit)
-            if (baseQuantity === null || baseQuantity <= 0 || (serverMode && baseQuantity > (ingredient.quantityAvailable ?? 0) + 0.000000001)) throw Error('Số lượng thực nhận vượt số đã xuất hoặc không hợp lệ.')
+            if (baseQuantity === null || baseQuantity <= 0 || (serverMode && baseQuantity > (contextQuery.data?.lots.find(lot => lot.itemId === ingredient.itemId)?.quantityAvailable ?? 0) + 0.000000001)) throw Error('Số lượng thực nhận vượt số đã xuất hoặc không hợp lệ.')
             return serverMode ? { itemId: row.itemId, quantity, unit } : { itemId: row.itemId, quantity: baseQuantity }
           })
         : undefined
@@ -230,7 +230,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                         <div><dt>Hạn sử dụng</dt><dd>{formatDate(selectedIngredient.expiresAt)} <em className={expiredAtService ? 'expired' : ''}>{expiredAtService ? 'Quá hạn tại ngày bữa ăn' : 'Còn hạn tại ngày bữa ăn'}</em></dd></div>
                       </dl>
                       <div className="supervision-ingredient-quantity" style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(105px,135px)',gap:12,alignItems:'end'}}>
-                        <label>Số lượng thực nhận <input required type="number" inputMode="decimal" min="0.000001" step="any" max={serverMode ? (convertReceiptQuantity(selectedIngredient.quantityAvailable ?? 0, selectedIngredient.unit, row.unit || selectedIngredient.unit) ?? undefined) : undefined} aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
+                        <label>Số lượng thực nhận <input required type="number" inputMode="decimal" min="0.000001" step="any" max={serverMode ? (convertReceiptQuantity(contextQuery.data?.lots.find(lot => lot.itemId === selectedIngredient.itemId)?.quantityAvailable ?? 0, selectedIngredient.unit, row.unit || selectedIngredient.unit) ?? undefined) : undefined} aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
                         <label>Đơn vị
                           <select aria-label={`Đơn vị thực nhận ${selectedIngredient.ingredientName}`} value={row.unit || selectedIngredient.unit} onChange={event=>{
                             const targetUnit=event.target.value
