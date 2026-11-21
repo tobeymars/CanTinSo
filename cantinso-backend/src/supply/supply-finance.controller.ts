@@ -15,6 +15,11 @@ export class SupplyFinanceController {
  @Post(':kitchenId/purchase-receipts')
  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
  receipt(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Body() body:unknown){return this.service.createReceipt(user,kitchenId,body);}
+ @Post(':kitchenId/payments/:paymentId/reverse')
+ @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+ reverse(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('paymentId') paymentId:string,@Body() body:unknown){
+   return this.service.reversePayment(user,kitchenId,paymentId,body);
+ }
  @Post(':kitchenId/payments')
  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
  pay(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Body() body:unknown){return this.service.pay(user,kitchenId,body);}
