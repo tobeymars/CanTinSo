@@ -129,6 +129,28 @@ export class SupplyService {
     if(!exists)throw new NotFoundException('Nhà cung cấp không thuộc bếp.');
     return this.prisma.supplier.update({where:{id},data:{status:status as 'ACTIVE'|'INACTIVE'}});
   }
+  async minimums(user:AuthUser,kitchenId:string){
+    await this.permitted(user,kitchenId);
+    return this.prisma.kitchenStockMinimum.findMany({
+      where:{kitchenId},
+      select:{ingredientId:true,minimumQty:true,ingredient:{select:{name:true,unit:true}}},
+      orderBy:{ingredient:{name:'asc'}},
+    });
+  }
+  async setMinimum(user:AuthUser,kitchenId:string,ingredientId:string,body:any){
+    await this.permitted(user,kitchenId,true);
+    if(!uuid(ingredientId))throw new BadRequestException('Nguyên liệu không hợp lệ.');
+    const item=await this.prisma.ingredient.findUnique({where:{id:ingredientId},select:{id:true}});
+    if(!item)throw new NotFoundException('Không tìm thấy nguyên liệu.');
+    const value=Number(body?.minimumQty);
+    if(body?.minimumQty===null||body?.minimumQty===undefined||body?.minimumQty===''||!Number.isFinite(value)||value<0||value>100000000||Math.round(value*1000)!==value*1000)
+      throw new BadRequestException('Định mức tồn phải từ 0 và tối đa 3 chữ số thập phân.');
+    return this.prisma.kitchenStockMinimum.upsert({
+      where:{kitchenId_ingredientId:{kitchenId,ingredientId}},
+      create:{kitchenId,ingredientId,minimumQty:value,updatedById:user.sub},
+      update:{minimumQty:value,updatedById:user.sub},
+    });
+  }
   async lots(user:AuthUser,kitchenId:string) {
     await this.permitted(user,kitchenId);
     const lots=await this.prisma.inventoryLot.findMany({where:{kitchenId},include:{ingredient:{select:{id:true,name:true,unit:true}},supplier:{select:{id:true,name:true,contactName:true,phone:true}}},orderBy:{receivedAt:'desc'},take:500});
