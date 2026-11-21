@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/roles.guard';
 import { Roles } from '../common/roles.decorator';
@@ -29,6 +29,15 @@ export class SupplyController {
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
   supplierStatus(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('supplierId') supplierId:string,@Body() body:{status?:string}){
     return this.service.supplierStatus(user,kitchenId,supplierId,body?.status);
+  }
+  @Get(':kitchenId/minimums')
+  minimums(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){
+    return this.service.minimums(user,kitchenId);
+  }
+  @Put(':kitchenId/minimums/:ingredientId')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  setMinimum(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('ingredientId') ingredientId:string,@Body() body:unknown){
+    return this.service.setMinimum(user,kitchenId,ingredientId,body);
   }
   @Get(':kitchenId/lots') lots(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.lots(user,kitchenId);}
   @Post(':kitchenId/receipts')
