@@ -196,8 +196,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             {editing.action !== 'report' && <p className="supervision-edit-guidance">{editing.action === 'confirm' ? 'BGH xác nhận đã đối chiếu bản báo cáo và hồ sơ tương ứng trong DEMO. Không phải xác nhận kiểm tra ATTP chính thức.' : 'Hồ sơ sẽ chuyển sang Cần bổ sung để bếp cập nhật lại, không xóa lịch sử cũ.'}</p>}
             {editing.id === 'ingredient_receipt' && editing.action === 'report' && <fieldset className="supervision-ingredient-fieldset">
               <legend>Nguyên liệu đã tiếp nhận <span aria-hidden="true">*</span></legend>
-              <p>Thêm từng dòng, tìm và chọn trong toàn bộ danh mục kho của trường. Mỗi nguyên liệu chỉ được chọn một lần.</p>
-              {ingredientCatalog.length === 0 ? <div className="supervision-ingredient-empty">Chưa có nguyên liệu trong danh mục kho của trường. Cần cập nhật kho trước khi lập bước kiểm thực này.</div> : <div className="supervision-ingredient-options">
+              <p>{serverMode ? "Chọn lô đã xuất từ kho bếp cho đúng trường, ngày và bữa. Mỗi lô chỉ được chọn một lần." : "Thêm từng dòng, tìm và chọn trong toàn bộ danh mục kho của trường. Mỗi nguyên liệu chỉ được chọn một lần."}</p>
+              {ingredientCatalog.length === 0 ? <div className="supervision-ingredient-empty">{serverMode ? 'Chưa có lô được xuất từ kho bếp cho đúng trường, ngày và bữa này. Hãy vào Quản lý kho → Xuất kho trước.' : 'Chưa có nguyên liệu trong danh mục kho của trường. Cần cập nhật kho trước khi lập bước kiểm thực này.'}</div> : <div className="supervision-ingredient-options">
                 {ingredientRows.map((row, index) => {
                   const usedIds = new Set(ingredientRows.filter(item => item.id !== row.id).map(item => item.itemId).filter(Boolean))
                   const options = ingredientCatalog.map(item => ({ value: item.itemId, label: item.ingredientName, description: `${item.lotCode} · ${item.supplierName} · ${item.supplierContact}`, tag: item.unit, disabled: usedIds.has(item.itemId) }))
@@ -220,7 +220,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                         <div><dt>Người cấp / liên hệ</dt><dd>{selectedIngredient.supplierContact}</dd></div>
                         <div><dt>Hạn sử dụng</dt><dd>{formatDate(selectedIngredient.expiresAt)} <em className={expiredAtService ? 'expired' : ''}>{expiredAtService ? 'Quá hạn tại ngày bữa ăn' : 'Còn hạn tại ngày bữa ăn'}</em></dd></div>
                       </dl>
-                      <label>Số lượng thực nhận ({selectedIngredient.unit}) <input required type="number" inputMode="decimal" min="0.001" max="5000" step="0.001" aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
+                      <label>Số lượng thực nhận ({selectedIngredient.unit}) <input required type="number" inputMode="decimal" min="0.001" max={serverMode ? (selectedIngredient.quantityAvailable ?? 5000) : 5000} step="0.001" aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
                     </div>}
                   </article>
                 })}
