@@ -9,6 +9,7 @@ import { SchoolsModule } from "./schools/schools.module";
 import { DishesModule } from "./dishes/dishes.module";
 import { MealPlansModule } from "./meal-plans/meal-plans.module";
 import { SupervisionModule } from "./supervision/supervision.module";
+import { SupplyModule } from "./supply/supply.module";
 import { KitchenLegalModule } from "./kitchen-legal/kitchen-legal.module";
 
 @Module({
@@ -24,6 +25,7 @@ import { KitchenLegalModule } from "./kitchen-legal/kitchen-legal.module";
     MealPlansModule,
     KitchenLegalModule,
     SupervisionModule,
+    SupplyModule,
   ],
 })
 export class AppModule {}
