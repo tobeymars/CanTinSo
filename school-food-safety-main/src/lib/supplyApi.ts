@@ -55,3 +55,7 @@ export const moveSupplyLot=(kitchenId:string,lotId:string,location:string,note:s
 export const importSupplySuppliers=(kitchenId:string,rows:unknown[])=>request<{imported:number;financialDataImported:false}>(kitchenPath(kitchenId)+'/suppliers/import',{method:'POST',body:JSON.stringify(rows)})
 
 export const reverseSupplyPayment=(kitchenId:string,paymentId:string,reason:string)=>request<{id:string;reversed:true}>(kitchenPath(kitchenId)+'/payments/'+encodeURIComponent(paymentId)+'/reverse',{method:'POST',body:JSON.stringify({reason})})
+
+export type SupplyMinimum={ingredientId:string;minimumQty:string;ingredient:{name:string;unit:string}}
+export const getSupplyMinimums=(kitchenId:string)=>request<SupplyMinimum[]>(kitchenPath(kitchenId)+'/minimums')
+export const setSupplyMinimum=(kitchenId:string,ingredientId:string,minimumQty:number)=>request<SupplyMinimum>(kitchenPath(kitchenId)+'/minimums/'+encodeURIComponent(ingredientId),{method:'PUT',body:JSON.stringify({minimumQty})})
