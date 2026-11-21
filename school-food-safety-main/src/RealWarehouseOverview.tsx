@@ -1,5 +1,6 @@
 import { Boxes, ClipboardList, Clock3, PackageCheck, ShieldAlert, Truck, Wallet } from 'lucide-react'
 import type { SupplyFinance,SupplyLot,SupplyMovement,SupplyMinimum } from './lib/supplyApi'
+import { convertReceiptQuantity } from './lib/supervisionUnits'
 
 const number=(n:number)=>n.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const currency=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
@@ -19,8 +20,15 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
  const stockValue=valued.reduce((sum,lot)=>sum+Math.round(lot.remainingQty*(priced.get(lot.id)??0)),0)
  const unpriced=lots.filter(lot=>!priced.has(lot.id))
  const stockByIngredient=new Map<string,number>()
- for(const lot of lots)stockByIngredient.set(lot.ingredientId,(stockByIngredient.get(lot.ingredientId)??0)+lot.remainingQty)
- const low=minimums.filter(row=>Number(row.minimumQty)>0&&(stockByIngredient.get(row.ingredientId)??0)<Number(row.minimumQty))
+ const incompatibleUnits=new Set<string>()
+ for(const lot of lots){
+   if(lot.status!=='AVAILABLE'||lot.remainingQty<=0||lot.expiryDate&&lot.expiryDate.slice(0,10)<now)continue
+   const target=minimums.find(min=>min.ingredientId===lot.ingredientId)?.ingredient.unit??lot.unit
+   const normalized=convertReceiptQuantity(lot.remainingQty,lot.unit,target)
+   if(normalized===null){incompatibleUnits.add(lot.ingredientId);continue}
+   stockByIngredient.set(lot.ingredientId,(stockByIngredient.get(lot.ingredientId)??0)+normalized)
+ }
+ const low=minimums.filter(row=>Number(row.minimumQty)>0&&!incompatibleUnits.has(row.ingredientId)&&(stockByIngredient.get(row.ingredientId)??0)<Number(row.minimumQty))
  const stats=[
   {Icon:Boxes,title:'Lô trong kho',value:String(lots.length),detail:'Toàn bộ lô của bếp',target:'lots' as const},
   {Icon:PackageCheck,title:'Lô có thể xuất',value:String(available.length),detail:'Chưa hết hạn và còn tồn',target:'stock' as const},
@@ -39,6 +47,7 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
      <Icon size={20}/><span>{title}</span><strong style={{fontSize:'1.35rem'}}>{value}</strong><small>{detail}</small>
    </button>)}
   </div>
+  {incompatibleUnits.size>0&&<p role="alert" className="error">Có {incompatibleUnits.size} nguyên liệu chứa lô với đơn vị không thể quy đổi. Cần đối chiếu dữ liệu kho trước khi kết luận tồn tối thiểu.</p>}
   {low.length>0&&<section className="card" style={{padding:16}}>
     <strong>Nguyên liệu cần bổ sung</strong>
     {low.map(row=><p key={row.ingredientId} className="muted">{row.ingredient.name}: còn {number(stockByIngredient.get(row.ingredientId)??0)} {row.ingredient.unit}, định mức {number(Number(row.minimumQty))} {row.ingredient.unit}</p>)}
