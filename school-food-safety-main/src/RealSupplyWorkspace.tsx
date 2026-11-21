@@ -129,7 +129,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <button className="outline" type="button" disabled={busy} onClick={()=>void execute(()=>updateSupplySupplierStatus(activeId,item.id,item.status==='ACTIVE'?'INACTIVE':'ACTIVE'),item.status==='ACTIVE'?'Đã ngừng sử dụng nhà cung cấp.':'Đã kích hoạt nhà cung cấp.')}>{item.status==='ACTIVE'?'Ngừng dùng':'Kích hoạt'}</button>
         </div>}</div></td></tr>)}
       </tbody></table></div>
-      {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<RealSupplierDocuments kitchenId={activeId} supplierId={viewingSupplier} supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''} canEdit={canEdit} busy={busy} execute={execute}/>}
+      {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<RealSupplierDocuments kitchenId={activeId} supplierId={viewingSupplier} supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''} receipts={(finance.data?.receipts??[]).map(item=>({id:item.id,number:item.number,supplierId:item.supplier.id}))} canEdit={canEdit} busy={busy} execute={execute}/>}
     </>}
     {activeId&&mode==='warehouse'&&<>
       <nav style={{display:'flex',gap:8,flexWrap:'wrap'}} aria-label="Quản lý kho">
