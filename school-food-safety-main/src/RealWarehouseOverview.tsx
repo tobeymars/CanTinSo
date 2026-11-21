@@ -14,7 +14,7 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
  const available=lots.filter(lot=>lot.status==='AVAILABLE'&&lot.remainingQty>0&&!expired.includes(lot))
  const receiptEvents=movements.filter(event=>event.eventType==='RECEIVED')
  const issueEvents=movements.filter(event=>event.eventType==='ISSUED')
- const priced=new Map(finance?.receipts.flatMap(receipt=>receipt.lines.map(line=>[line.lot.id,line.unitPrice] as const))??[])
+ const priced=new Map(finance?.receipts.flatMap(receipt=>receipt.lines.map(line=>[line.lot.id,line.quantity>0?line.amount/line.quantity:0] as const))??[])
  const valued=lots.filter(lot=>priced.has(lot.id))
  const stockValue=valued.reduce((sum,lot)=>sum+Math.round(lot.remainingQty*(priced.get(lot.id)??0)),0)
  const unpriced=lots.filter(lot=>!priced.has(lot.id))
