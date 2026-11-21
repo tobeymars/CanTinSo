@@ -189,7 +189,11 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       </nav>
       {section==='overview'&&<RealWarehouseOverview lots={lots.data??[]} movements={movements.data??[]} finance={finance.data} minimums={minimums.data??[]} onOpen={setSection}/>}
       {section==='stock'&&canEdit&&<form className="card" onSubmit={e=>{e.preventDefault();if(!thresholdIngredient)return;void execute(async()=>{await setSupplyMinimum(activeId,thresholdIngredient,Number(thresholdQty),thresholdUnit||ingredients.data?.find(row=>row.id===thresholdIngredient)?.unit||'');setThresholdIngredient('');setThresholdQty('');setThresholdUnit('')},'Đã cập nhật định mức tồn kho của bếp.')}} style={{padding:14,display:'flex',flexWrap:'wrap',gap:10,alignItems:'end'}}>
-        <label>Nguyên liệu cần đặt định mức<select required value={thresholdIngredient} onChange={e=>{setThresholdIngredient(e.target.value);setThresholdQty(String(minimums.data?.find(item=>item.ingredientId===e.target.value)?.minimumQty??''));setThresholdUnit(preferredReceiptUnit(ingredients.data?.find(item=>item.id===e.target.value)?.unit??''))}}><option value="">Chọn nguyên liệu</option>{ingredients.data?.map(item=><option key={item.id} value={item.id}>{item.name} · {item.unit}</option>)}</select></label>
+        <label>Nguyên liệu cần đặt định mức<select required value={thresholdIngredient} onChange={e=>{setThresholdIngredient(e.target.value);const base=ingredients.data?.find(item=>item.id===e.target.value)?.unit??''
+          const preferred=preferredReceiptUnit(base)
+          const stored=minimums.data?.find(item=>item.ingredientId===e.target.value)?.minimumQty
+          setThresholdQty(stored===undefined?'':String(convertReceiptQuantity(Number(stored),base,preferred)??stored))
+          setThresholdUnit(preferred)}}><option value="">Chọn nguyên liệu</option>{ingredients.data?.map(item=><option key={item.id} value={item.id}>{item.name} · {item.unit}</option>)}</select></label>
         <label>Tồn tối thiểu (0 = tắt cảnh báo)<input required type="number" min="0" step="any" value={thresholdQty} onChange={e=>setThresholdQty(e.target.value)}/></label>
         <label>Đơn vị định mức<select value={thresholdUnit} onChange={e=>{
           const base=ingredients.data?.find(item=>item.id===thresholdIngredient)?.unit??''
