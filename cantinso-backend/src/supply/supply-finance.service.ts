@@ -72,7 +72,7 @@ export class SupplyFinanceService {
     const lines=inputLines.map((line:any)=>{
       if(!uuid(line?.ingredientId))throw new BadRequestException('Cần chọn nguyên liệu từ danh mục.');
       const lotCode=code(line?.lotCode,'Mã lô',100);
-      const n=quantity(line?.quantity),unitPrice=money(line?.unitPrice,true);
+      const n=quantity(line?.quantity),unitPrice=money(line?.unitPrice);
       const amount=Number(new Prisma.Decimal(n).mul(unitPrice).toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP));
       if(!Number.isSafeInteger(amount)||amount>1000000000000)throw new BadRequestException('Thành tiền vượt giới hạn.');
       return {ingredientId:line.ingredientId as string,lotCode,quantity:n,unitPrice,amount,expiryDate:parseDate(line?.expiryDate),storageLocation:code(line?.storageLocation,'Vị trí lưu',120,false)||null};
