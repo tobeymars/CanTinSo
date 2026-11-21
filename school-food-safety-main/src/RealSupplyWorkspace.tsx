@@ -15,6 +15,7 @@ const emptyReceipt=()=>({lotCode:'',ingredientId:'',supplierId:'',quantity:'',ex
 const emptyIssue=()=>({quantity:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
 const fmt=(value:number)=>value.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const date=(value?:string|null)=>value?new Date(value).toLocaleDateString('vi-VN'):'Chưa có'
+const expired=(value?:string|null)=>!!value&&value.slice(0,10)<new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
 export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'warehouse';role:ViewRole}){
   const qc=useQueryClient()
   const canEdit=role==='central_kitchen'||role==='school_kitchen'
@@ -115,7 +116,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <h3><Boxes size={19}/>Tồn kho theo lô ({lots.data?.length??0})</h3>
         {lots.data?.length===0&&<p className="muted">Bếp chưa có lô nguyên liệu thật. Hãy tạo nhà cung cấp và nhập kho.</p>}
         <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Lô</th><th>Nguyên liệu</th><th>Nhà cung cấp</th><th>Tồn</th><th>Hạn dùng</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-        {lots.data?.map(lot=><tr key={lot.id}><td>{lot.lotCode}</td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td>{fmt(lot.remainingQty)} {lot.unit}</td><td>{date(lot.expiryDate)}</td><td>{lot.status}</td><td>{canEdit&&lot.status==='AVAILABLE'&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue(emptyIssue())}}>Xuất lô</button>}</td></tr>)}
+        {lots.data?.map(lot=><tr key={lot.id}><td>{lot.lotCode}</td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td>{fmt(lot.remainingQty)} {lot.unit}</td><td>{date(lot.expiryDate)}</td><td>{expired(lot.expiryDate)?'Hết hạn':lot.status==='AVAILABLE'?'Có thể xuất':lot.status==='DEPLETED'?'Đã hết':'Cách ly / tạm ngưng'}</td><td>{canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue(emptyIssue())}}>Xuất lô</button>}</td></tr>)}
         </tbody></table></div>
         {issueLot&&canEdit&&<form onSubmit={submitIssue} style={{display:'grid',gap:10}}>
           <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({fmt(issueLot.remainingQty)} {issueLot.unit} còn lại)</h3>
