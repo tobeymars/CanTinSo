@@ -16,3 +16,6 @@ CREATE UNIQUE INDEX "inventory_lots_kitchen_id_lot_code_key" ON "inventory_lots"
 CREATE INDEX "inventory_lots_kitchen_id_status_expiry_date_idx" ON "inventory_lots"("kitchen_id","status","expiry_date");
 
 -- Do not infer ownership of old school lots. Manual, verified migration will be needed.
+
+-- Dedicated stock issue event; PREPARED retains its original food-trace meaning.
+ALTER TYPE "TraceEventType" ADD VALUE IF NOT EXISTS 'ISSUED';
