@@ -42,7 +42,7 @@ export const getSupplyFinance=(id:string)=>request<SupplyFinance>(kitchenPath(id
 export const createSupplyPurchase=(id:string,input:{number:string;supplierId:string;invoiceNumber:string;reference:string;description:string;lines:SupplyPurchaseLine[]})=>request<{id:string;number:string;total:number;lines:number}>(kitchenPath(id)+'/purchase-receipts',{method:'POST',body:JSON.stringify(input)})
 export const createSupplyPayment=(id:string,input:{receiptId:string;reference:string;amount:number;method:'BANK_TRANSFER'|'CASH'|'OTHER';paidAt:string;note:string})=>request<{id:string;reference:string;amount:number}>(kitchenPath(id)+'/payments',{method:'POST',body:JSON.stringify(input)})
 
-export type SupplierDocument = {id:string;category:string;filename:string;mimeType:string;size:number;documentNumber:string|null;issuer:string|null;issuedAt:string|null;expiresAt:string|null;createdAt:string}
+export type SupplierDocument = {id:string;category:string;receiptId:string|null;filename:string;mimeType:string;size:number;documentNumber:string|null;issuer:string|null;issuedAt:string|null;expiresAt:string|null;createdAt:string}
 const docPath=(kitchenId:string,supplierId:string)=>kitchenPath(kitchenId)+'/suppliers/'+encodeURIComponent(supplierId)+'/documents'
 export const getSupplierDocuments=(kitchenId:string,supplierId:string)=>request<SupplierDocument[]>(docPath(kitchenId,supplierId))
 export const uploadSupplierDocument=(kitchenId:string,supplierId:string,input:{category:string;receiptId:string;filename:string;mimeType:string;base64:string;documentNumber:string;issuer:string;issuedAt:string;expiresAt:string})=>request<SupplierDocument>(docPath(kitchenId,supplierId),{method:'POST',body:JSON.stringify(input)})
