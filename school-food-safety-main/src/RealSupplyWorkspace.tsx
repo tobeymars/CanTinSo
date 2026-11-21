@@ -5,7 +5,7 @@ import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucid
 import type { ViewRole } from './lib/store'
 import {
   getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,
-  issueSupplyLot,receiveSupplyLot,saveSupplySupplier,
+  issueSupplyLot,receiveSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
 import './WarehouseManagement.css'
@@ -101,7 +101,10 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       <h3>Danh sách nhà cung cấp ({suppliers.data?.length??0})</h3>
       {suppliers.data?.length===0&&<p className="muted">Chưa có nhà cung cấp. Bếp cần tạo trước khi nhập lô nguyên liệu.</p>}
       <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-        {suppliers.data?.map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{canEdit&&<button className="outline" type="button" onClick={()=>editVendor(item)}>Sửa</button>}</td></tr>)}
+        {suppliers.data?.map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{canEdit&&<div style={{display:'flex',gap:6}}>
+          <button className="outline" type="button" onClick={()=>editVendor(item)}>Sửa</button>
+          <button className="outline" type="button" disabled={busy} onClick={()=>void execute(()=>updateSupplySupplierStatus(activeId,item.id,item.status==='ACTIVE'?'INACTIVE':'ACTIVE'),item.status==='ACTIVE'?'Đã ngừng sử dụng nhà cung cấp.':'Đã kích hoạt nhà cung cấp.')}>{item.status==='ACTIVE'?'Ngừng dùng':'Kích hoạt'}</button>
+        </div>}</td></tr>)}
       </tbody></table></div>
     </>}
     {activeId&&mode==='warehouse'&&<>
