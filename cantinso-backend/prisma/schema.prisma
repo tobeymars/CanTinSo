@@ -320,6 +320,8 @@ model Supplier {
   lots        InventoryLot[]
   purchaseReceipts PurchaseReceipt[]
   payments SupplierPayment[]
+  documents SupplierDocument[]
+  note String? 
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
@@ -863,4 +865,24 @@ model SupplierPayment {
   @@index([supplierId, paidAt])
   @@index([receiptId, paidAt])
   @@map("supplier_payments")
+}
+
+model SupplierDocument {
+  id String @id @default(uuid()) @db.Uuid
+  supplierId String @map("supplier_id") @db.Uuid
+  category String
+  filename String
+  mimeType String @map("mime_type")
+  size Int
+  data Bytes
+  documentNumber String? @map("document_number")
+  issuer String?
+  issuedAt DateTime? @map("issued_at") @db.Date
+  expiresAt DateTime? @map("expires_at") @db.Date
+  uploadedById String @map("uploaded_by_id") @db.Uuid
+  isArchived Boolean @default(false) @map("is_archived")
+  createdAt DateTime @default(now()) @map("created_at")
+  supplier Supplier @relation(fields:[supplierId],references:[id],onDelete:Restrict)
+  @@index([supplierId, isArchived])
+  @@map("supplier_documents")
 }
