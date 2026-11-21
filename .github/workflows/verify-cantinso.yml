@@ -26,6 +26,7 @@ jobs:
       - run: npm ci
       - run: npx prisma validate
       - run: npx prisma generate
+      - run: npm run test:units
       - run: npm run build
 
   frontend:
