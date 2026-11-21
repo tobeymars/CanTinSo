@@ -11,6 +11,7 @@ import { SupplyService } from './supply.service';
 export class SupplyController {
   constructor(private readonly service:SupplyService){}
   @Get('kitchens') kitchens(@CurrentUser() user:AuthUser){return this.service.kitchens(user);}
+  @Get(':kitchenId/schools') schools(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.schools(user,kitchenId);}
   @Get(':kitchenId/ingredients') ingredients(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.ingredients(user,kitchenId);}
   @Get(':kitchenId/suppliers') suppliers(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.suppliers(user,kitchenId);}
   @Post(':kitchenId/suppliers')
