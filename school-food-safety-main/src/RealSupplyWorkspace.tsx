@@ -66,7 +66,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   function submitIssue(e:FormEvent){
     e.preventDefault()
     if(!issueLot)return
-    void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{quantity:Number(issue.quantity),note:issue.note});setIssueLot(null);setIssue(emptyIssue())},'Đã xuất kho và cập nhật tồn lô.')
+    void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{quantity:Number(issue.quantity),note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType});setIssueLot(null);setIssue(emptyIssue())},'Đã xuất kho và cập nhật tồn lô.')
   }
   const isLoading=kitchenQuery.isLoading||(!!activeId&&(suppliers.isLoading|| (mode==='warehouse'&&lots.isLoading)))
   const failure=kitchenQuery.error||suppliers.error||lots.error||ingredients.error||movements.error
