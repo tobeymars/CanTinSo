@@ -5,7 +5,7 @@ import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucid
 import type { ViewRole } from './lib/store'
 import {
   getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,
-  issueSupplyLot,receiveSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,
+  issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
 import './WarehouseManagement.css'
@@ -13,7 +13,6 @@ import RealSupplierFinance from './RealSupplierFinance'
 import RealPurchaseReceipt from './RealPurchaseReceipt'
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:''})
-const emptyReceipt=()=>({lotCode:'',ingredientId:'',supplierId:'',quantity:'',expiryDate:'',storageLocation:'',note:''})
 const emptyIssue=()=>({quantity:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
 const fmt=(value:number)=>value.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const date=(value?:string|null)=>value?new Date(value).toLocaleDateString('vi-VN'):'Chưa có'
@@ -33,14 +32,13 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const movements=useQuery({queryKey:['supply-movements',activeId],queryFn:()=>getSupplyMovements(activeId),enabled:!!activeId&&mode==='warehouse'})
   const [vendor,setVendor]=useState(emptySupplier)
   const [editingVendor,setEditingVendor]=useState<string|null>(null)
-  const [receipt,setReceipt]=useState(emptyReceipt)
   const [issue,setIssue]=useState(emptyIssue)
   const [issueLot,setIssueLot]=useState<SupplyLot|null>(null)
   const [section,setSection]=useState<'stock'|'receipts'|'movements'>('stock')
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setReceipt(emptyReceipt());setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -63,10 +61,6 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   function submitVendor(e:FormEvent){
     e.preventDefault()
     void execute(async()=>{await saveSupplySupplier(activeId,vendor,editingVendor??undefined);setEditingVendor(null);setVendor(emptySupplier())},'Đã lưu nhà cung cấp vào dữ liệu bếp.')
-  }
-  function submitReceipt(e:FormEvent){
-    e.preventDefault()
-    void execute(async()=>{await receiveSupplyLot(activeId,{...receipt,quantity:Number(receipt.quantity)});setReceipt(emptyReceipt());setSection('stock')},'Đã ghi nhận lô nhập kho và nhật ký.')
   }
   function submitIssue(e:FormEvent){
     e.preventDefault()
