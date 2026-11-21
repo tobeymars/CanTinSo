@@ -172,7 +172,7 @@ export class SupervisionService {
             return {itemId:lot.id,ingredientName:lot.ingredient.name,lotCode:lot.lotCode,
               supplierName:lot.supplier.name,supplierContact:lot.supplier.contactName || lot.supplier.phone || '',
               expiresAt:lot.expiryDate?.toISOString().slice(0,10) ?? '',
-              quantity,unit:lot.unit};
+              quantity:normalizedQuantity,unit:lot.unit,displayQuantity,displayUnit};
           });
           body.ingredientReceipts=normalized;
         }
