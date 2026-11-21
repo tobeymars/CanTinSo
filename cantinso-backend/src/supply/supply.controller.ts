@@ -17,6 +17,11 @@ export class SupplyController {
   @Post(':kitchenId/suppliers')
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
   createSupplier(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Body() body:unknown){return this.service.saveSupplier(user,kitchenId,body);}
+  @Post(':kitchenId/suppliers/import')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  bulkImport(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Body() body:unknown){
+    return this.service.importSuppliers(user,kitchenId,body);
+  }
   @Patch(':kitchenId/suppliers/:supplierId')
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
   updateSupplier(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('supplierId') supplierId:string,@Body() body:unknown){return this.service.saveSupplier(user,kitchenId,body,supplierId);}
