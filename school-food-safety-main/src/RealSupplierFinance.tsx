@@ -67,8 +67,26 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
       <header className="card-header"><div><div className="section-kicker">CHỨNG TỪ MUA HÀNG</div><h3>Phiếu nhập và thanh toán</h3></div>
         <div style={{display:'flex',gap:8}}><button type="button" className={tab==='receipts'?'primary':'outline'} onClick={()=>setTab('receipts')}>Phiếu nhập ({finance.receipts.length})</button><button type="button" className={tab==='payments'?'primary':'outline'} onClick={()=>setTab('payments')}>Thanh toán ({finance.payments.length})</button></div></header>
       {tab==='receipts'&&<div className="supply-table-scroll"><table className="management-table supply-table"><thead><tr><th>Số phiếu</th><th>Ngày</th><th>Nhà cung cấp</th><th>Tổng tiền</th><th>Đã trả</th><th>Còn nợ</th><th>Chi tiết</th></tr></thead><tbody>
-        {finance.receipts.map(row=><tr key={row.id}><td><strong>{row.number}</strong><small style={{display:'block'}}>{row.invoiceNumber||'Chưa có số hóa đơn'}</small></td><td>{new Date(row.createdAt).toLocaleDateString('vi-VN')}</td><td>{row.supplier.name}</td><td>{cash(row.total)}</td><td>{cash(row.paid)}</td><td>{cash(row.debt)}</td><td><button type="button" className="outline" onClick={()=>setExpanded(current=>current===row.id?null:row.id)}>{expanded===row.id?'Ẩn':'Xem'}</button>{expanded===row.id&&<div style={{minWidth:250}}>{row.lines.map(line=><p key={line.id}>{line.lot.ingredient.name} · {line.lot.lotCode}: {line.enteredQuantity ?? line.quantity} {line.enteredUnit ?? line.lot.ingredient.unit} × {unitCost(line.unitPrice)} / {line.enteredUnit ?? line.lot.ingredient.unit} = {cash(line.amount)}</p>)}</div>}</td></tr>)}
+        {finance.receipts.map(row=><tr key={row.id}><td><strong>{row.number}</strong><small style={{display:'block'}}>{row.invoiceNumber||'Chưa có số hóa đơn'}</small></td><td>{new Date(row.createdAt).toLocaleDateString('vi-VN')}</td><td>{row.supplier.name}</td><td>{cash(row.total)}</td><td>{cash(row.paid)}</td><td>{cash(row.debt)}</td><td><button type="button" className="outline" onClick={()=>setExpanded(current=>current===row.id?null:row.id)}>{expanded===row.id?'Ẩn':'Xem'}</button></td></tr>)}
       </tbody></table></div>}
+      {tab==='receipts'&&expanded&&finance.receipts.some(row=>row.id===expanded)&&(()=>{
+        const receipt=finance.receipts.find(row=>row.id===expanded)!
+        return <div className="supply-receipt-detail">
+          <div className="supply-section-heading">
+            <div><span className="supply-step">CHI TIẾT PHIẾU NHẬP</span><h3>{receipt.number} · {receipt.supplier.name}</h3></div>
+            <button className="outline" type="button" onClick={()=>setExpanded(null)}>Đóng chi tiết</button>
+          </div>
+          <div className="supply-receipt-detail__rows">
+            {receipt.lines.map(line=><div className="supply-receipt-detail__line" key={line.id}>
+              <div><strong>{line.lot.ingredient.name}</strong><small>Mã lô: {line.lot.lotCode}</small></div>
+              <div><span>Số lượng</span><strong>{line.enteredQuantity??line.quantity} {line.enteredUnit??line.lot.ingredient.unit}</strong></div>
+              <div><span>Đơn giá</span><strong>{unitCost(line.unitPrice)} / {line.enteredUnit??line.lot.ingredient.unit}</strong></div>
+              <div><span>Thành tiền</span><strong>{cash(line.amount)}</strong></div>
+            </div>)}
+          </div>
+          <div className="supply-receipt-detail__total"><span>Tổng tiền phiếu</span><strong>{cash(receipt.total)}</strong></div>
+        </div>
+      })()}
       {tab==='payments'&&<div className="supply-table-scroll"><table className="management-table supply-table"><thead><tr><th>Ngày trả</th><th>Mã phiếu chi</th><th>Nhà cung cấp</th><th>Phiếu nhập</th><th>Hình thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
         {finance.payments.map(row=><tr key={row.id}><td>{new Date(row.paidAt).toLocaleDateString('vi-VN')}</td><td>{row.reference}</td><td>{row.supplier.name}</td><td>{row.receipt.number}</td><td>{row.method==='BANK_TRANSFER'?'Chuyển khoản':row.method==='CASH'?'Tiền mặt':'Khác'}</td><td>{cash(row.amount)}</td><td>{row.reversedAt?'Đã hủy · '+new Date(row.reversedAt).toLocaleDateString('vi-VN'):'Đã ghi nhận'}</td><td>
           {canEdit&&!row.reversedAt&&<button type="button" className="outline" disabled={busy} onClick={()=>{setReversingId(row.id);setReversalReason('')}}>Hủy bút toán</button>}
