@@ -31,7 +31,7 @@ export function canonicalQuantity(value:unknown, selected:unknown, canonical:str
   const a=unitInfo[unitText(from)],b=unitInfo[unitText(canonical)];
   if(a?.family!==b?.family && unitText(from)!==unitText(canonical))
     throw new BadRequestException('Không thể quy đổi '+from+' sang '+canonical+'. Chỉ được đổi trong cùng nhóm khối lượng hoặc thể tích.');
-  if((a&&!b)||(!a&&b))throw new BadRequestException('Đơn vị nguyên liệu không tương thích.');
+  if((!a||!b)&&unitText(from)!==unitText(canonical))throw new BadRequestException('Đơn vị nguyên liệu không tương thích hoặc thiếu quy cách đóng gói.');
   const countUnits=new Set(['chai','hộp','cái','quả','gói','lon','túi','thùng','bịch','viên','củ','chiếc','phần','suất']);
   if(countUnits.has(unitText(canonical))&&!Number.isInteger(number))
     throw new BadRequestException('Đơn vị '+canonical+' phải nhập số lượng nguyên. Muốn quy đổi ra g, kg hoặc lít cần có quy cách đóng gói riêng.');
