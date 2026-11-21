@@ -19,7 +19,7 @@ import type { CheckAction, CheckId, CheckStatus, SupervisionMealType, Supervisio
 import type { IngredientReceiptLine } from './lib/supervisionStatus'
 import { supervisionIngredientCatalog } from './lib/inventory'
 import Select from './components/ui/Select'
-import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions } from './lib/supervisionUnits'
+import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit } from './lib/supervisionUnits'
 
 const labels: Record<CheckStatus, string> = {
   not_reported: 'Chưa cập nhật', reported: 'Chờ BGH xác nhận',
@@ -219,7 +219,12 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                     </div>
                     <div className="supervision-ingredient-picker">
                       <label>Nguyên liệu <span aria-hidden="true">*</span>
-                        <Select label={`Nguyên liệu dòng ${index + 1}`} required searchable value={row.itemId} placeholder="Tìm và chọn từ kho" searchPlaceholder="Tên, mã lô, nhà cung cấp…" options={options} onValueChange={itemId => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, itemId, unit: ingredientCatalog.find(ingredient=>ingredient.itemId===itemId)?.unit ?? '', quantity: '1' } : item))}/>
+                        <Select label={`Nguyên liệu dòng ${index + 1}`} required searchable value={row.itemId} placeholder="Tìm và chọn từ kho" searchPlaceholder="Tên, mã lô, nhà cung cấp…" options={options} onValueChange={itemId => setIngredientRows(current => current.map(item => {
+                          if(item.id!==row.id)return item
+                          const base=ingredientCatalog.find(ingredient=>ingredient.itemId===itemId)?.unit ?? ''
+                          const issued=contextQuery.data?.lots.find(lot=>lot.itemId===itemId)?.quantityAvailable
+                          return {...item,itemId,unit:serverMode?preferredReceiptUnit(base,issued):base,quantity:''}
+                        }))}/>
                       </label>
                     </div>
                     {selectedIngredient && <div className="supervision-ingredient-selected">
