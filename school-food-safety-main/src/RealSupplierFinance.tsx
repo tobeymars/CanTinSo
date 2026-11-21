@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Building2, CreditCard, Download, ReceiptText, Wallet } from 'lucide-react'
-import { createSupplyPayment } from './lib/supplyApi'
+import { createSupplyPayment, reverseSupplyPayment } from './lib/supplyApi'
 import type { SupplyFinance } from './lib/supplyApi'
 import './SupplierManagement.css'
 
@@ -17,6 +17,8 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
   execute:(action:()=>Promise<unknown>,success:string)=>Promise<void>
 }){
   const [filter,setFilter]=useState('')
+  const [reversingId,setReversingId]=useState<string|null>(null)
+  const [reversalReason,setReversalReason]=useState('')
   const [debtOnly,setDebtOnly]=useState(false)
   const [tab,setTab]=useState<'receipts'|'payments'>('receipts')
   const [expanded,setExpanded]=useState<string|null>(null)
@@ -66,8 +68,15 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
       {tab==='receipts'&&<div className="table-scroll"><table className="management-table"><thead><tr><th>Số phiếu</th><th>Ngày</th><th>Nhà cung cấp</th><th>Tổng tiền</th><th>Đã trả</th><th>Còn nợ</th><th>Chi tiết</th></tr></thead><tbody>
         {finance.receipts.map(row=><tr key={row.id}><td><strong>{row.number}</strong><small style={{display:'block'}}>{row.invoiceNumber||'Chưa có số hóa đơn'}</small></td><td>{new Date(row.createdAt).toLocaleDateString('vi-VN')}</td><td>{row.supplier.name}</td><td>{cash(row.total)}</td><td>{cash(row.paid)}</td><td>{cash(row.debt)}</td><td><button type="button" className="outline" onClick={()=>setExpanded(current=>current===row.id?null:row.id)}>{expanded===row.id?'Ẩn':'Xem'}</button>{expanded===row.id&&<div style={{minWidth:250}}>{row.lines.map(line=><p key={line.id}>{line.lot.ingredient.name} · {line.lot.lotCode}: {line.quantity} {line.lot.ingredient.unit} × {cash(line.unitPrice)} = {cash(line.amount)}</p>)}</div>}</td></tr>)}
       </tbody></table></div>}
-      {tab==='payments'&&<div className="table-scroll"><table className="management-table"><thead><tr><th>Ngày trả</th><th>Mã phiếu chi</th><th>Nhà cung cấp</th><th>Phiếu nhập</th><th>Hình thức</th><th>Số tiền</th></tr></thead><tbody>
-        {finance.payments.map(row=><tr key={row.id}><td>{new Date(row.paidAt).toLocaleDateString('vi-VN')}</td><td>{row.reference}</td><td>{row.supplier.name}</td><td>{row.receipt.number}</td><td>{row.method==='BANK_TRANSFER'?'Chuyển khoản':row.method==='CASH'?'Tiền mặt':'Khác'}</td><td>{cash(row.amount)}</td></tr>)}
+      {tab==='payments'&&<div className="table-scroll"><table className="management-table"><thead><tr><th>Ngày trả</th><th>Mã phiếu chi</th><th>Nhà cung cấp</th><th>Phiếu nhập</th><th>Hình thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
+        {finance.payments.map(row=><tr key={row.id}><td>{new Date(row.paidAt).toLocaleDateString('vi-VN')}</td><td>{row.reference}</td><td>{row.supplier.name}</td><td>{row.receipt.number}</td><td>{row.method==='BANK_TRANSFER'?'Chuyển khoản':row.method==='CASH'?'Tiền mặt':'Khác'}</td><td>{cash(row.amount)}</td><td>{row.reversedAt?'Đã hủy · '+new Date(row.reversedAt).toLocaleDateString('vi-VN'):'Đã ghi nhận'}</td><td>
+          {canEdit&&!row.reversedAt&&<button type="button" className="outline" disabled={busy} onClick={()=>{setReversingId(row.id);setReversalReason('')}}>Hủy bút toán</button>}
+          {row.reversedAt&&<small>{row.reversalReason}</small>}
+          {reversingId===row.id&&<form onSubmit={event=>{event.preventDefault();void execute(async()=>{await reverseSupplyPayment(kitchenId,row.id,reversalReason);setReversingId(null);setReversalReason('')},'Đã hủy bút toán và cập nhật lại công nợ.')}} style={{display:'grid',gap:6}}>
+            <label>Lý do hủy *<input required minLength={5} maxLength={500} value={reversalReason} onChange={event=>setReversalReason(event.target.value)}/></label>
+            <button type="submit" className="primary" disabled={busy}>Xác nhận hủy</button><button type="button" className="outline" onClick={()=>setReversingId(null)}>Đóng</button>
+          </form>}
+        </td></tr>)}
       </tbody></table></div>}
       {(tab==='receipts'&&!finance.receipts.length||tab==='payments'&&!finance.payments.length)&&<p className="muted">Chưa có chứng từ trong hệ thống.</p>}
     </section>
