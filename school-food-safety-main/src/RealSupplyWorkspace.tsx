@@ -11,8 +11,9 @@ import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
 import './WarehouseManagement.css'
 import RealSupplierFinance from './RealSupplierFinance'
 import RealPurchaseReceipt from './RealPurchaseReceipt'
+import RealSupplierDocuments from './RealSupplierDocuments'
 
-const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:''})
+const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:'',note:''})
 const emptyIssue=()=>({quantity:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
 const fmt=(value:number)=>value.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const date=(value?:string|null)=>value?new Date(value).toLocaleDateString('vi-VN'):'Chưa có'
@@ -32,13 +33,16 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const movements=useQuery({queryKey:['supply-movements',activeId],queryFn:()=>getSupplyMovements(activeId),enabled:!!activeId&&mode==='warehouse'})
   const [vendor,setVendor]=useState(emptySupplier)
   const [editingVendor,setEditingVendor]=useState<string|null>(null)
+  const [viewingSupplier,setViewingSupplier]=useState<string|null>(null)
+  const [supplierSearch,setSupplierSearch]=useState('')
+  const [supplierDebtOnly,setSupplierDebtOnly]=useState(false)
   const [issue,setIssue]=useState(emptyIssue)
   const [issueLot,setIssueLot]=useState<SupplyLot|null>(null)
   const [section,setSection]=useState<'stock'|'receipts'|'movements'>('stock')
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -55,7 +59,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     finally{setBusy(false)}
   }
   function editVendor(item:SupplySupplier){
-    setEditingVendor(item.id);setVendor({code:item.code,name:item.name,taxCode:item.taxCode??'',contactName:item.contactName??'',phone:item.phone??'',email:item.email??'',address:item.address??''})
+    setEditingVendor(item.id);setVendor({code:item.code,name:item.name,taxCode:item.taxCode??'',contactName:item.contactName??'',phone:item.phone??'',email:item.email??'',address:item.address??'',note:item.note??''})
     window.scrollTo({top:0,behavior:'smooth'})
   }
   function submitVendor(e:FormEvent){
@@ -95,17 +99,20 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <label>Email<input type="email" value={vendor.email} onChange={e=>setVendor(v=>({...v,email:e.target.value}))}/></label>
           <label>Mã số thuế<input value={vendor.taxCode} onChange={e=>setVendor(v=>({...v,taxCode:e.target.value}))}/></label>
           <label>Địa chỉ<input value={vendor.address} onChange={e=>setVendor(v=>({...v,address:e.target.value}))}/></label>
+          <label>Ghi chú<input maxLength={500} value={vendor.note} onChange={e=>setVendor(v=>({...v,note:e.target.value}))}/></label>
         </div>
         <div style={{display:'flex',gap:10}}><button className="primary" type="submit" disabled={busy}><Plus size={16}/>{editingVendor?'Lưu thay đổi':'Thêm nhà cung cấp'}</button>{editingVendor&&<button className="outline" type="button" onClick={()=>{setEditingVendor(null);setVendor(emptySupplier())}}>Hủy sửa</button>}</div>
       </form>}
       <h3>Danh sách nhà cung cấp ({suppliers.data?.length??0})</h3>
+      <div className="management-toolbar" style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>setSupplierSearch(e.target.value)}/></label><label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>setSupplierDebtOnly(e.target.checked)}/>Còn công nợ</label></div>
       {suppliers.data?.length===0&&<p className="muted">Chưa có nhà cung cấp. Bếp cần tạo trước khi nhập lô nguyên liệu.</p>}
-      <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-        {suppliers.data?.map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{canEdit&&<div style={{display:'flex',gap:6}}>
+      <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th>Còn phải trả</th><th>Chức năng</th></tr></thead><tbody>
+        {suppliers.data?.filter(item=>{const query=supplierSearch.toLocaleLowerCase('vi');return (item.code+' '+item.name+' '+(item.phone??'')).toLocaleLowerCase('vi').includes(query)&&(!supplierDebtOnly||(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0)>0)}).map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0).toLocaleString('vi-VN')} đ</td><td><div style={{display:'flex',gap:6}}><button type="button" className="outline" onClick={()=>setViewingSupplier(current=>current===item.id?null:item.id)}>Hồ sơ</button>{canEdit&&<div style={{display:'flex',gap:6}}>
           <button className="outline" type="button" onClick={()=>editVendor(item)}>Sửa</button>
           <button className="outline" type="button" disabled={busy} onClick={()=>void execute(()=>updateSupplySupplierStatus(activeId,item.id,item.status==='ACTIVE'?'INACTIVE':'ACTIVE'),item.status==='ACTIVE'?'Đã ngừng sử dụng nhà cung cấp.':'Đã kích hoạt nhà cung cấp.')}>{item.status==='ACTIVE'?'Ngừng dùng':'Kích hoạt'}</button>
-        </div>}</td></tr>)}
+        </div>}</div></td></tr>)}
       </tbody></table></div>
+      {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<RealSupplierDocuments kitchenId={activeId} supplierId={viewingSupplier} supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''} canEdit={canEdit} busy={busy} execute={execute}/>}
     </>}
     {activeId&&mode==='warehouse'&&<>
       <nav style={{display:'flex',gap:8,flexWrap:'wrap'}} aria-label="Quản lý kho">
