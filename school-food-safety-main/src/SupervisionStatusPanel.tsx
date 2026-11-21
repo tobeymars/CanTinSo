@@ -220,7 +220,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                         <div><dt>Người cấp / liên hệ</dt><dd>{selectedIngredient.supplierContact}</dd></div>
                         <div><dt>Hạn sử dụng</dt><dd>{formatDate(selectedIngredient.expiresAt)} <em className={expiredAtService ? 'expired' : ''}>{expiredAtService ? 'Quá hạn tại ngày bữa ăn' : 'Còn hạn tại ngày bữa ăn'}</em></dd></div>
                       </dl>
-                      <label>Số lượng thực nhận ({selectedIngredient.unit}) <input required type="number" inputMode="decimal" min="0.001" max={serverMode ? (selectedIngredient.quantityAvailable ?? 5000) : 5000} step="0.001" aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
+                      <label>Số lượng thực nhận ({selectedIngredient.unit}) <input required type="number" inputMode="decimal" min="0.001" max={serverMode ? (contextQuery.data?.lots.find(lot=>lot.itemId===row.itemId)?.quantityAvailable ?? 5000) : 5000} step="0.001" aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
                     </div>}
                   </article>
                 })}
