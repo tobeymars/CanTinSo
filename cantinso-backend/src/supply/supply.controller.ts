@@ -32,6 +32,16 @@ export class SupplyController {
   @Post(':kitchenId/lots/:lotId/issues')
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
   issue(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('lotId') lotId:string,@Body() body:unknown){return this.service.issue(user,kitchenId,lotId,body);}
+  @Patch(':kitchenId/lots/:lotId/status')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  lotStatus(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('lotId') lotId:string,@Body() body:unknown){
+    return this.service.lotStatus(user,kitchenId,lotId,body);
+  }
+  @Patch(':kitchenId/lots/:lotId/location')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  moveLot(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('lotId') lotId:string,@Body() body:unknown){
+    return this.service.moveLot(user,kitchenId,lotId,body);
+  }
   @Get(':kitchenId/movements')
   movements(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.movements(user,kitchenId);}
 }
