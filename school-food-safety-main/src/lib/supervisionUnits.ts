@@ -38,3 +38,11 @@ export function convertReceiptQuantity(quantity: number, from: string, to: strin
 
 export const formatReceiptQuantity = (value: number) =>
   value.toLocaleString('vi-VN', { maximumFractionDigits: 6 })
+
+/** Human-friendly suggestion for warehouse and meal checks; never changes stored lot unit. */
+export function preferredReceiptUnit(baseUnit: string, availableCanonical?: number): string {
+  const key=baseUnit.trim().toLowerCase()
+  if(key==='g' && (availableCanonical===undefined || availableCanonical>=1000))return 'kg'
+  if(key==='ml' && (availableCanonical===undefined || availableCanonical>=1000))return 'lít'
+  return baseUnit
+}
