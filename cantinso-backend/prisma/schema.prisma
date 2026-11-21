@@ -208,6 +208,8 @@ model Kitchen {
   dishes      Dish[]
   mealPlans   MealPlan[]
   legalDocuments KitchenLegalDocument[]
+  suppliers Supplier[]
+  inventoryLots InventoryLot[]
   supervisionMeals SupervisionMeal[]
   dishQrs     DishQr[]
   schools     KitchenSchoolAssignment[]
@@ -269,7 +271,9 @@ model Student {
   hikvisionEnrollments HikvisionStudentEnrollment[]
 
   @@unique([schoolId, code])
+  @@unique([kitchenId, code])
   @@index([schoolId, name])
+  @@index([kitchenId, name])
   @@index([classroomId, status])
   @@map("students")
 }
@@ -299,7 +303,9 @@ model AttendanceEvent {
 }
 
 model Supplier {
-  school      School         @relation(fields: [schoolId], references: [id])
+  school      School?        @relation(fields: [schoolId], references: [id])
+  kitchen     Kitchen?       @relation(fields: [kitchenId], references: [id])
+  kitchenId   String?        @map("kitchen_id") @db.Uuid
   id          String         @id @default(uuid()) @db.Uuid
   code        String
   name        String
@@ -309,7 +315,7 @@ model Supplier {
   email       String?
   address     String?
   status      SupplierStatus @default(ACTIVE)
-  schoolId    String         @map("school_id") @db.Uuid
+  schoolId    String?        @map("school_id") @db.Uuid
   lots        InventoryLot[]
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
@@ -334,12 +340,14 @@ model Ingredient {
 }
 
 model InventoryLot {
-  school          School       @relation(fields: [schoolId], references: [id])
+  school          School?      @relation(fields: [schoolId], references: [id])
+  kitchen         Kitchen?     @relation(fields: [kitchenId], references: [id])
+  kitchenId       String?      @map("kitchen_id") @db.Uuid
   id              String       @id @default(uuid()) @db.Uuid
   lotCode         String       @map("lot_code")
   ingredientId    String       @map("ingredient_id") @db.Uuid
   supplierId      String       @map("supplier_id") @db.Uuid
-  schoolId        String       @map("school_id") @db.Uuid
+  schoolId        String?      @map("school_id") @db.Uuid
   quantity        Decimal      @db.Decimal(12, 3)
   remainingQty    Decimal      @map("remaining_qty") @db.Decimal(12, 3)
   unit            String
@@ -352,7 +360,9 @@ model InventoryLot {
   traceEvents     TraceEvent[]
 
   @@unique([schoolId, lotCode])
+  @@unique([kitchenId, lotCode])
   @@index([schoolId, status, expiryDate])
+  @@index([kitchenId, status, expiryDate])
   @@map("inventory_lots")
 }
 
