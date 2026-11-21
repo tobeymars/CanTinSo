@@ -29,7 +29,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const activeId=kitchens.some(item=>item.id===kitchenId)?kitchenId:kitchens[0]?.id??''
   const schoolQuery=useQuery({queryKey:['supply-schools',activeId],queryFn:()=>getSupplySchools(activeId),enabled:!!activeId&&mode==='warehouse'})
   const minimums=useQuery({queryKey:['supply-minimums',activeId],queryFn:()=>getSupplyMinimums(activeId),enabled:!!activeId&&mode==='warehouse'})
-  const finance=useQuery({queryKey:['supply-finance',activeId],queryFn:()=>getSupplyFinance(activeId),enabled:!!activeId})
+  const finance=useQuery({queryKey:['supply-finance',activeId],queryFn:()=>getSupplyFinance(activeId),enabled:!!activeId&&canEdit})
   const suppliers=useQuery({queryKey:['supply-suppliers',activeId],queryFn:()=>getSupplySuppliers(activeId),enabled:!!activeId})
   const ingredients=useQuery({queryKey:['supply-ingredients',activeId],queryFn:()=>getSupplyIngredients(activeId),enabled:!!activeId&&mode==='warehouse'})
   const lots=useQuery({queryKey:['supply-lots',activeId],queryFn:()=>getSupplyLots(activeId),enabled:!!activeId&&mode==='warehouse'})
@@ -166,10 +166,10 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <button className="outline" type="button" onClick={exportSupplierList}>Xuất CSV</button>
         </div>
       </div>
-      <div className="management-toolbar" style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>{setSupplierSearch(e.target.value);setSupplierPage(1)}}/></label><label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>{setSupplierDebtOnly(e.target.checked);setSupplierPage(1)}}/>Còn công nợ</label></div>
+      <div className="management-toolbar" style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>{setSupplierSearch(e.target.value);setSupplierPage(1)}}/></label>{canEdit&&<label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>{setSupplierDebtOnly(e.target.checked);setSupplierPage(1)}}/>Còn công nợ</label>}</div>
       {suppliers.data?.length===0&&<p className="muted">Chưa có nhà cung cấp. Bếp cần tạo trước khi nhập lô nguyên liệu.</p>}
       <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th>Còn phải trả</th><th>Chức năng</th></tr></thead><tbody>
-        {visibleSuppliers.map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0).toLocaleString('vi-VN')} đ</td><td><div style={{display:'flex',gap:6}}><button type="button" className="outline" onClick={()=>setViewingSupplier(current=>current===item.id?null:item.id)}>Hồ sơ</button>{canEdit&&<div style={{display:'flex',gap:6}}>
+        {visibleSuppliers.map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{canEdit?(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0).toLocaleString('vi-VN')+' đ':'Chỉ bếp được xem'}</td><td><div style={{display:'flex',gap:6}}><button type="button" className="outline" onClick={()=>setViewingSupplier(current=>current===item.id?null:item.id)}>Hồ sơ</button>{canEdit&&<div style={{display:'flex',gap:6}}>
           <button className="outline" type="button" onClick={()=>editVendor(item)}>Sửa</button>
           <button className="outline" type="button" disabled={busy} onClick={()=>void execute(()=>updateSupplySupplierStatus(activeId,item.id,item.status==='ACTIVE'?'INACTIVE':'ACTIVE'),item.status==='ACTIVE'?'Đã ngừng sử dụng nhà cung cấp.':'Đã kích hoạt nhà cung cấp.')}>{item.status==='ACTIVE'?'Ngừng dùng':'Kích hoạt'}</button>
         </div>}</div></td></tr>)}
