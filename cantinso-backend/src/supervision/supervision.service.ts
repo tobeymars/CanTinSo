@@ -78,7 +78,7 @@ export class SupervisionService {
     return {
       schoolId:scope.schoolId,serviceDate:date,mealType,kitchen,
       legalDocuments:legalDocuments.map(doc=>({...doc,expiresAt:doc.expiresAt?.toISOString().slice(0,10)??null})),
-      menu:plan ? {id:plan.id,servings:plan.servings,status:plan.revisions[0]?.status ?? plan.status,
+      menu:plan?.revisions[0] ? {id:plan.id,servings:plan.servings,status:plan.revisions[0].status,
         dishes:plan.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name})) ?? []} : null,
       lots:lots.filter(lot=>issued.has(lot.id)).map(lot=>({
         itemId:lot.id,ingredientName:lot.ingredient.name,lotCode:lot.lotCode,
