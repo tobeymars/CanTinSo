@@ -39,7 +39,7 @@ function IngredientReceiptDetails({ lines, serviceDate }: { lines: readonly Ingr
       return <article key={line.itemId}>
         <div className="supervision-ingredient-title">
           <span><strong>{line.ingredientName}</strong><small>Lô {line.lotCode}</small></span>
-          <b>{line.quantity.toLocaleString('vi-VN')} {line.unit}</b>
+          <b>{(line.displayQuantity ?? line.quantity).toLocaleString('vi-VN')} {line.displayUnit ?? line.unit}{line.displayUnit && line.displayUnit !== line.unit ? ` (quy đổi: ${formatReceiptQuantity(line.quantity)} ${line.unit})` : ''}</b>
         </div>
         <dl>
           <div><dt>Nhà cung cấp</dt><dd>{line.supplierName}</dd></div>
@@ -177,7 +177,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             <div className="supervision-check-main">
               <strong>{def.label}</strong>
               <p>{def.description}</p>
-              {def.id === 'ingredient_receipt' && Array.isArray(reportedIngredients) && reportedIngredients.length > 0 && (canReport || canConfirm) && <div className="supervision-ingredient-summary"><strong>{reportedIngredients.length} nguyên liệu đã ghi nhận</strong><span>{reportedIngredients.map(line => `${line.ingredientName}: ${line.quantity.toLocaleString('vi-VN')} ${line.unit}`).join(' · ')}</span></div>}
+              {def.id === 'ingredient_receipt' && Array.isArray(reportedIngredients) && reportedIngredients.length > 0 && (canReport || canConfirm) && <div className="supervision-ingredient-summary"><strong>{reportedIngredients.length} nguyên liệu đã ghi nhận</strong><span>{reportedIngredients.map(line => `${line.ingredientName}: ${(line.displayQuantity ?? line.quantity).toLocaleString('vi-VN')} ${line.displayUnit ?? line.unit}`).join(' · ')}</span></div>}
               {latest && (canReport || canConfirm) && <small>{latest.actorLabel} · {formatTimestamp(latest.recordedAt)} · {latest.evidenceRef ? `Tham chiếu: ${latest.evidenceRef}` : 'Không có tham chiếu'}</small>}
               {showHistory && (canReport || canConfirm) && item.history.length > 0 && <ol className="supervision-status-history">{item.history.map(entry => <li key={entry.id}><strong>{actionLabels[entry.action]}</strong> · {formatTimestamp(entry.recordedAt)} · {entry.note}</li>)}</ol>}
             </div>
