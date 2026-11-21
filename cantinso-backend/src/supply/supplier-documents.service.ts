@@ -31,7 +31,7 @@ export class SupplierDocumentsService{
  async list(user:AuthUser,kitchenId:string,supplierId:string){
   await this.supplier(user,kitchenId,supplierId);
   return this.prisma.supplierDocument.findMany({where:{supplierId,isArchived:false},
-   select:{id:true,category:true,filename:true,mimeType:true,size:true,documentNumber:true,issuer:true,issuedAt:true,expiresAt:true,createdAt:true},
+   select:{id:true,category:true,filename:true,mimeType:true,size:true,receiptId:true,documentNumber:true,issuer:true,issuedAt:true,expiresAt:true,createdAt:true},
    orderBy:{createdAt:'desc'}});
  }
  async upload(user:AuthUser,kitchenId:string,supplierId:string,body:any){
@@ -52,10 +52,16 @@ export class SupplierDocumentsService{
     mimeType==='image/jpeg'?data[0]===255&&data[1]===216&&data[2]===255:
     data.subarray(0,4).toString()==='RIFF'&&data.subarray(8,12).toString()==='WEBP';
   if(!valid)throw new BadRequestException('Nội dung tệp không đúng định dạng đã khai báo.');
+  const receiptId=body?.receiptId||null;
+  if(receiptId){
+    if(!uuid(receiptId))throw new BadRequestException('Số phiếu nhập không hợp lệ.');
+    const receipt=await this.prisma.purchaseReceipt.findFirst({where:{id:receiptId,kitchenId,supplierId},select:{id:true}});
+    if(!receipt)throw new BadRequestException('Phiếu nhập không thuộc nhà cung cấp và bếp đã chọn.');
+  }
   const issuedAt=day(body?.issuedAt),expiresAt=day(body?.expiresAt);
   if(issuedAt&&expiresAt&&issuedAt>expiresAt)throw new BadRequestException('Hạn hết hiệu lực không thể trước ngày cấp.');
   return this.prisma.supplierDocument.create({data:{
-    supplierId,category,filename,mimeType,size:data.length,data,uploadedById:user.sub,
+    supplierId,receiptId,category,filename,mimeType,size:data.length,data,uploadedById:user.sub,
     documentNumber:text(body?.documentNumber,120)||null,issuer:text(body?.issuer,200)||null,issuedAt,expiresAt,
    },select:{id:true,category:true,filename:true,mimeType:true,size:true,createdAt:true}});
  }
@@ -71,6 +77,6 @@ export class SupplierDocumentsService{
   if(!uuid(documentId))throw new BadRequestException('Mã chứng từ không hợp lệ.');
   const document=await this.prisma.supplierDocument.findFirst({where:{id:documentId,supplierId,isArchived:false}});
   if(!document)throw new NotFoundException('Không tìm thấy chứng từ.');
-  return this.prisma.supplierDocument.update({where:{id:documentId},data:{isArchived:true},select:{id:true,isArchived:true}});
+  return this.prisma.supplierDocument.update({where:{id:documentId},data:{isArchived:true,archivedAt:new Date(),archivedById:user.sub},select:{id:true,isArchived:true}});
  }
 }
