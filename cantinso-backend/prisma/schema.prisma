@@ -211,6 +211,7 @@ model Kitchen {
   legalDocuments KitchenLegalDocument[]
   suppliers Supplier[]
   inventoryLots InventoryLot[]
+  stockMinimums KitchenStockMinimum[]
   purchaseReceipts PurchaseReceipt[]
   supplierPayments SupplierPayment[]
   supervisionMeals SupervisionMeal[]
@@ -341,6 +342,7 @@ model Ingredient {
   lots            InventoryLot[]
   dishIngredients DishIngredient[]
   nutritionProfiles IngredientNutritionProfile[]
+  stockMinimums KitchenStockMinimum[]
   createdAt       DateTime         @default(now()) @map("created_at")
 
   @@map("ingredients")
@@ -894,4 +896,17 @@ model SupplierDocument {
   @@index([supplierId, isArchived])
   @@index([receiptId])
   @@map("supplier_documents")
+}
+
+model KitchenStockMinimum {
+ id String @id @default(uuid()) @db.Uuid
+ kitchenId String @map("kitchen_id") @db.Uuid
+ ingredientId String @map("ingredient_id") @db.Uuid
+ minimumQty Decimal @map("minimum_qty") @db.Decimal(12,3)
+ updatedById String @map("updated_by_id") @db.Uuid
+ updatedAt DateTime @updatedAt @map("updated_at")
+ kitchen Kitchen @relation(fields:[kitchenId],references:[id],onDelete:Restrict)
+ ingredient Ingredient @relation(fields:[ingredientId],references:[id],onDelete:Restrict)
+ @@unique([kitchenId,ingredientId])
+ @@map("kitchen_stock_minimums")
 }
