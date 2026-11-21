@@ -140,7 +140,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <h3>Nhật ký nhập / xuất theo lô</h3>
         {movements.data?.length===0&&<p className="muted">Chưa có nhật ký.</p>}
         <div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'left'}}><thead><tr><th>Thời điểm</th><th>Nguyên liệu</th><th>Mã lô</th><th>Loại</th><th>Nội dung</th></tr></thead><tbody>
-        {movements.data?.map(item=><tr key={item.id}><td>{date(item.occurredAt)}</td><td>{item.lot.ingredient.name}</td><td>{item.lot.lotCode}</td><td>{item.eventType==='RECEIVED'?'Nhập kho':item.eventType==='PREPARED'?'Xuất kho':item.eventType}</td><td>{item.description}</td></tr>)}
+        {movements.data?.map(item=><tr key={item.id}><td>{date(item.occurredAt)}</td><td>{item.lot.ingredient.name}</td><td>{item.lot.lotCode}</td><td>{item.eventType==='RECEIVED'?'Nhập kho':item.eventType==='ISSUED'?'Xuất kho':item.eventType}</td><td>{item.description}</td></tr>)}
         </tbody></table></div>
       </>}
     </>}
