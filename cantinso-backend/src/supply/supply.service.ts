@@ -57,6 +57,20 @@ export class SupplyService {
       where:{isActive:true,wardId:user.wardId},select:{id:true,name:true,type:true}});
     return [];
   }
+  async schools(user:AuthUser,kitchenId:string) {
+    const kitchen=await this.permitted(user,kitchenId);
+    const assigned=await this.prisma.kitchenSchoolAssignment.findMany({
+      where:{kitchenId,isActive:true,OR:[{endsAt:null},{endsAt:{gte:new Date()}}]},
+      include:{school:{select:{id:true,name:true}}},
+      orderBy:{createdAt:'desc'},
+    });
+    const rows=assigned.map(item=>item.school);
+    if(kitchen.schoolId&&!rows.some(item=>item.id===kitchen.schoolId)){
+      const school=await this.prisma.school.findUnique({where:{id:kitchen.schoolId},select:{id:true,name:true}});
+      if(school)rows.push(school);
+    }
+    return rows.filter((item,index)=>rows.findIndex(x=>x.id===item.id)===index);
+  }
   async ingredients(user:AuthUser,kitchenId:string) {
     await this.permitted(user,kitchenId);
     return this.prisma.ingredient.findMany({select:{id:true,code:true,name:true,unit:true,category:true},orderBy:{name:'asc'},take:1000});
@@ -110,6 +124,20 @@ export class SupplyService {
     if(!uuid(lotId)) throw new BadRequestException('Mã lô không hợp lệ.');
     const quantity=qty(input?.quantity);
     const reason=str(input?.note,'Lý do xuất kho',500);
+    const schoolId=input?.schoolId;
+    const serviceDate=input?.serviceDate;
+    const mealType=input?.mealType;
+    if(!uuid(schoolId) || typeof serviceDate!=='string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(serviceDate) || !['BREAKFAST','LUNCH','SNACK'].includes(mealType))
+      throw new BadRequestException('Cần xác định trường, ngày và bữa sử dụng lô.');
+    const day=new Date(serviceDate+'T00:00:00.000Z');
+    const dayEnd=new Date(serviceDate+'T23:59:59.999Z');
+    if(Number.isNaN(day.valueOf())||day.toISOString().slice(0,10)!==serviceDate)throw new BadRequestException('Ngày bữa không hợp lệ.');
+    const kitchen=await this.prisma.kitchen.findUnique({where:{id:kitchenId},select:{schoolId:true}});
+    const assigned=kitchen?.schoolId===schoolId || !!(await this.prisma.kitchenSchoolAssignment.findFirst({
+      where:{kitchenId,schoolId,isActive:true,startsAt:{lte:dayEnd},OR:[{endsAt:null},{endsAt:{gte:day}}]},
+      select:{id:true},
+    }));
+    if(!assigned)throw new ForbiddenException('Trường không thuộc bếp phục vụ tại ngày được chọn.');
     return this.prisma.$transaction(async tx=>{
       const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},select:{id:true,remainingQty:true,status:true,expiryDate:true}});
       if(!lot) throw new NotFoundException('Không tìm thấy lô thuộc bếp.');
@@ -118,7 +146,7 @@ export class SupplyService {
       if(current<quantity) throw new ConflictException('Không đủ số lượng tồn.');
       const changed=await tx.inventoryLot.updateMany({where:{id:lotId,kitchenId,status:'AVAILABLE',remainingQty:{gte:quantity}},data:{remainingQty:{decrement:quantity},...(current===quantity?{status:'DEPLETED' as const}:{})}});
       if(changed.count!==1) throw new ConflictException('Tồn kho đã thay đổi; vui lòng tải lại.');
-      await tx.traceEvent.create({data:{lotId,eventType:'ISSUED',actorId:user.sub,description:reason,metadata:{kind:'ISSUE',quantity}}});
+      await tx.traceEvent.create({data:{lotId,eventType:'ISSUED',actorId:user.sub,description:reason,metadata:{kind:'ISSUE',quantity,schoolId,serviceDate,mealType}}});
       return {lotId,quantity,remainingQty:current-quantity};
     });
   }
