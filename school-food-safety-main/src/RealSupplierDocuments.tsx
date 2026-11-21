@@ -52,11 +52,11 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
   }catch(error){setFileError(error instanceof Error?error.message:'Không thể tải chứng từ.')}
  }
  const records=docs.data??[]
- return <section className="card" style={{padding:16,display:'grid',gap:12}}>
+ return <section className="card supply-panel supply-documents">
   <header className="card-header"><div><span className="section-kicker">HỒ SƠ NHÀ CUNG CẤP</span><h3><Paperclip size={18}/>{supplierName}</h3><p className="muted">Chứng từ được lưu theo nhà cung cấp và bếp, không dùng dữ liệu DEMO. Tệp đính kèm chưa đồng nghĩa đã xác minh pháp lý.</p></div></header>
   {docs.isLoading&&<p role="status">Đang tải hồ sơ…</p>}
   {docs.isError&&<p className="error" role="alert">{docs.error.message}</p>}
-  <div className="table-scroll"><table className="management-table"><thead><tr><th>Loại hồ sơ</th><th>Tên tệp</th><th>Số hồ sơ</th><th>Phiếu nhập</th><th>Đơn vị cấp</th><th>Ngày hết hạn</th><th></th></tr></thead><tbody>
+  <div className="supply-table-scroll"><table className="management-table supply-table"><thead><tr><th>Loại hồ sơ</th><th>Tên tệp</th><th>Số hồ sơ</th><th>Phiếu nhập</th><th>Đơn vị cấp</th><th>Ngày hết hạn</th><th></th></tr></thead><tbody>
    {records.map(row=><tr key={row.id}>
      <td>{kinds.find(kind=>kind.id===row.category)?.label??row.category}</td>
      <td><FileText size={14}/>{row.filename}</td><td>{row.documentNumber||'—'}</td><td>{receipts.find(item=>item.id===row.receiptId)?.number??'Chưa liên kết'}</td><td>{row.issuer||'—'}</td>
@@ -68,9 +68,9 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
    </tr>)}
   </tbody></table></div>
   {!records.length&&!docs.isLoading&&<p className="muted">Nhà cung cấp chưa có chứng từ.</p>}
-  {canEdit&&<form onSubmit={submit} style={{display:'grid',gap:10}}>
+  {canEdit&&<form className="supply-documents-form" onSubmit={submit}>
     <h4>Thêm hồ sơ / chứng từ</h4>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:10}}>
+    <div className="supply-form-grid">
      <label>Loại hồ sơ<select value={category} onChange={e=>setCategory(e.target.value)}>{kinds.map(kind=><option key={kind.id} value={kind.id}>{kind.label}</option>)}</select></label>
      <label>Gắn với phiếu nhập<select value={receiptId} onChange={e=>setReceiptId(e.target.value)}><option value="">Không liên kết</option>{receipts.filter(item=>item.supplierId===supplierId).map(item=><option key={item.id} value={item.id}>{item.number}</option>)}</select></label>
      <label>Số hồ sơ<input maxLength={120} value={documentNumber} onChange={e=>setDocumentNumber(e.target.value)}/></label>
