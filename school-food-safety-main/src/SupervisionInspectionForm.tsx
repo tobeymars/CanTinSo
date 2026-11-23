@@ -10,7 +10,7 @@ export type InspectionLine = {
   foodType:string;amount:string;temperature:string;takenAt:string;container:string;sealCode:string;storedAt:string;sampledBy:string;qualityNote:string;
 }
 export type InspectionDraft = {inspector:string;location:string;checkedAt:string;dishes:InspectionLine[]}
-export const isDetailedInspection=(value:unknown):value is {kind:InspectionKind;inspector:string;location:string;checkedAt:string;isPass:boolean;dishes:(Record<string,unknown>&{dishId:string;dishName:string;servings:number})[]} =>
+export const isDetailedInspection=(value:unknown):value is {kind:InspectionKind;inspector:string;location:string;checkedAt:string;isPass:boolean;notApplicable?:boolean;reason?:string;dishes:(Record<string,unknown>&{dishId:string;dishName:string;servings:number})[]} =>
   !!value&&typeof value==='object'&&Array.isArray((value as {dishes?:unknown}).dishes)
 
 const blankLine=(dishId:string,servings:number):InspectionLine=>({
@@ -117,6 +117,7 @@ export function InspectionEditor({kind,menu,value,onChange}:{
 
 export function InspectionReadout({inspection}:{inspection:unknown}){
   if(!isDetailedInspection(inspection))return <p className="sif-warning">Báo cáo theo mẫu cũ chưa có các tiêu chí kiểm thực chi tiết. Cần yêu cầu bổ sung trước khi xác nhận.</p>
+  if(inspection.notApplicable)return <p className="sif-guidance">Bữa ăn đã duyệt dưới 30 suất; hồ sơ lưu mẫu được ghi nhận không bắt buộc áp dụng. Lý do: <strong>{inspection.reason}</strong></p>
   const keys=inspection.kind==='processing'?['ingredients','prepFinishedAt','cookedAt','workerHygiene','toolsHygiene','areaHygiene','sensory','disposition']:
     inspection.kind==='before_serving'?['platedAt','servedAt','utensils','sensory','disposition']:
     ['foodType','amount','temperature','takenAt','container','sealCode','storedAt','sampledBy','qualityNote']
