@@ -107,12 +107,13 @@ export class SupervisionService {
     const {action,itemId} = body;
     const note = typeof body.note === 'string' ? body.note.trim() : '';
     if (note.length < 5 || note.length > 1000) throw new BadRequestException('Ghi chú phải có từ 5 đến 1000 ký tự.');
-    if (!['check_report','check_confirm','check_revision','check_reopen','stage_report','stage_confirm','stage_reopen','meal_confirm'].includes(action)) throw new BadRequestException('Thao tác không hợp lệ.');
+    if (!['check_report','check_confirm','check_revision','check_reopen','stage_report','stage_confirm','stage_reopen','meal_confirm','sample_dispose','sample_hold'].includes(action)) throw new BadRequestException('Thao tác không hợp lệ.');
     if (action.startsWith('check_') && !checkIds.includes(itemId)) throw new BadRequestException('Mục kiểm thực không hợp lệ.');
     if (action.startsWith('stage_') && !stages.includes(itemId)) throw new BadRequestException('Mốc vận hành không hợp lệ.');
     if ((action.endsWith('_confirm') || action === 'check_revision' || action === 'check_reopen' || action === 'stage_reopen') && user.role !== 'SCHOOL_ADMIN') throw new ForbiddenException('Chỉ BGH được xác nhận.');
     if ((action === 'check_report' || action === 'stage_report') && !['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role)) throw new ForbiddenException('Chỉ bếp được báo cáo.');
-    const lateReason = validateSupervisionWriteDate(date,body);
+    const sampleLifecycle=['sample_dispose','sample_hold'].includes(action);
+    const lateReason = sampleLifecycle ? '' : validateSupervisionWriteDate(date,body);
     try {
       return await this.prisma.$transaction(async tx => {
       await tx.supervisionMeal.upsert({where:this.key(s),create:{...s,checks:{},stages:{},approvals:[]},update:{}});
@@ -122,8 +123,38 @@ export class SupervisionService {
       const entry = {id:eventId,actorId:user.sub,actorRole:user.role,at:new Date().toISOString(),note,...(lateReason?{lateReason}:{})};
       const latestApproval=approvals.at(-1);
       const approved=!!latestApproval && latestApproval.snapshot===canonical({checks,journey});
-      if (approved && action!=='check_reopen' && action!=='stage_reopen')
+      if (approved && action!=='check_reopen' && action!=='stage_reopen' && !sampleLifecycle)
         throw new ConflictException('Bữa đã được BGH xác nhận tổng thể. BGH cần mở điều chỉnh mục cụ thể trước khi cập nhật.');
+      if(sampleLifecycle){
+        const inspection=checks['food_sample']?.inspection;
+        if(!inspection || !Array.isArray(inspection.dishes))throw new ConflictException('Chưa có hồ sơ lấy mẫu đã ghi nhận.');
+        if(!['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role) && action==='sample_dispose')
+          throw new ForbiddenException('Chỉ nhân viên bếp được ghi nhận hủy mẫu.');
+        if(action==='sample_hold'){
+          const holds=await tx.supervisionEvent.findMany({where:{mealId:current.id,action:'sample_hold'}});
+          if(holds.length)throw new ConflictException('Đã có yêu cầu giữ mẫu; không được tự hủy.');
+          await tx.supervisionEvent.create({data:{id:eventId,mealId:current.id,actorId:user.sub,actorRole:user.role,action,itemId:'food_sample',payload:{note}}});
+          return {success:true,id:eventId};
+        }
+        const dishId=typeof body.dishId==='string'?body.dishId:'';
+        const sample=inspection.dishes.find((line:any)=>line.dishId===dishId);
+        if(!sample)throw new BadRequestException('Món lấy mẫu không thuộc hồ sơ này.');
+        if(body.noHoldConfirmed!==true)throw new BadRequestException('Phải xác nhận không có nghi ngờ ngộ độc hoặc yêu cầu giữ mẫu trước khi hủy.');
+        const disposedBy=typeof body.disposedBy==='string'?body.disposedBy.trim():'';
+        if(disposedBy.length<2||disposedBy.length>200)throw new BadRequestException('Cần ghi rõ người thực hiện hủy mẫu.');
+        const taken=new Date(sample.takenAt+':00+07:00').getTime();
+        const now=Date.now();
+        if(!Number.isFinite(taken)||now-taken<24*60*60*1000)
+          throw new ConflictException('Mẫu chưa đủ 24 giờ kể từ khi lấy; không được hủy.');
+        const prior=await tx.supervisionEvent.findMany({where:{mealId:current.id,action:{in:['sample_dispose','sample_hold']}}});
+        if(prior.some(row=>row.action==='sample_hold'))throw new ConflictException('Đang có yêu cầu giữ mẫu; không được hủy.');
+        if(prior.some(row=>row.action==='sample_dispose' && asObject(row.payload).dishId===dishId))
+          throw new ConflictException('Mẫu món này đã ghi nhận hủy.');
+        await tx.supervisionEvent.create({data:{id:eventId,mealId:current.id,actorId:user.sub,actorRole:user.role,
+          action:'sample_dispose',itemId:dishId,payload:{dishId,dishName:sample.dishName,disposedBy,disposedAt:new Date().toISOString(),
+            note,noHoldConfirmed:true}}});
+        return {success:true,id:eventId};
+      }
       if (action === 'check_report') {
         if (checks[itemId] && !['revision_requested'].includes(checks[itemId].status)) throw new ConflictException('Mục đã báo cáo.');
         if (typeof body.evidenceRef !== 'string' || !body.evidenceRef.trim()) throw new BadRequestException('Thiếu tham chiếu hồ sơ.');
