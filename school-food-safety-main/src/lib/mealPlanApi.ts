@@ -1,6 +1,6 @@
 import { getAccessToken, getStoredUser } from './authApi';
 import { fetchMyKitchenContext } from './myKitchenApi';
-import { getManagedSchools } from './usersApi';
+import { getManagedSchools, getMyAssignedSchool } from './usersApi';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -47,7 +47,13 @@ export async function loadMealPlanWorkspace() {
     fetchMyKitchenContext(),
     request<Array<{ id: string; name: string; versions: Array<{ id: string; versionNo: number; status: string; recipeSnapshot?: Record<string, unknown> | null; approvals?: Array<{ schoolId: string; status: string }> }> }>>('/dishes'),
   ]);
-  const schools = (context.kitchen.schools ?? []).map(row => ({ id: row.school.id, name: row.school.name }));
+  // Bếp trung tâm phục vụ nhiều trường; bếp tại trường chỉ phục vụ trường sở hữu bếp.
+  // Không lấy danh sách trường từ dữ liệu demo hoặc từ các thực đơn đã tạo.
+  const schools = context.providerType === 'SCHOOL'
+    ? (context.kitchen.schoolId && user.schoolId === context.kitchen.schoolId
+        ? [{ id: context.kitchen.schoolId, name: (await getMyAssignedSchool()).name }]
+        : [])
+    : (context.kitchen.schools ?? []).map(row => ({ id: row.school.id, name: row.school.name }));
   const dishes = rawDishes.flatMap(dish => (dish.versions ?? []).filter(version => version.approvals?.some(a => a.status === 'APPROVED')).map(version => ({
     versionId: version.id, dishId: dish.id, name: dish.name, versionNo: version.versionNo,
     ageBand: typeof version.recipeSnapshot?.ageBand === 'string' ? version.recipeSnapshot.ageBand : undefined,
