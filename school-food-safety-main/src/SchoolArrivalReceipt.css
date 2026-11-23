@@ -1,0 +1,18 @@
+/* Detailed school-delivery receipt. Scoped to the existing supervision modal. */
+.supervision-edit-form .arrival-section{border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0;display:grid;gap:14px;background:var(--surface)}
+.supervision-edit-form .arrival-section legend{padding:0 8px;font-size:13px;font-weight:800;color:var(--text)}
+.supervision-edit-form .arrival-section label{margin:0;min-width:0;display:grid;gap:7px}
+.supervision-edit-form .arrival-section select{width:100%;border:1px solid var(--border);border-radius:9px;padding:12px;background:var(--surface);color:var(--text);font-size:13px;min-height:43px}
+.supervision-edit-form .arrival-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:center}
+.supervision-edit-form .arrival-grid>div{border-radius:9px;background:var(--surface-alt);padding:12px;min-height:60px}
+.supervision-edit-form .arrival-grid small{font-size:11px;color:var(--muted);display:block}
+.supervision-edit-form .arrival-grid strong{display:block;font-size:14px;margin-top:5px;overflow-wrap:anywhere}
+.supervision-edit-form .arrival-help{font-size:12px;color:var(--muted);line-height:1.6}
+.supervision-edit-form .arrival-dish{display:grid;grid-template-columns:minmax(120px,1fr) minmax(150px,1fr) minmax(130px,.75fr);align-items:end;gap:10px;padding:10px 0;border-top:1px solid var(--border)}
+.supervision-edit-form .arrival-dish>strong{font-size:13px;line-height:1.5;align-self:center}
+.supervision-edit-form .arrival-warning{padding:12px;border-radius:9px;background:#fff1dd;color:#80501c;font-size:12px;line-height:1.6}
+.supervision-edit-form .arrival-attestation{display:flex!important;flex-direction:row!important;gap:10px!important;align-items:flex-start!important;padding:12px;background:var(--surface-alt);border-radius:9px;font-size:12px;line-height:1.6;cursor:pointer}
+.supervision-edit-form .arrival-attestation input[type=checkbox]{width:18px!important;height:18px!important;min-width:18px;margin:1px 0 0;padding:0;accent-color:var(--primary)}
+.supervision-edit-form .arrival-attestation span{flex:1}
+[data-theme=dark] .supervision-edit-form .arrival-warning{background:#49371e;color:#ffe0ab}
+@media(max-width:630px){.supervision-edit-form .arrival-grid{grid-template-columns:1fr}.supervision-edit-form .arrival-dish{grid-template-columns:1fr}.supervision-edit-form .arrival-dish>strong{padding-top:5px}}
