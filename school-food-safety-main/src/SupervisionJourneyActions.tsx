@@ -35,6 +35,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   const contextQuery = useQuery({queryKey:['supervision-context',scope.schoolId,scope.serviceDate,scope.mealType],queryFn:()=>readSupervisionContext(scope),enabled:serverMode})
   const [revision, setRevision] = useState(0)
   const [editing, setEditing] = useState<Editing | null>(null)
+  const [viewReceipt,setViewReceipt] = useState(false)
   const [note, setNote] = useState('')
   const [receivedServings,setReceivedServings] = useState('')
   const [receiptChecked,setReceiptChecked] = useState(false)
@@ -153,15 +154,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
           <span className="supervision-check-icon">{event?.confirmed ? <CheckCircle2 size={18}/> : event ? <Clock3 size={18}/> : <Activity size={18}/>}</span>
           <div className="supervision-stage-info"><strong>{stageNames[status]}</strong><small>{event ? `${event.actorLabel} · ${event.time}${event.confirmedAt ? ' · BGH xác nhận' : ''}` : 'Chưa ghi nhận mới'}</small>{event?.confirmationNote && (role === 'school_board' || role === 'school_kitchen' || role === 'central_kitchen') && <small>Ghi chú xác nhận: {event.confirmationNote}</small>}
             {serverMode && status === 'ARRIVED' && serverQuery.data?.stages.ARRIVED?.arrival && <small>Thực nhận: {serverQuery.data.stages.ARRIVED.arrival.receivedServings.toLocaleString('vi-VN')} suất · {serverQuery.data.stages.ARRIVED.arrival.result === 'ACCEPTED' ? 'Đã chấp nhận' : serverQuery.data.stages.ARRIVED.arrival.result === 'REJECTED' ? 'Từ chối tiếp nhận' : serverQuery.data.stages.ARRIVED.arrival.result === 'CONDITIONAL' ? 'Tạm giữ chờ xử lý' : serverQuery.data.stages.ARRIVED.arrival.condition === 'GOOD' ? 'Tình trạng tốt' : 'Có lưu ý khi tiếp nhận'}</small>}
-            {serverMode && status==='ARRIVED' && serverQuery.data?.stages.ARRIVED?.arrival && <details className="supervision-stage-revisions">
-              <summary>Xem phiếu giao nhận đã lưu</summary>
-              <div className="arrival-saved">
-                <p>Đến trường: {serverQuery.data.stages.ARRIVED.arrival.arrivalTime??'Chưa ghi'} · Người giao: {serverQuery.data.stages.ARRIVED.arrival.deliveryPerson??'Chưa ghi'}</p>
-                <p>Bao gói: {serverQuery.data.stages.ARRIVED.arrival.packaging==='ISSUE'?'Bất thường':'Không ghi nhận bất thường'} · Cảm quan: {serverQuery.data.stages.ARRIVED.arrival.sensory==='ISSUE'?'Bất thường':'Không ghi nhận bất thường'}</p>
-                <ul>{serverQuery.data.stages.ARRIVED.arrival.dishChecks?.map(item=><li key={item.dishId}>{item.name}: {item.status==='MATCH'?'Đủ, đúng món':item.status==='SHORT'?'Thiếu / sai lệch':'Không nhận được món'}{item.temperatureC!==null ? ' · '+item.temperatureC+'°C' : ''}</li>)}</ul>
-                {serverQuery.data.stages.ARRIVED.arrival.photo && <img className="arrival-saved-photo" src={serverQuery.data.stages.ARRIVED.arrival.photo} alt="Hình ảnh giao nhận đã lưu"/>}
-              </div>
-            </details>}
+            {serverMode && status==='ARRIVED' && serverQuery.data?.stages.ARRIVED?.arrival && <button type="button" className="arrival-open-receipt" onClick={()=>setViewReceipt(true)}><ShieldCheck size={15}/> Xem phiếu giao nhận đã lưu</button>}
             {serverMode && serverQuery.data?.stages[status]?.lateReason && <small>Lý do ghi nhận muộn: {serverQuery.data.stages[status].lateReason}</small>}
             {serverMode && serverQuery.data?.stages[status]?.reopenReason && <small>BGH yêu cầu điều chỉnh: {serverQuery.data.stages[status].reopenReason}</small>}
             {serverMode && (serverQuery.data?.stages[status]?.history?.length??0)>0 && <details className="supervision-stage-revisions">
@@ -173,6 +166,50 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
       })}
     </div>
     <p className="supervision-stage-footnote">{saved?.events.length ? (serverMode ? 'Các mốc được lưu theo đúng bữa trên hệ thống. BGH phải xác nhận để ảnh phục vụ được công khai.' : 'Các mốc đã ghi nhận trong DEMO được lưu riêng theo bữa. BGH phải xác nhận để ảnh phục vụ được công khai.') : 'Đang hiển thị lịch trình minh họa ở nhật ký bên dưới. Khi bếp bắt đầu báo cáo, lịch trình sẽ chuyển sang các mốc ghi nhận mới của bữa này.'} Không phải chứng nhận an toàn thực phẩm.</p>
+    {viewReceipt && serverQuery.data?.stages.ARRIVED?.arrival && (() => {
+      const arrival = serverQuery.data.stages.ARRIVED.arrival
+      const stage = serverQuery.data.stages.ARRIVED
+      const resultLabel = arrival.result==='ACCEPTED'?'Đã chấp nhận':arrival.result==='REJECTED'?'Từ chối tiếp nhận':arrival.result==='CONDITIONAL'?'Tạm giữ, chờ xử lý':arrival.condition==='GOOD'?'Đã xác nhận':'Có lưu ý'
+      return <div className="supervision-edit-backdrop arrival-receipt-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setViewReceipt(false)}}>
+        <section className="arrival-receipt-modal" role="dialog" aria-modal="true" aria-labelledby="arrival-receipt-title" onKeyDown={event=>{if(event.key==='Escape')setViewReceipt(false)}}>
+          <header className="arrival-receipt-header">
+            <div><span className="section-kicker">HỒ SƠ GIAO NHẬN · CHỈ XEM</span><h2 id="arrival-receipt-title">Phiếu tiếp nhận suất ăn</h2><p>{school.name} · {new Date(date+'T12:00:00').toLocaleDateString('vi-VN')} · {mealLabel}</p></div>
+            <button type="button" className="icon-button" onClick={()=>setViewReceipt(false)} aria-label="Đóng phiếu giao nhận"><X size={20}/></button>
+          </header>
+          <div className="arrival-receipt-body">
+            <div className="arrival-receipt-summary">
+              <div><small>KẾT LUẬN GIAO NHẬN</small><strong className={arrival.result==='REJECTED'?'arrival-result-rejected':arrival.result==='CONDITIONAL'?'arrival-result-pending':'arrival-result-accepted'}>{resultLabel}</strong></div>
+              <div><small>SỐ SUẤT THỰC NHẬN</small><strong>{arrival.receivedServings.toLocaleString('vi-VN')}</strong></div>
+              <div><small>SỐ SUẤT DỰ KIẾN</small><strong>{contextQuery.data?.menu?.servings.toLocaleString('vi-VN')??'—'}</strong></div>
+            </div>
+            <section className="arrival-receipt-section"><h3>01. Thông tin bàn giao</h3><div className="arrival-receipt-facts">
+              <div><span>Trường tiếp nhận</span><strong>{school.name}</strong></div>
+              <div><span>Bếp cung cấp</span><strong>{contextQuery.data?.kitchen?.name??'—'}</strong></div>
+              <div><span>Giờ xuất bếp</span><strong>{serverQuery.data?.stages.DISPATCHED?.time??'—'}</strong></div>
+              <div><span>Giờ đến trường</span><strong>{arrival.arrivalTime??'—'}</strong></div>
+              <div><span>Người giao</span><strong>{arrival.deliveryPerson??'Chưa ghi'}</strong></div>
+              <div><span>Đơn vị vận chuyển</span><strong>{arrival.transportUnit||'Không ghi nhận'}</strong></div>
+              <div><span>Người xác nhận</span><strong>Ban Giám hiệu</strong></div>
+              <div><span>Thời gian xác nhận</span><strong>{stage.confirmedAt?new Date(stage.confirmedAt).toLocaleString('vi-VN'):'—'}</strong></div>
+            </div></section>
+            <section className="arrival-receipt-section"><h3>02. Đối chiếu món ăn</h3>
+              <div className="arrival-receipt-table-wrap"><table className="arrival-receipt-table"><thead><tr><th>Món ăn</th><th>Đối chiếu</th><th>Nhiệt độ đo</th></tr></thead><tbody>
+                {(arrival.dishChecks??[]).map(item=><tr key={item.dishId}><td>{item.name}</td><td>{item.status==='MATCH'?'Đủ, đúng món':item.status==='SHORT'?'Thiếu / sai lệch':'Không nhận được'}</td><td>{item.temperatureC==null?'Không ghi nhận':item.temperatureC+' °C'}</td></tr>)}
+                {!arrival.dishChecks?.length && <tr><td colSpan={3}>Phiếu cũ chưa có đối chiếu từng món.</td></tr>}
+              </tbody></table></div>
+            </section>
+            <section className="arrival-receipt-section"><h3>03. Kiểm tra tình trạng</h3><div className="arrival-receipt-facts">
+              <div><span>Bao gói / niêm phong</span><strong>{arrival.packaging==='OK'?'Không phát hiện bất thường':arrival.packaging==='ISSUE'?'Có bất thường':'Chưa ghi nhận'}</strong></div>
+              <div><span>Kiểm tra cảm quan</span><strong>{arrival.sensory==='OK'?'Không phát hiện bất thường':arrival.sensory==='ISSUE'?'Có bất thường':'Chưa ghi nhận'}</strong></div>
+            </div></section>
+            <section className="arrival-receipt-section"><h3>04. Ghi chú và minh chứng</h3><p className="arrival-receipt-note">{stage.confirmationNote||stage.note||'Không có ghi chú.'}</p>
+              {arrival.photo && <div className="arrival-receipt-evidence"><img src={arrival.photo} alt="Ảnh thực tế tại thời điểm giao nhận"/><small>Ảnh giao nhận đã lưu</small></div>}
+            </section>
+          </div>
+          <footer className="arrival-receipt-footer"><span><ShieldCheck size={15}/> Hồ sơ được lưu trên hệ thống · Không thay thế kết luận an toàn thực phẩm</span><button type="button" className="primary" onClick={()=>setViewReceipt(false)}>Đóng phiếu</button></footer>
+        </section>
+      </div>
+    })()}
     {editing && <div className="supervision-edit-backdrop" role="presentation" onMouseDown={event => {if(event.target===event.currentTarget)setEditing(null)}}>
       <section role="dialog" aria-modal="true" aria-labelledby="edit-stage-title" className="supervision-edit-dialog">
         <div className="dialog-head"><h2 id="edit-stage-title">{isArrivalReceipt(editing) ? (editing.action==='arrival_resolve'?'Phiếu kiểm tra lại giao nhận':'Phiếu xác nhận Đến trường') : editing.action === 'report' ? 'Cập nhật mốc vận hành' : editing.action === 'reopen' ? 'Mở điều chỉnh mốc vận hành' : 'Xác nhận mốc vận hành'}</h2><button className="icon-button" type="button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
