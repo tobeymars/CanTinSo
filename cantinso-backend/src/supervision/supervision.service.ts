@@ -108,7 +108,7 @@ export class SupervisionService {
     const {action,itemId} = body;
     const note = typeof body.note === 'string' ? body.note.trim() : '';
     if (note.length < 5 || note.length > 1000) throw new BadRequestException('Ghi chú phải có từ 5 đến 1000 ký tự.');
-    if (!['check_report','check_confirm','check_revision','check_reopen','stage_report','stage_confirm','stage_reopen','meal_confirm','sample_dispose','sample_hold'].includes(action)) throw new BadRequestException('Thao tác không hợp lệ.');
+    if (!['check_report','check_confirm','check_revision','check_reopen','stage_report','stage_confirm','stage_arrival_confirm','stage_reopen','meal_confirm','sample_dispose','sample_hold'].includes(action)) throw new BadRequestException('Thao tác không hợp lệ.');
     if (action.startsWith('check_') && !checkIds.includes(itemId)) throw new BadRequestException('Mục kiểm thực không hợp lệ.');
     if (action.startsWith('stage_') && !stages.includes(itemId)) throw new BadRequestException('Mốc vận hành không hợp lệ.');
     if ((action.endsWith('_confirm') || action === 'check_revision' || action === 'check_reopen' || action === 'stage_reopen') && user.role !== 'SCHOOL_ADMIN') throw new ForbiddenException('Chỉ BGH được xác nhận.');
@@ -303,6 +303,26 @@ export class SupervisionService {
         if (itemId === 'READY' && (typeof body.photo !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(body.photo) || body.photo.length>1100000)) throw new BadRequestException('Cần ảnh thực tế hợp lệ tối đa 750 KB.');
         journey[itemId] = {...entry,status:itemId,time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),confirmed:false,photos:itemId==='READY'?[body.photo]:[],
           history:[...(previousStage?.history??[]),...(previousStage?[{...previousStage,history:undefined}]:[])]};
+      } else if (action === 'stage_arrival_confirm') {
+        // BGH directly records and confirms the handover at its own school.
+        // This is a receipt of delivery, not a food-safety certification.
+        if (itemId !== 'ARRIVED') throw new BadRequestException('Chỉ hỗ trợ xác nhận mốc Đến trường.');
+        const kitchen = await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}});
+        if (kitchen?.type !== 'CENTRAL') throw new ConflictException('Bếp tại trường không có mốc Đến trường.');
+        if (!journey.DISPATCHED?.confirmed) throw new ConflictException('Bếp trung tâm phải xuất bếp và được BGH xác nhận trước khi tiếp nhận.');
+        if (journey.ARRIVED) throw new ConflictException('Mốc Đến trường đã có hồ sơ. Vui lòng sử dụng quy trình duyệt hoặc điều chỉnh hiện có.');
+        const receivedServings = body.receivedServings;
+        if (!Number.isSafeInteger(receivedServings) || receivedServings < 1 || receivedServings > 1000000)
+          throw new BadRequestException('Số suất thực nhận phải là số nguyên từ 1 đến 1.000.000.');
+        if (body.condition !== 'GOOD' && body.condition !== 'WITH_NOTES')
+          throw new BadRequestException('Phải ghi nhận tình trạng thức ăn khi tiếp nhận.');
+        if (body.receiptChecked !== true)
+          throw new BadRequestException('BGH phải xác nhận đã kiểm tra thực tế trước khi lưu.');
+        const arrival = {receivedServings,condition:body.condition,receiptChecked:true};
+        journey.ARRIVED = {...entry,status:'ARRIVED',
+          time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),
+          confirmed:true,confirmedAt:entry.at,confirmedBy:user.sub,confirmationNote:note,
+          note,photos:[],arrival,history:[]};
       } else if (action === 'stage_reopen') {
         if (!journey[itemId]?.confirmed) throw new ConflictException('Chỉ được mở điều chỉnh mốc đã xác nhận.');
         journey[itemId] = {...journey[itemId],confirmed:false,revisionRequested:true,
@@ -320,7 +340,7 @@ export class SupervisionService {
         approvals.push({...entry,snapshot});
       }
       const updated = await tx.supervisionMeal.update({where:this.key(s),data:{checks:checks as Prisma.InputJsonValue,stages:journey as Prisma.InputJsonValue,approvals:approvals as Prisma.InputJsonValue}});
-      await tx.supervisionEvent.create({data:{id:eventId,mealId:updated.id,actorId:user.sub,actorRole:user.role,action,itemId:typeof itemId==='string'?itemId:'meal',payload:{note,...(lateReason?{lateReason}:{})}}});
+      await tx.supervisionEvent.create({data:{id:eventId,mealId:updated.id,actorId:user.sub,actorRole:user.role,action,itemId:typeof itemId==='string'?itemId:'meal',payload:{note,...(action==='stage_arrival_confirm'?{receivedServings:body.receivedServings,condition:body.condition,receiptChecked:true}:{}),...(lateReason?{lateReason}:{})}}});
       return {success:true,id:eventId};
       },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
     } catch(error) {
