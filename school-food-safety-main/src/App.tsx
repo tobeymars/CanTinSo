@@ -1622,7 +1622,17 @@ function Shell() {
                 </div>
               ) : (
                 <>
-                 {location.pathname === "/giam-sat" && (
+                 {isSchoolKitchenReceiver && location.pathname === "/thuc-don" && (
+                    <Suspense fallback={<div className="loading-grid"><div className="skeleton"/></div>}>
+                      <SchoolReceiverWorkspace schoolId={school.id} schoolName={school.name} date={date} view="menu"/>
+                    </Suspense>
+                  )}
+                  {isSchoolKitchenReceiver && location.pathname === "/giam-sat" && (
+                    <Suspense fallback={<div className="loading-grid"><div className="skeleton"/></div>}>
+                      <SchoolReceiverWorkspace schoolId={school.id} schoolName={school.name} date={date} view="supervision"/>
+                    </Suspense>
+                  )}
+                  {!isSchoolKitchenReceiver && location.pathname === "/giam-sat" && (
                     <SupervisionSection
                       school={school}
                       date={date}
