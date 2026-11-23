@@ -7,6 +7,7 @@ import { validateSupervisionWriteDate } from './supervision-date-policy';
 import { validateFoodSafetyForm } from './food-safety-forms';
 import { verifySamplesBeforeDispatch } from './dispatch-sample-policy';
 import { validateArrivalReceipt, arrivalAllowsService } from './arrival-receipt';
+import { validateServingStageReport } from './serving-stage-form';
 
 const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sample'];
 const stages = ['DISPATCHED', 'ARRIVED', 'PLATED', 'READY'];
@@ -304,8 +305,27 @@ export class SupervisionService {
         if (required[0]==='DISPATCHED' && ['PLATED','READY'].includes(itemId) &&
           (!journey.ARRIVED?.confirmed || !arrivalAllowsService(journey.ARRIVED.arrival)))
           throw new ConflictException('BGH chưa chấp nhận phiếu giao nhận. Không được chuyển sang ra món hoặc phục vụ.');
+        let servingReport;
+        if (itemId==='PLATED' || itemId==='READY') {
+          const plan=await tx.mealPlan.findUnique({
+            where:{schoolId_serviceDate_mealType:{schoolId:s.schoolId,serviceDate:s.serviceDate,mealType:s.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
+            include:{revisions:{where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,
+              include:{items:{include:{dishVersion:{include:{dish:true}}}},ageGroups:{select:{plannedServings:true}}}}},
+          });
+          const revision=plan?.revisions[0];
+          servingReport=validateServingStageReport(body,itemId,
+            revision?.items.map(row=>({id:row.id,name:row.dishVersion.dish.name}))??[],
+            revision?.ageGroups.reduce((total,row)=>total+row.plannedServings,0)??0,date);
+          if(itemId==='READY') {
+            if(!journey.PLATED?.confirmed || journey.PLATED?.revisionRequested)
+              throw new ConflictException('Mốc Ra món phải được BGH xác nhận trước khi chuyển Sẵn sàng phục vụ.');
+            const platedTime=journey.PLATED?.serving?.occurredAt;
+            if(typeof platedTime==='string' && body.occurredAt < platedTime)
+              throw new ConflictException('Giờ Sẵn sàng phục vụ không được trước giờ Ra món.');
+          }
+        }
         if (itemId === 'READY' && (typeof body.photo !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(body.photo) || body.photo.length>1100000)) throw new BadRequestException('Cần ảnh thực tế hợp lệ tối đa 750 KB.');
-        journey[itemId] = {...entry,status:itemId,time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),confirmed:false,photos:itemId==='READY'?[body.photo]:[],
+        journey[itemId] = {...entry,status:itemId,time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),confirmed:false,photos:itemId==='READY'?[body.photo]:[],...(servingReport?{serving:servingReport}:{}),
           history:[...(previousStage?.history??[]),...(previousStage?[{...previousStage,history:undefined}]:[])]};
       } else if (action === 'stage_arrival_confirm' || action === 'stage_arrival_resolve') {
         // BGH directly records and confirms the handover at its own school.
@@ -349,6 +369,12 @@ export class SupervisionService {
       } else if (action === 'stage_confirm') {
         if (!journey[itemId] || journey[itemId].confirmed || journey[itemId].revisionRequested) throw new ConflictException('Mốc chưa được bếp báo cáo bổ sung để xác nhận.');
         let arrival;
+        if(itemId==='READY' && (!journey.PLATED?.confirmed || journey.PLATED?.revisionRequested))
+          throw new ConflictException('Ra món chưa được BGH xác nhận.');
+        if(itemId==='READY' && !journey[itemId]?.serving)
+          throw new ConflictException('Thiếu phiếu sẵn sàng phục vụ. Yêu cầu báo cáo bổ sung.');
+        if(itemId==='PLATED' && !journey[itemId]?.serving)
+          throw new ConflictException('Thiếu phiếu ra món. Yêu cầu báo cáo bổ sung.');
         if(itemId==='ARRIVED'){
           const plan=await tx.mealPlan.findUnique({
             where:{schoolId_serviceDate_mealType:{schoolId:s.schoolId,serviceDate:s.serviceDate,mealType:s.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
@@ -380,7 +406,7 @@ export class SupervisionService {
         approvals.push({...entry,snapshot});
       }
       const updated = await tx.supervisionMeal.update({where:this.key(s),data:{checks:checks as Prisma.InputJsonValue,stages:journey as Prisma.InputJsonValue,approvals:approvals as Prisma.InputJsonValue}});
-      await tx.supervisionEvent.create({data:{id:eventId,mealId:updated.id,actorId:user.sub,actorRole:user.role,action,itemId:typeof itemId==='string'?itemId:'meal',payload:{note,...((['stage_arrival_confirm','stage_arrival_resolve'].includes(action) || (action==='stage_confirm' && itemId==='ARRIVED'))?{receivedServings:body.receivedServings,result:body.result,arrivalTime:body.arrivalTime,deliveryPerson:body.deliveryPerson,receiptChecked:true}:{}),...(lateReason?{lateReason}:{})}}});
+      await tx.supervisionEvent.create({data:{id:eventId,mealId:updated.id,actorId:user.sub,actorRole:user.role,action,itemId:typeof itemId==='string'?itemId:'meal',payload:{note,...((['stage_arrival_confirm','stage_arrival_resolve'].includes(action) || (action==='stage_confirm' && itemId==='ARRIVED'))?{receivedServings:body.receivedServings,result:body.result,arrivalTime:body.arrivalTime,deliveryPerson:body.deliveryPerson,receiptChecked:true}:{}),...(action==='stage_report' && ['PLATED','READY'].includes(itemId)?{actualServings:journey[itemId]?.serving?.actualServings,occurredAt:journey[itemId]?.serving?.occurredAt}:{}),...(lateReason?{lateReason}:{})}}});
       return {success:true,id:eventId};
       },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
     } catch(error) {
