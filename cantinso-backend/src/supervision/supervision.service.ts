@@ -115,6 +115,8 @@ export class SupervisionService {
     if (action.startsWith('stage_') && !stages.includes(itemId)) throw new BadRequestException('Mốc vận hành không hợp lệ.');
     if ((action.endsWith('_confirm') || action === 'check_revision' || action === 'check_reopen' || action === 'stage_reopen' || action === 'stage_arrival_resolve') && user.role !== 'SCHOOL_ADMIN') throw new ForbiddenException('Chỉ BGH được xác nhận.');
     if ((action === 'check_report' || action === 'stage_report') && !['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role)) throw new ForbiddenException('Chỉ bếp được báo cáo.');
+    if (action === 'check_report' && user.role === 'SCHOOL_KITCHEN' && user.kitchenId !== s.kitchenId)
+      throw new ForbiddenException('Nhân viên tiếp nhận tại trường chỉ được xem kiểm thực của bếp trung tâm.');
     const sampleLifecycle=['sample_dispose','sample_hold'].includes(action);
     const lateReason = sampleLifecycle ? '' : validateSupervisionWriteDate(date,body);
     try {
@@ -297,6 +299,7 @@ export class SupervisionService {
         if (previousStage && !previousStage.revisionRequested) throw new ConflictException('Mốc đã báo cáo.');
         const required = s.kitchenId && (await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}}))?.type === 'CENTRAL' ? stages : ['PLATED','READY'];
         if (!required.includes(itemId) || (!previousStage && required.find(x=>!journey[x])!==itemId)) throw new ConflictException('Cần báo cáo mốc theo thứ tự.');
+        if (itemId === 'ARRIVED') throw new ForbiddenException('Mốc Đến trường do BGH lập phiếu và xác nhận, không do nhân viên bếp báo cáo.');
         if (itemId === 'DISPATCHED' && user.role !== 'CENTRAL_KITCHEN') throw new ForbiddenException('Chỉ bếp trung tâm được báo cáo xuất bếp.');
         if (itemId === 'DISPATCHED') verifySamplesBeforeDispatch(
           checks.food_sample, checks.processing, new Date(entry.at),
