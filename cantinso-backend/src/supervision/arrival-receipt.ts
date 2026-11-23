@@ -24,7 +24,7 @@ export function validateArrivalReceipt(
   if (!dishes.length || !Number.isSafeInteger(plannedServings) || plannedServings < 1)
     throw new ConflictException('Chưa có thực đơn được duyệt để đối chiếu khi tiếp nhận.');
   const arrivalTime = typeof body.arrivalTime === 'string' ? body.arrivalTime.trim() : '';
-  if (!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(arrivalTime))
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(arrivalTime))
     throw new BadRequestException('Giờ đến thực tế phải đúng định dạng HH:mm.');
   const arrivalAt = new Date(date + 'T' + arrivalTime + ':00+07:00');
   if (!Number.isFinite(arrivalAt.getTime()) || arrivalAt.getTime() > Date.now() + 60000)
@@ -73,7 +73,7 @@ export function validateArrivalReceipt(
   if (hasIssue && result === 'ACCEPTED')
     throw new ConflictException('Có bất thường hoặc số suất chênh lệch. Không thể xác nhận đủ điều kiện phục vụ.');
   const photo = typeof body.photo === 'string' && body.photo.trim() ? body.photo : null;
-  if (photo && (!/^data:image\\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo) || photo.length > 1100000))
+  if (photo && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo) || photo.length > 1100000))
     throw new BadRequestException('Ảnh giao nhận chỉ hỗ trợ JPG, PNG, WebP tối đa 750 KB.');
   return {arrivalTime,deliveryPerson,transportUnit:transportUnit || null,receivedServings,packaging,
     sensory,dishChecks,result,condition:hasIssue?'WITH_NOTES':'GOOD',receiptChecked:true,photo};
