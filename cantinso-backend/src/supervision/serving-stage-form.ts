@@ -52,13 +52,15 @@ export function validateServingStageReport(body: any, stage: 'PLATED' | 'READY',
   let foodCondition: 'PASS'|'ISSUE'|undefined;
   let handHygieneChecked: boolean|undefined;
   if (stage==='PLATED') {
-    portionStartAt=typeof body.portionStartAt==='string'?body.portionStartAt.trim():'';
-    if (!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(portionStartAt))
+    const startAt=typeof body.portionStartAt==='string'?body.portionStartAt.trim():'';
+    portionStartAt=startAt;
+    if (!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(startAt))
       throw new BadRequestException('Cần ghi giờ bắt đầu chia suất theo HH:mm.');
-    if (portionStartAt>occurredAt)
+    if (startAt>occurredAt)
       throw new BadRequestException('Giờ bắt đầu chia suất không được sau giờ hoàn tất ra món.');
-    distributionArea=typeof body.distributionArea==='string'?body.distributionArea.trim():'';
-    if(distributionArea.length<2||distributionArea.length>160)
+    const area=typeof body.distributionArea==='string'?body.distributionArea.trim():'';
+    distributionArea=area;
+    if(area.length<2||area.length>160)
       throw new BadRequestException('Cần ghi vị trí chia suất (2–160 ký tự).');
     handHygieneChecked=body.handHygieneChecked===true;
     if(!handHygieneChecked)
