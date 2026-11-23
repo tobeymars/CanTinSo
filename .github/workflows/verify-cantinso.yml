@@ -27,6 +27,7 @@ jobs:
       - run: npx prisma validate
       - run: npx prisma generate
       - run: npm run test:units
+      - run: npm run test:supervision-dates
       - run: npm run build
 
   frontend:
