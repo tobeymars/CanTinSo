@@ -6,6 +6,7 @@ import type { ServerSupervision } from './lib/supervisionApi'
 import { writeServerSupervision } from './lib/supervisionApi'
 import { isDetailedInspection } from './SupervisionInspectionForm'
 import type { ViewRole } from './lib/store'
+import { getStoredUser } from './lib/authApi'
 
 export default function SupervisionSampleLifecycle({scope,data,role}:{
   scope:SupervisionScope;data:ServerSupervision;role:ViewRole
@@ -22,7 +23,7 @@ export default function SupervisionSampleLifecycle({scope,data,role}:{
   const holds=data.events.filter(event=>event.action==='sample_hold')
   const disposed=data.events.filter(event=>event.action==='sample_dispose')
   const canHold=['central_kitchen','school_kitchen','school_board'].includes(role)
-  const canDispose=['central_kitchen','school_kitchen'].includes(role)
+  const canDispose=['central_kitchen','school_kitchen'].includes(role) && !!getStoredUser()?.kitchenId
   const done=(dishId:string)=>disposed.find(event=>event.payload?.dishId===dishId)
   const send=async(event:FormEvent<HTMLFormElement>)=>{
     event.preventDefault()
