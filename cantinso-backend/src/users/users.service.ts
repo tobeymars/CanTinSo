@@ -198,7 +198,7 @@ export class UsersService {
       return { providerType: actor.role === UserRole.CENTRAL_KITCHEN ? "CENTRAL" as const : "SCHOOL" as const, assignmentId: null, startsAt: null, kitchen };
     }
 
-    if (![UserRole.SCHOOL_ADMIN, UserRole.SCHOOL_KITCHEN].includes(actor.role as UserRole) || !actor.schoolId) {
+    if ((actor.role !== UserRole.SCHOOL_ADMIN && actor.role !== UserRole.SCHOOL_KITCHEN) || !actor.schoolId) {
       throw new ForbiddenException("Tài khoản chưa được gán trường để xem thông tin bếp phục vụ.");
     }
 
