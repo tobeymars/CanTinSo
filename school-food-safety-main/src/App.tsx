@@ -735,7 +735,7 @@ function SupervisionMealContent({
   const serverQuery = useQuery({queryKey:['supervision-server',school.id,date,mealType],queryFn:()=>readServerSupervision(scope),enabled:serverMode});
   const effectiveSchool:School = serverMode ? {...school,mode:contextQuery.data?.kitchen?.type === 'CENTRAL' ? 'CENTRAL_KITCHEN' : 'ON_SITE'} : school;
   const realEvents = Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({
-    status,label:stageNames[status as keyof typeof stageNames] ?? status,time:item.time??'',actor:'Bếp',confirmed:!!item.confirmed,
+    status,label:stageNames[status as keyof typeof stageNames] ?? status,time:item.time??'',actor:item.actorRole==='SCHOOL_ADMIN'?'BGH':'Bếp',confirmed:!!item.confirmed,
     photos:item.photos??[],hasReportedPhotos:(item.photos?.length??0)>0,
   }));
   const effectiveData:DayData = serverMode ? {
