@@ -66,7 +66,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
     }
   }, [])
   void revision
-  const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:'Bếp',photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
+  const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:item.actorRole==='SCHOOL_ADMIN'?'BGH':'Bếp',photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
   const centralDelivery = serverMode && contextQuery.data?.kitchen?.type === 'CENTRAL'
   const stages = serverMode && contextQuery.data?.kitchen ? (centralDelivery ? ['DISPATCHED','ARRIVED','PLATED','READY'] : ['PLATED','READY']) as JourneyStatus[] : stagesForSchool(school.mode, role)
   const dateKind=serverMode?supervisionDateKind(date):'today'
