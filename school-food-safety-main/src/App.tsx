@@ -1597,7 +1597,7 @@ function Shell() {
                   </div>
                   <span className="updated">
                     <span />{" "}
-                    {demo
+                    {isAuthenticatedWorkspace ? "Dữ liệu hệ thống · Theo phạm vi tài khoản" : demo
                       ? "Dữ liệu minh họa · Theo phạm vi vai trò"
                       : "Dữ liệu theo phạm vi được cấp"}
                   </span>
