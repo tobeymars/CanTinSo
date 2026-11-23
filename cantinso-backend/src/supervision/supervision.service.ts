@@ -320,8 +320,17 @@ export class SupervisionService {
           throw new ConflictException('Chỉ được lập phiếu xử lý lại khi kết quả tiếp nhận trước đó chưa được chấp nhận.');
         const plan = await tx.mealPlan.findUnique({
           where:{schoolId_serviceDate_mealType:{schoolId:s.schoolId,serviceDate:s.serviceDate,mealType:s.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
-          include:{revisions:{where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,
-            include:{items:{include:{dishVersion:{include:{dish:true}}}},ageGroups:{select:{plannedServings:true}}}}}},
+          include: {
+            revisions: {
+              where: { status: 'APPROVED' },
+              orderBy: { revisionNo: 'desc' },
+              take: 1,
+              include: {
+                items: { include: { dishVersion: { include: { dish: true } } } },
+                ageGroups: { select: { plannedServings: true } },
+              },
+            },
+          },
         });
         const revision = plan?.revisions[0];
         const dishes = revision?.items.map(row=>({id:row.id,name:row.dishVersion.dish.name}))??[];
@@ -343,8 +352,17 @@ export class SupervisionService {
         if(itemId==='ARRIVED'){
           const plan=await tx.mealPlan.findUnique({
             where:{schoolId_serviceDate_mealType:{schoolId:s.schoolId,serviceDate:s.serviceDate,mealType:s.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
-            include:{revisions:{where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,
-              include:{items:{include:{dishVersion:{include:{dish:true}}}},ageGroups:{select:{plannedServings:true}}}}}},
+            include: {
+            revisions: {
+              where: { status: 'APPROVED' },
+              orderBy: { revisionNo: 'desc' },
+              take: 1,
+              include: {
+                items: { include: { dishVersion: { include: { dish: true } } } },
+                ageGroups: { select: { plannedServings: true } },
+              },
+            },
+          },
           });
           const revision=plan?.revisions[0];
           arrival=validateArrivalReceipt(body,revision?.items.map(row=>({id:row.id,name:row.dishVersion.dish.name}))??[],
