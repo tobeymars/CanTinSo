@@ -795,6 +795,12 @@ function SupervisionMealContent({
     </>
   );
 }
+/** Empty authenticated day: server-backed supervision loads the actual meal and events.
+ * This placeholder deliberately has no demo dishes, photos or stage history. */
+function emptyRealSupervisionDay(serviceDate: string, mealType: SupervisionMealType): DayData {
+  return {serviceDate,mealType,servings:0,suppliers:0,dishes:[],dishDetails:[],events:[],kitchen:'',
+    photo:'',updatedAt:'',transportDistanceKm:null,transportDurationMinutes:null,publicInspection:null,mealUseByAt:null};
+}
 /** Phạm vi dữ liệu luôn là (trường, ngày, bữa), không phụ thuộc vai trò. */
 function SupervisionSection({
   school, date, data, dailyMenu, dailyMenuLoading, dailyMenuError, mealType, role, onMealTypeChange, loading, error, onRetry,
@@ -1628,25 +1634,20 @@ function Shell() {
                       <SchoolReceiverWorkspace schoolId={school.id} schoolName={school.name} date={date} view="menu"/>
                     </Suspense>
                   )}
-                  {isSchoolKitchenReceiver && location.pathname === "/giam-sat" && (
-                    <Suspense fallback={<div className="loading-grid"><div className="skeleton"/></div>}>
-                      <SchoolReceiverWorkspace schoolId={school.id} schoolName={school.name} date={date} view="supervision"/>
-                    </Suspense>
-                  )}
-                  {!isSchoolKitchenReceiver && location.pathname === "/giam-sat" && (
+                  {location.pathname === "/giam-sat" && (
                     <SupervisionSection
                       school={school}
                       date={date}
-                      data={supervisionData}
+                      data={isSchoolKitchenReceiver ? emptyRealSupervisionDay(date,supervisionMealType) : supervisionData}
                       dailyMenu={supervisionDailyMenuQuery.data}
-                      dailyMenuLoading={supervisionDailyMenuQuery.isLoading}
-                      dailyMenuError={supervisionDailyMenuQuery.isError}
+                      dailyMenuLoading={isSchoolKitchenReceiver ? false : supervisionDailyMenuQuery.isLoading}
+                      dailyMenuError={isSchoolKitchenReceiver ? false : supervisionDailyMenuQuery.isError}
                       mealType={supervisionMealType}
                       role={role}
                       onMealTypeChange={setSupervisionMealType}
-                      loading={supervisionMealQuery.isLoading}
-                      error={supervisionMealQuery.isError}
-                      onRetry={() => { void supervisionMealQuery.refetch(); }}
+                      loading={isSchoolKitchenReceiver ? !school.id : supervisionMealQuery.isLoading}
+                      error={isSchoolKitchenReceiver ? false : supervisionMealQuery.isError}
+                      onRetry={() => { if (isSchoolKitchenReceiver) void schoolQuery.refetch(); else void supervisionMealQuery.refetch(); }}
                     />
                   )}
                   {location.pathname === "/ho-so-phap-ly" && (
