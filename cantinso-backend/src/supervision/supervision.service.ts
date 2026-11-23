@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/current-user.decorator';
 import { validateSupervisionWriteDate } from './supervision-date-policy';
+import { validateFoodSafetyForm } from './food-safety-forms';
 
 const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sample'];
 const stages = ['DISPATCHED', 'ARRIVED', 'PLATED', 'READY'];
@@ -183,13 +184,28 @@ export class SupervisionService {
           });
           body.ingredientReceipts=normalized;
         }
-        checks[itemId] = {status:'reported',evidenceRef:body.evidenceRef.trim(),ingredientReceipts:body.ingredientReceipts??[],history:[...(checks[itemId]?.history??[]),{...entry,action:'report',status:'reported',evidenceRef:body.evidenceRef.trim(),ingredientReceipts:body.ingredientReceipts??[]}]};
+        let inspection: ReturnType<typeof validateFoodSafetyForm> | undefined;
+        if(['processing','before_serving','food_sample'].includes(itemId)){
+          const plan=await tx.mealPlan.findUnique({
+            where:{schoolId_serviceDate_mealType:{schoolId:s.schoolId,serviceDate:s.serviceDate,mealType:s.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
+            include:{revisions:{where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,
+              include:{items:{include:{dishVersion:{include:{dish:true}}}}}}}
+          });
+          const dishes=plan?.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name}))??[];
+          inspection=validateFoodSafetyForm(itemId as 'processing'|'before_serving'|'food_sample',body.inspection,dishes,date);
+        }
+        const evidence={evidenceRef:body.evidenceRef.trim(),ingredientReceipts:body.ingredientReceipts??[],...(inspection?{inspection}:{})};
+        checks[itemId] = {status:'reported',...evidence,history:[...(checks[itemId]?.history??[]),{...entry,action:'report',status:'reported',...evidence}]};
       } else if (action === 'check_reopen') {
         if (checks[itemId]?.status!=='confirmed')
           throw new ConflictException('Chỉ được mở điều chỉnh mục kiểm thực đã xác nhận.');
         checks[itemId]={...checks[itemId],status:'revision_requested',history:[...(checks[itemId].history??[]),{...entry,action:'reopen',status:'revision_requested'}]};
       } else if (action === 'check_confirm' || action === 'check_revision') {
         if (checks[itemId]?.status !== 'reported') throw new ConflictException('Mục chưa chờ xác nhận.');
+        if(action==='check_confirm' && checks[itemId]?.inspection?.isPass===false)
+          throw new ConflictException('Kết quả kiểm tra có nội dung Không đạt. BGH phải yêu cầu bổ sung/xử lý, không được xác nhận đạt.');
+        if(action==='check_confirm' && ['processing','before_serving','food_sample'].includes(itemId) && !checks[itemId]?.inspection)
+          throw new ConflictException('Báo cáo theo mẫu cũ thiếu thông tin kiểm thực. BGH cần yêu cầu bổ sung trước khi xác nhận.');
         const status = action === 'check_confirm' ? 'confirmed' : 'revision_requested';
         checks[itemId] = {...checks[itemId],status,history:[...checks[itemId].history,{...entry,action:action==='check_confirm'?'confirm':'request_revision',status}]};
       } else if (action === 'stage_report') {
