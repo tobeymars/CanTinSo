@@ -20,7 +20,7 @@ import type { IngredientReceiptLine } from './lib/supervisionStatus'
 import { supervisionIngredientCatalog } from './lib/inventory'
 import Select from './components/ui/Select'
 import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit } from './lib/supervisionUnits'
-import SupervisionDateNotice, { supervisionDateKind } from './SupervisionDateNotice'
+import { supervisionDateKind } from './SupervisionDateNotice'
 
 const labels: Record<CheckStatus, string> = {
   not_reported: 'Chưa cập nhật', reported: 'Chờ BGH xác nhận',
@@ -169,7 +169,6 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
           }}><ClipboardCheck size={16}/>Xác nhận trạng thái ({pendingCount})</button>}
         </div>
       </div>
-      <SupervisionDateNotice date={date} serverMode={serverMode}/>
       {serverMode && contextQuery.isError && <p className="error" role="alert">Không lấy được dữ liệu kho, thực đơn theo trường và bữa từ hệ thống.</p>}
       {serverMode && contextQuery.data?.menu && <p className="muted">Thực đơn: {contextQuery.data.menu.dishes.map(dish=>dish.name).join(', ') || 'Chưa có món được duyệt'} · {contextQuery.data.menu.servings} suất dự kiến</p>}
       {serverMode && contextQuery.data && <p className="muted">Hồ sơ pháp lý bếp: {contextQuery.data.legalDocuments.length} hồ sơ · {contextQuery.data.legalDocuments.filter(doc=>doc.status==='valid').length} hồ sơ đánh dấu còn hiệu lực. Xem chi tiết tại Hồ sơ pháp lý & điều kiện bếp.</p>}
