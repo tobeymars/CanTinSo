@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, Clock3, ClipboardCheck, RefreshCw, ShieldCheck, Truck, Utensils } from 'lucide-react'
 import { getMyKitchen } from './lib/usersApi'
 import { readSupervisionContext, readServerSupervision, writeServerSupervision } from './lib/supervisionApi'
+import type { ServerSupervision } from './lib/supervisionApi'
 import type { SupervisionMealType, SupervisionScope } from './lib/supervisionStatus'
 import { supervisionDateKind } from './SupervisionDateNotice'
 import './SchoolReceiverWorkspace.css'
@@ -22,7 +23,6 @@ const stageHints: Record<Stage,string> = {
   READY:'Ghi nhận khi hoàn tất chuẩn bị, kèm ảnh thực tế'
 }
 const labelDate=(date:string)=>new Date(date+'T12:00:00').toLocaleDateString('vi-VN')
-const displayTime=(value:string)=>value?new Date(value).toLocaleString('vi-VN'):'Chưa ghi nhận'
 
 export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:Props) {
   const [mealType,setMealType] = useState<SupervisionMealType>('BREAKFAST')
@@ -43,7 +43,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
   const contexts={BREAKFAST:breakfast,LUNCH:lunch,SNACK:snack}
   const selected=contexts[mealType]
   const record=useQuery({queryKey:['supervision-server',schoolId,date,mealType],queryFn:()=>readServerSupervision(scope),enabled:!!schoolId})
-  const current=record.data?.stages??{}
+  const current: ServerSupervision['stages'] = record.data?.stages??{}
   const central=kitchen.data?.providerType==='CENTRAL'
   const order:Stage[]=central?[...stages]:['PLATED','READY']
   const next=order.find(stage=>!current[stage] || current[stage]?.revisionRequested)
