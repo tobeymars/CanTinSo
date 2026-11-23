@@ -107,7 +107,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   const pendingCount = checks.filter(item => item.status === 'reported').length
   const mealLabel = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
   const selected = editing && CHECK_DEFINITIONS.find(item => item.id === editing.id)
-  const start = (id: CheckId, action: CheckAction) => {
+  const start = (id: CheckId, action: CheckAction | 'reopen') => {
     setEditing({ id, action })
     setError('')
     setNote('')
@@ -140,7 +140,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
       if (serverMode) {
         await writeServerSupervision(scope,{action:editing.action==='report'?'check_report':editing.action==='confirm'?'check_confirm':editing.action==='reopen'?'check_reopen':'check_revision',itemId:editing.id,note,lateReason,evidenceRef,ingredientReceipts})
         await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
-      } else updateSupervisionStatus({ scope, id: editing.id, action: editing.action, role, schoolMode: school.mode, note, evidenceRef, ingredientReceipts })
+      } else updateSupervisionStatus({ scope, id: editing.id, action: editing.action as CheckAction, role, schoolMode: school.mode, note, evidenceRef, ingredientReceipts })
       setEditing(null)
       setError('')
       setMessage(serverMode ? 'Đã lưu trạng thái giám sát cho ' + mealLabel + '.' : 'Đã cập nhật trạng thái DEMO cho ' + mealLabel + '. Chưa phải kết quả kiểm tra ATTP chính thức.')
