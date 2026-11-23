@@ -56,7 +56,7 @@ export default function SupervisionSampleLifecycle({scope,data,role}:{
         </article>
       })}
     </div>
-    {canHold&&holds.length===0&&<button type="button" className="outline" onClick={()=>{setActive('hold');setError('')}}>Ghi nhận yêu cầu giữ mẫu (nghi ngờ ngộ độc / cơ quan yêu cầu)</button>}
+    {canHold&&holds.length===0&&disposed.length===0&&<button type="button" className="outline" onClick={()=>{setActive('hold');setError('')}}>Ghi nhận yêu cầu giữ mẫu (nghi ngờ ngộ độc / cơ quan yêu cầu)</button>}
     {active&&<form onSubmit={send} className="sif-lifecycle-form">
       <strong>{label}</strong>
       {active!=='hold'&&<><label>Người trực tiếp hủy mẫu *<input required minLength={2} maxLength={200} value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Họ tên người thực hiện"/></label>
