@@ -45,7 +45,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
   const record=useQuery({queryKey:['supervision-server',schoolId,date,mealType],queryFn:()=>readServerSupervision(scope),enabled:!!schoolId})
   const current: ServerSupervision['stages'] = record.data?.stages??{}
   const central=kitchen.data?.providerType==='CENTRAL'
-  const order:Stage[]=central?[...stages]:['PLATED','READY']
+  const order:Stage[]=kitchen.data ? (central?[...stages]:['PLATED','READY']) : []
   const next=order.find(stage=>!current[stage] || current[stage]?.revisionRequested)
   const canReport=next==='ARRIVED'||next==='PLATED'||next==='READY'
   const dateKind=supervisionDateKind(date)
@@ -138,7 +138,9 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
             </div>}
           {record.data?.approvalCurrent&&<p className="receiver-notice"><ShieldCheck size={17}/> BGH đã xác nhận tổng thể hồ sơ bữa ăn.</p>}
           {dateKind==='future'&&<p className="receiver-notice">Ngày tương lai chỉ được xem, không được báo cáo.</p>}
-          {!central&&!kitchen.isLoading&&<p className="receiver-notice">Trường dùng bếp tại chỗ: chỉ cần mốc Ra món và Sẵn sàng phục vụ.</p>}
+          {kitchen.isLoading&&<p className="receiver-notice">Đang xác định bếp cung cấp và các mốc bắt buộc…</p>}
+          {!kitchen.isLoading&&!kitchen.data&&<p className="error" role="alert">Chưa có bếp được phân công hoặc không truy vấn được bếp phục vụ. Không thể ghi nhận mốc vận hành.</p>}
+          {kitchen.data&&!central&&<p className="receiver-notice">Trường dùng bếp tại chỗ: chỉ cần mốc Ra món và Sẵn sàng phục vụ.</p>}
           {notice&&<p role="status" className="receiver-notice">{notice}</p>}
         </section>
         {editing&&<section className="card receiver-report">
