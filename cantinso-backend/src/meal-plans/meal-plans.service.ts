@@ -37,6 +37,17 @@ export class MealPlansService {
   }
 
   async list(user: AuthUser) {
+    // School-side receiving staff: only the school's approved menus, never the
+    // central kitchen's plans for other assigned schools or draft revisions.
+    if (user.role === 'SCHOOL_KITCHEN' && !user.kitchenId) {
+      if (!user.schoolId) throw new ForbiddenException('Tài khoản chưa được gắn với trường.');
+      return this.prisma.mealPlan.findMany({
+        where: { schoolId: user.schoolId, revisions: { some: { status: 'APPROVED' } } },
+        orderBy: [{ serviceDate: 'desc' }, { mealType: 'asc' }],
+        include: { school: { select: { id: true, name: true } },
+          revisions: { where: { status: 'APPROVED' }, orderBy: { revisionNo: 'desc' }, include: this.revisionInclude() } },
+      });
+    }
     if (user.role === 'SCHOOL_ADMIN') {
       if (!user.schoolId) throw new ForbiddenException('Tài khoản chưa được gắn với trường.');
       return this.prisma.mealPlan.findMany({
