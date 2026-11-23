@@ -131,8 +131,9 @@ export class SupervisionService {
         if(!['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role) && action==='sample_dispose')
           throw new ForbiddenException('Chỉ nhân viên bếp được ghi nhận hủy mẫu.');
         if(action==='sample_hold'){
-          const holds=await tx.supervisionEvent.findMany({where:{mealId:current.id,action:'sample_hold'}});
-          if(holds.length)throw new ConflictException('Đã có yêu cầu giữ mẫu; không được tự hủy.');
+          const holds=await tx.supervisionEvent.findMany({where:{mealId:current.id,action:{in:['sample_hold','sample_dispose']}}});
+          if(holds.some(row=>row.action==='sample_hold'))throw new ConflictException('Đã có yêu cầu giữ mẫu; không được tự hủy.');
+          if(holds.some(row=>row.action==='sample_dispose'))throw new ConflictException('Một phần mẫu đã bị hủy; không thể ghi nhận giữ mẫu toàn bộ hồi tố. Cần lập biên bản riêng.');
           await tx.supervisionEvent.create({data:{id:eventId,mealId:current.id,actorId:user.sub,actorRole:user.role,action,itemId:'food_sample',payload:{note}}});
           return {success:true,id:eventId};
         }
@@ -233,6 +234,20 @@ export class SupervisionService {
           });
           const dishes=plan?.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name}))??[];
           inspection=validateFoodSafetyForm(itemId as 'processing'|'before_serving'|'food_sample',body.inspection,dishes,date);
+          if(itemId==='food_sample' && checks.before_serving?.inspection?.dishes){
+            for(const sample of inspection.dishes){
+              const served=checks.before_serving.inspection.dishes.find((line:any)=>line.dishId===sample.dishId);
+              if(served?.servedAt && 'takenAt' in sample && sample.takenAt>served.servedAt)
+                throw new BadRequestException('Mẫu '+sample.dishName+' phải được lấy trước thời điểm bắt đầu ăn.');
+            }
+          }
+          if(itemId==='before_serving' && checks.food_sample?.inspection?.dishes){
+            for(const served of inspection.dishes){
+              const sample=checks.food_sample.inspection.dishes.find((line:any)=>line.dishId===served.dishId);
+              if(sample?.takenAt && 'servedAt' in served && sample.takenAt>served.servedAt)
+                throw new BadRequestException('Đã ghi lấy mẫu '+served.dishName+' sau giờ bắt đầu ăn. Cần rà soát lại hồ sơ.');
+            }
+          }
         }
         const ingredientPass=itemId==='ingredient_receipt' && Array.isArray(body.ingredientReceipts)
           ? body.ingredientReceipts.every((line:any)=>line.documentsStatus==='pass' && line.sensoryStatus==='pass')
