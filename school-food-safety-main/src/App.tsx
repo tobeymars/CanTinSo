@@ -2055,6 +2055,7 @@ function Shell() {
             />
           </label>
           <p className="muted">{dateLabel(date)}</p>
+          <button className="outline full" type="button" onClick={() => setDate(todayInVietnam())}>Chọn hôm nay</button>
           <button className="primary full" onClick={() => setModal(null)}>
             Xem bữa ăn
           </button>
