@@ -1109,13 +1109,13 @@ function Shell() {
     queryFn: () => demoData.day(school, date, undefined, supervisionMealType),
     enabled:
       location.pathname === "/giam-sat" &&
-      !!schoolQuery.data && !isSchoolKitchenReceiver,
+      !!schoolQuery.data && !isSchoolKitchenReceiver && !isRealOnSiteKitchen && !isRealCentralKitchen,
   });
   const supervisionDailyMenuQuery = useQuery({
     queryKey: ["supervision-daily-menu", school.id, date],
     queryFn: () => Promise.all(parentMealOptions.map(option =>
       demoData.day(school, date, demoMealViewer("parent", school), option.value))),
-    enabled: location.pathname === "/giam-sat" && !!schoolQuery.data && !isSchoolKitchenReceiver,
+    enabled: location.pathname === "/giam-sat" && !!schoolQuery.data && !isSchoolKitchenReceiver && !isRealOnSiteKitchen && !isRealCentralKitchen,
   });
   /** Vai trò tác nghiệp và phụ huynh dùng chung cấu trúc bảng; chế độ công khai chỉ đọc dữ liệu được phép hiển thị. */
   const sharedAdminArea =
@@ -1639,16 +1639,16 @@ function Shell() {
                     <SupervisionSection
                       school={school}
                       date={date}
-                      data={isSchoolKitchenReceiver ? emptyRealSupervisionDay(date,supervisionMealType) : supervisionData}
+                      data={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? emptyRealSupervisionDay(date,supervisionMealType) : supervisionData}
                       dailyMenu={supervisionDailyMenuQuery.data}
-                      dailyMenuLoading={isSchoolKitchenReceiver ? false : supervisionDailyMenuQuery.isLoading}
-                      dailyMenuError={isSchoolKitchenReceiver ? false : supervisionDailyMenuQuery.isError}
+                      dailyMenuLoading={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? false : supervisionDailyMenuQuery.isLoading}
+                      dailyMenuError={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? false : supervisionDailyMenuQuery.isError}
                       mealType={supervisionMealType}
                       role={role}
                       onMealTypeChange={setSupervisionMealType}
-                      loading={isSchoolKitchenReceiver ? !school.id : supervisionMealQuery.isLoading}
-                      error={isSchoolKitchenReceiver ? false : supervisionMealQuery.isError}
-                      onRetry={() => { if (isSchoolKitchenReceiver) void schoolQuery.refetch(); else void supervisionMealQuery.refetch(); }}
+                      loading={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? !school.id : supervisionMealQuery.isLoading}
+                      error={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? false : supervisionMealQuery.isError}
+                      onRetry={() => { if (isSchoolKitchenReceiver || isRealOnSiteKitchen) void schoolQuery.refetch(); else if (isRealCentralKitchen) void realKitchenQuery.refetch(); else void supervisionMealQuery.refetch(); }}
                     />
                   )}
                   {location.pathname === "/ho-so-phap-ly" && (
