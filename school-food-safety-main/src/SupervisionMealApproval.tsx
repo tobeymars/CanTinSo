@@ -59,7 +59,7 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
   const approvals = serverQuery.data?.approvals ?? []
   const latestApproval = approvals.at(-1)
   const status = serverMode ? {confirmedChecks,requiredChecks:4,confirmedStages,requiredStages:requiredStages.length,pendingDetails,ready:pendingDetails.length===0,approved:!!latestApproval && serverQuery.data?.approvalCurrent === true && pendingDetails.length===0,stale:!!latestApproval && (serverQuery.data?.approvalCurrent !== true || pendingDetails.length>0),latest:latestApproval ? {actorLabel:'Ban Giám hiệu',confirmedAt:latestApproval.at,note:latestApproval.note}:undefined} : localStatus!
-  const history = serverMode ? approvals.map((a,i)=>({id:String(i),actorLabel:'Ban Giám hiệu',confirmedAt:a.at,note:a.note})) : readMealApprovalHistory(scope)
+  const history = serverMode ? approvals.map((a,i)=>({id:String(i),actorLabel:'Ban Giám hiệu',confirmedAt:a.at,note:[a.note,a.lateReason?'Lý do xác nhận muộn: '+a.lateReason:''].filter(Boolean).join(' · ')})) : readMealApprovalHistory(scope)
   const labelPending = (id:string) => CHECK_DEFINITIONS.find(check=>check.id===id)?.label ?? stageNames[id as keyof typeof stageNames] ?? id
   const isBoard = role === 'school_board'
   const dateKind=serverMode?supervisionDateKind(date):'today'
