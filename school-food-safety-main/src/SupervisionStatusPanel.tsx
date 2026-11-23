@@ -209,7 +209,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
               {serverMode ? <input required maxLength={180} value={evidenceRef} onChange={event => setEvidenceRef(event.target.value)} placeholder="Nhập mã hồ sơ thực tế đã đối chiếu" /> : <Select label="Tham chiếu hồ sơ" required searchable value={evidenceRef} options={evidenceOptions} placeholder={evidenceOptions.length ? 'Tìm và chọn hồ sơ' : 'Chưa có hồ sơ phù hợp'} searchPlaceholder="Tìm theo mã, loại hồ sơ hoặc nguyên liệu…" onValueChange={setEvidenceRef}/>}
               {!serverMode && evidenceOptions.length === 0 && <small className="supervision-reference-empty">Chưa có hồ sơ thuộc đúng trường, ngày và bữa để liên kết.</small>}
             </label>}
-            {editing.action !== 'report' && <p className="supervision-edit-guidance">{editing.action === 'confirm' ? 'BGH xác nhận đã đối chiếu nội dung báo cáo.' : 'Mục này chuyển về Cần bổ sung để bếp cập nhật lại. Lịch sử đã xác nhận vẫn được lưu.'}</p>}
+            {editing.action !== 'report' && <p className="supervision-edit-guidance">{editing.action === 'confirm' ? 'BGH xác nhận đã đối chiếu nội dung báo cáo.' : 'Mục này chuyển về Cần bổ sung để bếp cập nhật lại. Xác nhận tổng thể trước đó sẽ không còn hiện hành, nhưng lịch sử vẫn được lưu.'}</p>}
             {editing.id === 'ingredient_receipt' && editing.action === 'report' && <fieldset className="supervision-ingredient-fieldset">
               <legend>Nguyên liệu đã tiếp nhận <span aria-hidden="true">*</span></legend>
               <p>{serverMode ? "Chọn lô đã xuất từ kho bếp cho đúng trường, ngày và bữa. Mỗi lô chỉ được chọn một lần." : "Thêm từng dòng, tìm và chọn trong toàn bộ danh mục kho của trường. Mỗi nguyên liệu chỉ được chọn một lần."}</p>
