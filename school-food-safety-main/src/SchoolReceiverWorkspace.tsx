@@ -99,7 +99,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
         </article>
       })}
       <div className="receiver-next card"><Truck size={20}/><div><strong>Quy trình tiếp nhận</strong>
-        <p>Bếp trung tâm báo cáo Xuất bếp; nhân viên tại trường ghi Đến trường → Ra món → Sẵn sàng phục vụ. BGH xác nhận từng mốc.</p>
+        <p>Bếp trung tâm ghi Xuất bếp; BGH lập phiếu xác nhận Đến trường. Nhân viên được phân công ghi Ra món và Sẵn sàng phục vụ; BGH kiểm tra, xác nhận từng mốc.</p>
         <Link to="/giam-sat">Mở nhật ký tiếp nhận</Link></div></div>
     </div>}
     {view!=='overview'&&<>
