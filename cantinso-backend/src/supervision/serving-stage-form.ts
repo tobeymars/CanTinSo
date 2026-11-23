@@ -45,7 +45,7 @@ export function validateServingStageReport(body: any, stage: 'PLATED' | 'READY',
     used.add(line.dishId);
     if(!['PASS','ISSUE'].includes(line.status))
       throw new BadRequestException('Chọn Đạt hoặc Có bất thường cho từng món.');
-    return {dishId:line.dishId,name:expected.get(line.dishId)!,status:line.status as 'PASS'|'ISSUE'};
+    return {dishId:line.dishId,name:expected.get(line.dishId)!,status:line.status as 'PASS'|'ISSUE',portions:undefined as number|undefined};
   });
   let portionStartAt: string | undefined;
   let distributionArea: string | undefined;
