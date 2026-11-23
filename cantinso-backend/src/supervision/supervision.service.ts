@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/current-user.decorator';
 import { validateSupervisionWriteDate } from './supervision-date-policy';
 import { validateFoodSafetyForm } from './food-safety-forms';
+import { verifySamplesBeforeDispatch } from './dispatch-sample-policy';
 
 const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sample'];
 const stages = ['DISPATCHED', 'ARRIVED', 'PLATED', 'READY'];
@@ -235,6 +236,23 @@ export class SupervisionService {
           const dishes=plan?.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name}))??[];
           const plannedServings=plan?.revisions[0]?.ageGroups.reduce((sum,item)=>sum+item.plannedServings,0);
           inspection=validateFoodSafetyForm(itemId as 'processing'|'before_serving'|'food_sample',body.inspection,dishes,date,plannedServings);
+          if(itemId==='food_sample' && inspection.notApplicable!==true){
+            const cooking=asObject(checks.processing?.inspection);
+            if(!Array.isArray(cooking.dishes))
+              throw new ConflictException('Cần ghi kiểm thực bước 2 và thời điểm chế biến xong trước khi lấy mẫu.');
+            for(const line of inspection.dishes){
+              const cooked=cooking.dishes.find((item:any)=>item.dishId===line.dishId);
+              const takenAt=typeof line.takenAt==='string'?Date.parse(line.takenAt+':00+07:00'):NaN;
+              const cookedAt=typeof cooked?.cookedAt==='string'?Date.parse(cooked.cookedAt+':00+07:00'):NaN;
+              if(!Number.isFinite(takenAt)||!Number.isFinite(cookedAt)||takenAt<cookedAt)
+                throw new BadRequestException('Thời điểm lấy mẫu phải sau khi chế biến xong món '+line.dishName+'.');
+            }
+          }
+          if(itemId==='food_sample' && journey.DISPATCHED){
+            const dispatchedAt=Date.parse(journey.DISPATCHED.at);
+            if(inspection.notApplicable!==true && inspection.dishes.some(line=>typeof line.takenAt==='string' && Date.parse(line.takenAt+':00+07:00')>dispatchedAt))
+              throw new BadRequestException('Không thể ghi nhận mẫu lấy sau khi đã xuất bếp. Cần rà soát hồ sơ vận hành.');
+          }
           if(itemId==='food_sample' && checks.before_serving?.inspection?.dishes){
             for(const sample of inspection.dishes){
               const served=checks.before_serving.inspection.dishes.find((line:any)=>line.dishId===sample.dishId);
@@ -277,6 +295,9 @@ export class SupervisionService {
         const required = s.kitchenId && (await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}}))?.type === 'CENTRAL' ? stages : ['PLATED','READY'];
         if (!required.includes(itemId) || (!previousStage && required.find(x=>!journey[x])!==itemId)) throw new ConflictException('Cần báo cáo mốc theo thứ tự.');
         if (itemId === 'DISPATCHED' && user.role !== 'CENTRAL_KITCHEN') throw new ForbiddenException('Chỉ bếp trung tâm được báo cáo xuất bếp.');
+        if (itemId === 'DISPATCHED') verifySamplesBeforeDispatch(
+          checks.food_sample, checks.processing, new Date(entry.at),
+        );
         if (itemId !== 'DISPATCHED' && user.role !== 'SCHOOL_KITCHEN') throw new ForbiddenException('Chỉ bếp tại trường được báo cáo mốc này.');
         if (itemId === 'READY' && (typeof body.photo !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(body.photo) || body.photo.length>1100000)) throw new BadRequestException('Cần ảnh thực tế hợp lệ tối đa 750 KB.');
         journey[itemId] = {...entry,status:itemId,time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),confirmed:false,photos:itemId==='READY'?[body.photo]:[],
