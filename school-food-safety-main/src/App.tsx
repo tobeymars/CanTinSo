@@ -1016,6 +1016,7 @@ function Shell() {
   }, [isAuthenticatedWorkspace, date, setDate]);
   const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
   const isRealCentralKitchen = storedUser?.role === "CENTRAL_KITCHEN" && !!storedUser?.kitchenId;
+  const isRealOnSiteKitchen = storedUser?.role === "SCHOOL_KITCHEN" && !!storedUser?.kitchenId;
   const isRealKitchenAccount = (storedUser?.role === "CENTRAL_KITCHEN" || storedUser?.role === "SCHOOL_KITCHEN") && !!storedUser?.kitchenId;
   const realKitchenQuery = useQuery({ queryKey: ["my-kitchen-context"], queryFn: fetchMyKitchenContext, enabled: isRealKitchenAccount });
   // SCHOOL_KITCHEN without kitchenId is school-side meal receiving staff, not a kitchen operator.
@@ -1028,7 +1029,7 @@ function Shell() {
     }
   }, [isSchoolKitchenReceiver, location.pathname, navigate]);
   const schoolQuery = useQuery({
-    queryKey: ["schools", isWardWorkspace ? "ward-scoped" : isRealSchoolAdmin ? "school-account" : isSchoolKitchenReceiver ? "receiver-account" : "demo", isRealSchoolAdmin ? date : ""],
+    queryKey: ["schools", isWardWorkspace ? "ward-scoped" : isRealSchoolAdmin ? "school-account" : isSchoolKitchenReceiver ? "receiver-account" : isRealOnSiteKitchen ? "on-site-kitchen-account" : "demo", isRealSchoolAdmin ? date : ""],
     queryFn: async (): Promise<School[]> => {
       if (isWardWorkspace) {
         // UBND_ADMIN chỉ nhận danh sách trường thuộc wardId của tài khoản.
@@ -1040,9 +1041,10 @@ function Shell() {
           mode: "ON_SITE",
         }));
       }
-      if (isSchoolKitchenReceiver) {
+      if (isSchoolKitchenReceiver || isRealOnSiteKitchen) {
+        // Tài khoản bếp tại trường chỉ xem trường được gán trong JWT, không dùng trường mẫu.
         const assigned = await getMyAssignedSchool();
-        return [{id: assigned.id,name: assigned.name,address: assigned.address ?? assigned.ward?.name ?? "Chưa cập nhật địa chỉ",mode: "CENTRAL_KITCHEN"}];
+        return [{id: assigned.id,name: assigned.name,address: assigned.address ?? assigned.ward?.name ?? "Chưa cập nhật địa chỉ",mode: isRealOnSiteKitchen ? "ON_SITE" : "CENTRAL_KITCHEN"}];
       }
       if (isRealSchoolAdmin) {
         // BGH không dùng danh sách trường mẫu; backend tự giới hạn theo schoolId của JWT.
@@ -1063,7 +1065,7 @@ function Shell() {
     address: "Trường được phân công phục vụ",
     mode: "CENTRAL_KITCHEN",
   }));
-  const availableSchools = isWardWorkspace || isRealSchoolAdmin || isSchoolKitchenReceiver
+  const availableSchools = isWardWorkspace || isRealSchoolAdmin || isSchoolKitchenReceiver || isRealOnSiteKitchen
     ? (schoolQuery.data ?? [])
     : isRealCentralKitchen
       ? centralKitchenSchools
@@ -1075,15 +1077,15 @@ function Shell() {
       }
       return;
     }
-    if ((!isWardWorkspace && !isRealSchoolAdmin && !isSchoolKitchenReceiver) || !schoolQuery.data) return;
+    if ((!isWardWorkspace && !isRealSchoolAdmin && !isSchoolKitchenReceiver && !isRealOnSiteKitchen) || !schoolQuery.data) return;
     if (!schoolQuery.data.some((item) => item.id === schoolId)) {
       if (schoolQuery.data[0]) setSchool(schoolQuery.data[0].id);
     }
-  }, [isWardWorkspace, isRealSchoolAdmin, isSchoolKitchenReceiver, isRealCentralKitchen, schoolQuery.data, realKitchenQuery.isSuccess, centralKitchenSchools, schoolId, setSchool]);
+  }, [isWardWorkspace, isRealSchoolAdmin, isSchoolKitchenReceiver, isRealOnSiteKitchen, isRealCentralKitchen, schoolQuery.data, realKitchenQuery.isSuccess, centralKitchenSchools, schoolId, setSchool]);
   const school =
     availableSchools.find((s) => s.id === schoolId) ??
     availableSchools[0] ??
-    (isWardWorkspace || isRealSchoolAdmin || isSchoolKitchenReceiver
+    (isWardWorkspace || isRealSchoolAdmin || isSchoolKitchenReceiver || isRealOnSiteKitchen
       ? { id: "", name: schoolQuery.isError ? "Không tải được trường của tài khoản" : "Đang tải trường được gán…", address: "", mode: "ON_SITE" as const }
       : demoSchools[0]!);
   // Bản công khai của phụ huynh là nguồn đọc chuẩn cho cả năm vai trò, bao gồm quy tắc chỉ hiện ảnh đã duyệt.
