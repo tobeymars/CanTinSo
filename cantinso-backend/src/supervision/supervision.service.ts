@@ -112,7 +112,8 @@ export class SupervisionService {
     if ((action.endsWith('_confirm') || action === 'check_revision' || action === 'check_reopen' || action === 'stage_reopen') && user.role !== 'SCHOOL_ADMIN') throw new ForbiddenException('Chỉ BGH được xác nhận.');
     if ((action === 'check_report' || action === 'stage_report') && !['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role)) throw new ForbiddenException('Chỉ bếp được báo cáo.');
     const lateReason = validateSupervisionWriteDate(date,body);
-    return this.prisma.$transaction(async tx => {
+    try {
+      return await this.prisma.$transaction(async tx => {
       await tx.supervisionMeal.upsert({where:this.key(s),create:{...s,checks:{},stages:{},approvals:[]},update:{}});
       const current = await tx.supervisionMeal.findUniqueOrThrow({where:this.key(s)});
       const checks = asObject(current.checks), journey = asObject(current.stages), approvals = asArray(current.approvals);
@@ -220,6 +221,11 @@ export class SupervisionService {
       const updated = await tx.supervisionMeal.update({where:this.key(s),data:{checks:checks as Prisma.InputJsonValue,stages:journey as Prisma.InputJsonValue,approvals:approvals as Prisma.InputJsonValue}});
       await tx.supervisionEvent.create({data:{id:eventId,mealId:updated.id,actorId:user.sub,actorRole:user.role,action,itemId:typeof itemId==='string'?itemId:'meal',payload:{note,...(lateReason?{lateReason}:{})}}});
       return {success:true,id:eventId};
-    });
+      },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
+    } catch(error) {
+      if(error instanceof Prisma.PrismaClientKnownRequestError && ['P2034','P2002'].includes(error.code))
+        throw new ConflictException('Hồ sơ vừa được cập nhật bởi tài khoản khác. Vui lòng tải lại trang để thao tác trên dữ liệu mới nhất.');
+      throw error;
+    }
   }
 }
