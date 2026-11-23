@@ -1,0 +1,8 @@
+.supervision-date-notice{
+  display:flex;align-items:flex-start;gap:11px;
+  padding:13px 15px;margin:8px 0 15px;
+  border:1px solid #d7e3f1;border-left:4px solid #416aa8;border-radius:11px;
+  background:#f4f8ff;color:#254566;font-size:13px;font-weight:550;line-height:1.65;
+}
+.supervision-date-notice svg{flex:none;margin-top:2px}
+@media(max-width:640px){.supervision-date-notice{padding:12px;font-size:12px}}
