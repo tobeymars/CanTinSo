@@ -1020,6 +1020,13 @@ function Shell() {
   const realKitchenQuery = useQuery({ queryKey: ["my-kitchen-context"], queryFn: fetchMyKitchenContext, enabled: isRealKitchenAccount });
   // SCHOOL_KITCHEN without kitchenId is school-side meal receiving staff, not a kitchen operator.
   const isSchoolKitchenReceiver = storedUser?.role === "SCHOOL_KITCHEN" && !storedUser.kitchenId;
+  useEffect(() => {
+    // School-side receiving users must never fall back to legacy DEMO pages
+    // by navigating to an old URL directly.
+    if (isSchoolKitchenReceiver && !["/", "/thuc-don", "/giam-sat"].includes(location.pathname)) {
+      navigate("/", { replace: true });
+    }
+  }, [isSchoolKitchenReceiver, location.pathname, navigate]);
   const schoolQuery = useQuery({
     queryKey: ["schools", isWardWorkspace ? "ward-scoped" : isRealSchoolAdmin ? "school-account" : isSchoolKitchenReceiver ? "receiver-account" : "demo", isRealSchoolAdmin ? date : ""],
     queryFn: async (): Promise<School[]> => {
