@@ -56,8 +56,8 @@ function IngredientReceiptDetails({ lines, serviceDate }: { lines: readonly Ingr
 }
 
 type Editing = { id: CheckId; action: CheckAction | 'reopen' }
-type IngredientDraftRow = { id: string; itemId: string; quantity: string; unit: string }
-const createIngredientRow = (itemId = '', quantity = '', unit = ''): IngredientDraftRow => ({ id: crypto.randomUUID(), itemId, quantity, unit })
+type IngredientDraftRow = { id: string; itemId: string; quantity: string; unit: string; documentsStatus: string; sensoryStatus: string; storageCondition: string; handling: string }
+const createIngredientRow = (itemId = '', quantity = '', unit = '', documentsStatus = '', sensoryStatus = '', storageCondition = '', handling = ''): IngredientDraftRow => ({ id: crypto.randomUUID(), itemId, quantity, unit, documentsStatus, sensoryStatus, storageCondition, handling })
 export default function SupervisionStatusPanel({ school, date, mealType, role }: {
   school: School
   date: string
@@ -124,7 +124,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
       ? newInspectionDraft(contextQuery.data.menu,previousInspection) : null)
     setIngredientRows(id === 'ingredient_receipt' && action === 'report'
       ? Array.isArray(previousIngredients) && previousIngredients.length > 0
-        ? previousIngredients.map(item => createIngredientRow(item.itemId, String(item.displayQuantity ?? item.quantity), item.displayUnit ?? item.unit))
+        ? previousIngredients.map(item => createIngredientRow(item.itemId, String(item.displayQuantity ?? item.quantity), item.displayUnit ?? item.unit, item.documentsStatus ?? '', item.sensoryStatus ?? '', item.storageCondition ?? '', item.handling ?? ''))
         : [createIngredientRow()]
       : [])
   }
@@ -142,7 +142,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             if (!ingredient || !receiptUnitOptions(ingredient.unit).includes(unit)) throw Error('Đơn vị nhận nguyên liệu không phù hợp với lô đã chọn.')
             const baseQuantity = convertReceiptQuantity(quantity, unit, ingredient.unit)
             if (baseQuantity === null || baseQuantity <= 0 || (serverMode && baseQuantity > (contextQuery.data?.lots.find(lot => lot.itemId === ingredient.itemId)?.quantityAvailable ?? 0) + 0.000000001)) throw Error('Số lượng thực nhận vượt số đã xuất hoặc không hợp lệ.')
-            return serverMode ? { itemId: row.itemId, quantity, unit } : { itemId: row.itemId, quantity: baseQuantity }
+            return serverMode ? { itemId: row.itemId, quantity, unit, documentsStatus:row.documentsStatus, sensoryStatus:row.sensoryStatus, storageCondition:row.storageCondition, handling:row.handling } : { itemId: row.itemId, quantity: baseQuantity }
           })
         : undefined
       if (serverMode) {
@@ -270,6 +270,14 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                           </select>
                         </label>
                       </div>
+                      {serverMode && <div className="sif-intake-checks">
+                        <label>Điều kiện bảo quản / nhãn lô *<input required maxLength={500} value={row.storageCondition} onChange={e=>setIngredientRows(current=>current.map(item=>item.id===row.id?{...item,storageCondition:e.target.value}:item))} placeholder="Nhiệt độ / bao bì / bảo quản thực tế…"/></label>
+                        {(['documentsStatus','sensoryStatus'] as const).map(key=><fieldset key={key} className="sif-choice"><legend>{key==='documentsStatus'?'Chứng từ, nguồn gốc':'Cảm quan nguyên liệu'} *</legend><div>
+                          {([{value:'pass',label:'Đạt'},{value:'fail',label:'Không đạt'}] as const).map(option=><label key={option.value}><input required type="radio" name={row.id+'-'+key} value={option.value} checked={row[key]===option.value} onChange={()=>setIngredientRows(current=>current.map(item=>item.id===row.id?{...item,[key]:option.value}:item))}/>{option.label}</label>)}
+                        </div></fieldset>)}
+                        <label className="sif-intake-checks__wide">Xử lý / ghi chú (ghi “Không có” nếu đạt) *<textarea required rows={2} maxLength={1000} value={row.handling} onChange={e=>setIngredientRows(current=>current.map(item=>item.id===row.id?{...item,handling:e.target.value}:item))}/></label>
+                        {(row.documentsStatus==='fail'||row.sensoryStatus==='fail')&&<p role="status" className="sif-warning sif-intake-checks__wide">Có chỉ tiêu Không đạt: BGH không thể xác nhận mục này là đạt nếu chưa xử lý, kiểm tra và báo cáo lại.</p>}
+                      </div>}
                       {serverMode && <small className="muted">Đã cấp cho bữa này: {(()=>{
                           const base=contextQuery.data?.lots.find(lot=>lot.itemId===selectedIngredient.itemId)?.quantityAvailable??0
                           const shown=convertReceiptQuantity(base,selectedIngredient.unit,row.unit||selectedIngredient.unit)
