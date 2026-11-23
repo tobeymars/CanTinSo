@@ -11,6 +11,7 @@ import {
 } from './lib/supervisionApproval'
 import { SUPERVISION_STATUS_EVENT, SUPERVISION_STATUS_STORAGE_KEY } from './lib/supervisionStatus'
 import type { SupervisionMealType, SupervisionScope } from './lib/supervisionStatus'
+import SupervisionDateNotice, { supervisionDateKind } from './SupervisionDateNotice'
 import { CHECK_DEFINITIONS } from './lib/supervisionStatus'
 import { SUPERVISION_JOURNEY_EVENT, stageNames } from './lib/supervisionJourney'
 
@@ -27,6 +28,7 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
   const [revision, setRevision] = useState(0)
   const [confirming, setConfirming] = useState(false)
   const [note, setNote] = useState('')
+  const [lateReason,setLateReason]=useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [showHistory, setShowHistory] = useState(false)
@@ -60,12 +62,14 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
   const history = serverMode ? approvals.map((a,i)=>({id:String(i),actorLabel:'Ban Giám hiệu',confirmedAt:a.at,note:a.note})) : readMealApprovalHistory(scope)
   const labelPending = (id:string) => CHECK_DEFINITIONS.find(check=>check.id===id)?.label ?? stageNames[id as keyof typeof stageNames] ?? id
   const isBoard = role === 'school_board'
+  const dateKind=serverMode?supervisionDateKind(date):'today'
+  const dateLocked=dateKind==='future'
   const label = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     try {
       if(serverMode){
-        await writeServerSupervision(scope,{action:'meal_confirm',note})
+        await writeServerSupervision(scope,{action:'meal_confirm',note,lateReason})
         await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
       }else confirmMealSupervision({ scope, school, role, note })
       setConfirming(false)
@@ -83,8 +87,9 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
         <h2><ShieldCheck size={20}/> Ban Giám hiệu xác nhận Giám sát & an toàn · {label}</h2>
         <p className="muted">Sau khi đối chiếu đủ hồ sơ kiểm thực, lưu mẫu và các mốc vận hành, Ban Giám hiệu thực hiện một xác nhận tổng thể riêng cho từng trường, ngày và bữa.</p>
       </div>
-      {isBoard && !status.approved && <button type="button" className="primary" disabled={!status.ready} onClick={() => {setNote('');setError('');setConfirming(true)}}><ClipboardCheck size={17}/>Xác nhận tổng thể</button>}
+      {isBoard && !dateLocked && !status.approved && <button type="button" className="primary" disabled={!status.ready} onClick={() => {setNote('');setLateReason('');setError('');setConfirming(true)}}><ClipboardCheck size={17}/>Xác nhận tổng thể</button>}
     </div>
+    <SupervisionDateNotice date={date} serverMode={serverMode}/>
     <div className="supervision-approval-summary">
       <span className={`supervision-check-pill ${status.approved ? 'confirmed' : status.stale ? 'revision_requested' : 'reported'}`}>
         {status.approved ? <CheckCircle2 size={15}/> : status.stale ? <AlertCircle size={15}/> : <Clock3 size={15}/>}
@@ -109,9 +114,10 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
         <p className="supervision-edit-context">{school.name} · {date} · <strong>{label}</strong></p>
         <form className="supervision-edit-form" onSubmit={submit}>
           <p className="supervision-edit-guidance">Tôi đã đối chiếu {status.requiredChecks} nội dung kiểm thực/lưu mẫu và {status.requiredStages} mốc vận hành được báo cáo cho bữa này. Đây là xác nhận tổng thể, độc lập với việc xác nhận từng mục.</p>
+          {serverMode && dateKind==='past' && <label>Lý do xác nhận sau ngày phục vụ *<textarea required minLength={10} maxLength={1000} rows={3} value={lateReason} onChange={event=>setLateReason(event.target.value)} placeholder="Nêu nguyên nhân xác nhận muộn và căn cứ đối chiếu…"/></label>}
           <label>Ghi chú đối chiếu của Ban Giám hiệu <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Ghi rõ nội dung đã rà soát và kết quả đối chiếu…"/></label>
           {error && <p className="error" role="alert">{error}</p>}
-          <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setConfirming(false)}>Hủy</button><button type="submit" className="primary" disabled={!status.ready}>{serverMode ? 'Xác nhận tổng thể' : 'Xác nhận tổng thể (DEMO)'}</button></div>
+          <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setConfirming(false)}>Hủy</button><button type="submit" className="primary" disabled={!status.ready || dateLocked}>{serverMode ? 'Xác nhận tổng thể' : 'Xác nhận tổng thể (DEMO)'}</button></div>
         </form>
       </section>
     </div>}
