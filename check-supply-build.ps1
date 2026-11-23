@@ -7,23 +7,26 @@ function Check($label) {
     }
 }
 Set-Location (Join-Path $root 'cantinso-backend')
-Write-Host '[1/6] Prisma validate'
+Write-Host '[1/7] Prisma validate'
 npx prisma validate
 Check 'Prisma validate'
-Write-Host '[2/6] Prisma generate'
+Write-Host '[2/7] Prisma generate'
 npx prisma generate
 Check 'Prisma generate'
-Write-Host '[3/6] Backend unit conversion tests'
+Write-Host '[3/7] Backend unit conversion tests'
 npm run test:units
 Check 'Unit conversion tests'
-Write-Host '[4/6] Backend build'
+Write-Host '[4/7] Supervision date policy tests'
+npm run test:supervision-dates
+Check 'Supervision date tests'
+Write-Host '[5/7] Backend build'
 npm run build
 Check 'Backend build'
 Set-Location (Join-Path $root 'school-food-safety-main')
-Write-Host '[5/6] Frontend build'
+Write-Host '[6/7] Frontend build'
 npm run build
 Check 'Frontend build'
-Write-Host '[6/6] Frontend unit conversion tests'
+Write-Host '[7/7] Frontend unit conversion tests'
 npm run test:units
 Check 'Frontend unit tests'
 Write-Host 'BUILD OK. Migrations were NOT applied automatically.' -ForegroundColor Green
