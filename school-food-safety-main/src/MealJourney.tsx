@@ -43,7 +43,7 @@ export function MealJourneyProgress({
   const [, setQrRevision] = useState(0)
   useEffect(() => subscribePortionQrUpdates(() => setQrRevision(value => value + 1)), [])
   const steps = mode === 'CENTRAL_KITCHEN'
-    ? role === 'school_kitchen' ? centralSteps.filter(step => step.status !== 'ARRIVED') : centralSteps
+    ? centralSteps
     : onSiteSteps
   const entries = steps.map(step => ({ ...step, event: data.events.find(event => event.status === step.status) }))
   const lastConfirmed = [...entries].reverse().find(item => item.event?.confirmed)?.event
