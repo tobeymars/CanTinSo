@@ -310,6 +310,18 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
               <label className="arrival-attestation"><input type="checkbox" required checked={receiptChecked} onChange={event=>setReceiptChecked(event.target.checked)}/><span>Tôi xác nhận đã trực tiếp kiểm tra số lượng, món ăn và tình trạng bàn giao thực tế tại trường.</span></label>
             </fieldset>
           </>}
+          {serverMode && editing.action==='confirm' && (editing.stage==='PLATED'||editing.stage==='READY') && serverQuery.data?.stages[editing.stage]?.serving && (() => {
+            const report=serverQuery.data.stages[editing.stage].serving!
+            return <div className="arrival-confirm-review">
+              <strong>Đối chiếu phiếu {editing.stage==='PLATED'?'ra món':'sẵn sàng phục vụ'} trước khi xác nhận</strong>
+              <div className="arrival-receipt-facts"><div><span>Số suất thực tế</span><strong>{report.actualServings.toLocaleString('vi-VN')}</strong></div><div><span>Giờ / người thực hiện</span><strong>{report.occurredAt} · {report.handlerName}</strong></div></div>
+              <p>Khu vực và dụng cụ: {report.sanitaryCondition==='PASS'?'Không phát hiện bất thường':'Có bất thường'}</p>
+              <ul>{report.dishChecks.map(dish=><li key={dish.dishId}>{dish.name}: {dish.status==='PASS'?'Đạt':'Có bất thường'}</li>)}</ul>
+              {report.discrepancyNote && <p>Ghi chú: {report.discrepancyNote}</p>}
+              {editing.stage==='READY' && serverQuery.data.stages.READY?.photos?.[0] && <img className="arrival-review-photo" src={serverQuery.data.stages.READY.photos[0]} alt="Ảnh thực tế sẵn sàng phục vụ"/>}
+              <p className="arrival-help">BGH chỉ xác nhận sau khi kiểm tra hồ sơ và thực tế phù hợp. Nếu cần sửa, dùng “Mở điều chỉnh” theo quy trình hiện có.</p>
+            </div>
+          })()}
           {isServingReport(editing) && <>
             <p className="supervision-edit-guidance">{editing.stage==='PLATED'?'Ghi nhận việc ra món theo thực đơn đã duyệt và số suất thực tế. BGH sẽ kiểm tra và xác nhận.':'Chỉ ghi sẵn sàng phục vụ sau khi BGH xác nhận Ra món. Phải có ảnh thực tế của suất ăn chuẩn bị phục vụ.'}</p>
             <fieldset className="arrival-section"><legend>A. Thông tin thực hiện</legend>
