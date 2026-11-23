@@ -35,3 +35,12 @@ test('requires a real checker and a valid delivery conclusion',()=>{
   assert.throws(()=>validate({...sample(),receiptChecked:false}),/kiểm tra/);
   assert.throws(()=>validate({...sample(),result:'YES'}),/Kết luận/);
 });
+
+test('can record a refused delivery with zero received servings',()=>{
+  const receipt=validate({...sample(),receivedServings:0,result:'REJECTED',dishChecks:[
+    {dishId:'dish-1',status:'MISSING',temperatureC:null},
+    {dishId:'dish-2',status:'MISSING',temperatureC:null},
+  ]});
+  assert.equal(receipt.receivedServings,0);
+  assert.equal(arrivalAllowsService(receipt),false);
+});
