@@ -24,6 +24,7 @@ import { InspectionEditor, InspectionReadout, newInspectionDraft } from './Super
 import SupervisionSampleLifecycle from './SupervisionSampleLifecycle'
 import type { InspectionDraft, InspectionKind } from './SupervisionInspectionForm'
 import { supervisionDateKind } from './SupervisionDateNotice'
+import { getStoredUser } from './lib/authApi'
 
 const labels: Record<CheckStatus, string> = {
   not_reported: 'Chưa cập nhật', reported: 'Chờ BGH xác nhận',
@@ -111,7 +112,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   const dateKind=serverMode?supervisionDateKind(date):'today'
   const dateLocked=dateKind==='future'
   const approvedMeal=serverMode && !!serverQuery.data?.approvalCurrent
-  const canReport = (serverMode ? role === 'central_kitchen' || role === 'school_kitchen' : canReportSupervision(role, school.mode)) && !dateLocked && !approvedMeal
+  const isSchoolReceiver = serverMode && role === 'school_kitchen' && !getStoredUser()?.kitchenId && contextQuery.data?.kitchen?.type === 'CENTRAL'
+  const canReport = (serverMode ? (role === 'central_kitchen' || role === 'school_kitchen') && !isSchoolReceiver : canReportSupervision(role, school.mode)) && !dateLocked && !approvedMeal
   const canConfirm = canConfirmSupervision(role) && !dateLocked
   const confirmedCount = checks.filter(item => item.status === 'confirmed').length
   const pendingCount = checks.filter(item => item.status === 'reported').length
