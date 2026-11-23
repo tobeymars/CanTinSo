@@ -53,3 +53,13 @@ test('sample requires sealed item per dish, correct quantity and 2–8C refriger
 test('rejects records dated outside the selected day',()=>{
   assert.throws(()=>validateFoodSafetyForm('food_sample',{...samples,checkedAt:'2025-01-01T12:00'},dishes,date),/ngày phục vụ/);
 });
+
+test('sample exemption is explicit and only permitted for approved meals with 1–29 servings',()=>{
+  const raw={notApplicable:true,reason:'Bữa ăn 20 suất, dưới ngưỡng 30 suất'};
+  const result=validateFoodSafetyForm('food_sample',raw,dishes,date,20);
+  assert.equal(result.isPass,true);
+  assert.deepEqual(result.dishes,[]);
+  assert.throws(()=>validateFoodSafetyForm('food_sample',raw,dishes,date,30),/1 đến 29/);
+  assert.throws(()=>validateFoodSafetyForm('food_sample',raw,dishes,date,0),/1 đến 29/);
+  assert.throws(()=>validateFoodSafetyForm('food_sample',raw,[],date,20),/1 đến 29/);
+});
