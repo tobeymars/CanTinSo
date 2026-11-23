@@ -131,7 +131,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
                     {event?.note&&<p>{event.note}</p>}
                   </div>
                   <div><span>{confirmed?'Đã xác nhận':event?'Chờ xác nhận':'Chưa cập nhật'}</span>
-                    {canStart&&<button className="outline" type="button" onClick={()=>{reset();setEditing(stage)}}>Cập nhật</button>}
+                    {canStart&&<button className="outline" type="button" onClick={()=>{reset();setEditing(stage as 'ARRIVED'|'PLATED'|'READY')}}>Cập nhật</button>}
                   </div>
                 </article>
               })}
