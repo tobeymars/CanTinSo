@@ -309,7 +309,7 @@ export class SupervisionService {
         if (itemId !== 'ARRIVED') throw new BadRequestException('Chỉ hỗ trợ xác nhận mốc Đến trường.');
         const kitchen = await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}});
         if (kitchen?.type !== 'CENTRAL') throw new ConflictException('Bếp tại trường không có mốc Đến trường.');
-        if (!journey.DISPATCHED?.confirmed) throw new ConflictException('Bếp trung tâm phải xuất bếp và được BGH xác nhận trước khi tiếp nhận.');
+        if (!journey.DISPATCHED || journey.DISPATCHED.revisionRequested) throw new ConflictException('Bếp trung tâm phải báo cáo Xuất bếp hợp lệ trước khi tiếp nhận.');
         if (journey.ARRIVED) throw new ConflictException('Mốc Đến trường đã có hồ sơ. Vui lòng sử dụng quy trình duyệt hoặc điều chỉnh hiện có.');
         const receivedServings = body.receivedServings;
         if (!Number.isSafeInteger(receivedServings) || receivedServings < 1 || receivedServings > 1000000)
