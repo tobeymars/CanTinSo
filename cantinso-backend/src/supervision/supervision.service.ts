@@ -3,18 +3,10 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/current-user.decorator';
+import { validateSupervisionWriteDate } from './supervision-date-policy';
 
 const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sample'];
 const stages = ['DISPATCHED', 'ARRIVED', 'PLATED', 'READY'];
-const vietnamDate = () => new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-const lateReasonOf = (body: any, serviceDate: string) => {
-  const today = vietnamDate();
-  if (serviceDate > today) throw new ForbiddenException('Ngày phục vụ chưa đến. Chỉ được xem kế hoạch, không ghi nhận kiểm thực hoặc xác nhận trước.');
-  if (serviceDate === today) return '';
-  const reason = typeof body?.lateReason === 'string' ? body.lateReason.trim() : '';
-  if(reason.length < 10 || reason.length > 1000) throw new BadRequestException('Cập nhật hồ sơ ngày trước phải có lý do bổ sung từ 10 đến 1000 ký tự.');
-  return reason;
-};
 const asObject = (v: unknown): Record<string, any> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, any> : {};
 const asArray = (v: unknown): any[] => Array.isArray(v) ? v : [];
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, entry:unknown) =>
@@ -119,7 +111,7 @@ export class SupervisionService {
     if (action.startsWith('stage_') && !stages.includes(itemId)) throw new BadRequestException('Mốc vận hành không hợp lệ.');
     if ((action.endsWith('_confirm') || action === 'check_revision' || action === 'check_reopen' || action === 'stage_reopen') && user.role !== 'SCHOOL_ADMIN') throw new ForbiddenException('Chỉ BGH được xác nhận.');
     if ((action === 'check_report' || action === 'stage_report') && !['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role)) throw new ForbiddenException('Chỉ bếp được báo cáo.');
-    const lateReason = lateReasonOf(body, date);
+    const lateReason = validateSupervisionWriteDate(date,body);
     return this.prisma.$transaction(async tx => {
       await tx.supervisionMeal.upsert({where:this.key(s),create:{...s,checks:{},stages:{},approvals:[]},update:{}});
       const current = await tx.supervisionMeal.findUniqueOrThrow({where:this.key(s)});
