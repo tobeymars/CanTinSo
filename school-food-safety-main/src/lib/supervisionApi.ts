@@ -19,7 +19,7 @@ async function call<T>(scope: SupervisionScope, init?: RequestInit, suffix = '')
 }
 export type ServerSupervision = {
   checks: Record<string,{status:string;evidenceRef?:string;ingredientReceipts?:unknown[];inspection?:unknown;history?:unknown[]}>
-  stages: Record<string,{confirmed:boolean;revisionRequested?:boolean;lateReason?:string;photos?:string[];note?:string;time?:string;confirmedAt?:string;confirmationNote?:string;reopenReason?:string;reopenedAt?:string;history?:{action?:string;at?:string;note?:string;lateReason?:string}[]}>
+  stages: Record<string,{confirmed:boolean;revisionRequested?:boolean;lateReason?:string;photos?:string[];note?:string;time?:string;confirmedAt?:string;confirmationNote?:string;arrival?:{receivedServings:number;condition:'GOOD'|'WITH_NOTES';receiptChecked:boolean};reopenReason?:string;reopenedAt?:string;history?:{action?:string;at?:string;note?:string;lateReason?:string}[]}>
   approvals: {snapshot:string;at:string;note:string;lateReason?:string}[]
   approvalCurrent:boolean
   events:{id:string;action:string;itemId:string;createdAt:string;actorRole:string;payload:{dishId?:string;dishName?:string;disposedBy?:string;disposedAt?:string;note?:string}}[]
