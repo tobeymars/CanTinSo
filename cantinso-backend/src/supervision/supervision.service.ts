@@ -238,14 +238,14 @@ export class SupervisionService {
           if(itemId==='food_sample' && checks.before_serving?.inspection?.dishes){
             for(const sample of inspection.dishes){
               const served=checks.before_serving.inspection.dishes.find((line:any)=>line.dishId===sample.dishId);
-              if(served?.servedAt && 'takenAt' in sample && sample.takenAt>served.servedAt)
+              if(typeof served?.servedAt==='string' && typeof sample.takenAt==='string' && sample.takenAt>served.servedAt)
                 throw new BadRequestException('Mẫu '+sample.dishName+' phải được lấy trước thời điểm bắt đầu ăn.');
             }
           }
           if(itemId==='before_serving' && checks.food_sample?.inspection?.dishes){
             for(const served of inspection.dishes){
               const sample=checks.food_sample.inspection.dishes.find((line:any)=>line.dishId===served.dishId);
-              if(sample?.takenAt && 'servedAt' in served && sample.takenAt>served.servedAt)
+              if(typeof sample?.takenAt==='string' && typeof served.servedAt==='string' && sample.takenAt>served.servedAt)
                 throw new BadRequestException('Đã ghi lấy mẫu '+served.dishName+' sau giờ bắt đầu ăn. Cần rà soát lại hồ sơ.');
             }
           }
