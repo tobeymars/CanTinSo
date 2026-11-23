@@ -102,6 +102,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
         return <div className="supervision-stage-row" key={status}>
           <span className="supervision-check-icon">{event?.confirmed ? <CheckCircle2 size={18}/> : event ? <Clock3 size={18}/> : <Activity size={18}/>}</span>
           <div className="supervision-stage-info"><strong>{stageNames[status]}</strong><small>{event ? `${event.actorLabel} · ${event.time}${event.confirmedAt ? ' · BGH xác nhận' : ''}` : 'Chưa ghi nhận mới'}</small>{event?.confirmationNote && (role === 'school_board' || role === 'school_kitchen' || role === 'central_kitchen') && <small>Ghi chú xác nhận: {event.confirmationNote}</small>}
+            {serverMode && serverQuery.data?.stages[status]?.lateReason && <small>Lý do ghi nhận muộn: {serverQuery.data.stages[status].lateReason}</small>}
             {serverMode && serverQuery.data?.stages[status]?.reopenReason && <small>BGH yêu cầu điều chỉnh: {serverQuery.data.stages[status].reopenReason}</small>}
             {serverMode && (serverQuery.data?.stages[status]?.history?.length??0)>0 && <details className="supervision-stage-revisions">
               <summary>Xem lịch sử điều chỉnh ({serverQuery.data?.stages[status]?.history?.length})</summary>
