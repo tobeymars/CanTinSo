@@ -208,10 +208,19 @@ export class SupervisionService {
               throw new BadRequestException('Lô hết hạn tại ngày bữa ăn.');
             if (lot.receivedAt > new Date(date+'T23:59:59.999Z'))
               throw new BadRequestException('Lô chưa được tiếp nhận tại ngày bữa ăn.');
+            const documentsStatus=line.documentsStatus;
+            const sensoryStatus=line.sensoryStatus;
+            const storageCondition=typeof line.storageCondition==='string'?line.storageCondition.trim():'';
+            const handling=typeof line.handling==='string'?line.handling.trim():'';
+            if(!['pass','fail'].includes(documentsStatus)||!['pass','fail'].includes(sensoryStatus))
+              throw new BadRequestException('Phải ghi Đạt/Không đạt cho chứng từ và cảm quan từng lô nguyên liệu.');
+            if(!storageCondition||storageCondition.length>500||!handling||handling.length>1000)
+              throw new BadRequestException('Cần ghi điều kiện bảo quản và biện pháp xử lý/ghi chú từng lô.');
             return {itemId:lot.id,ingredientName:lot.ingredient.name,lotCode:lot.lotCode,
               supplierName:lot.supplier.name,supplierContact:lot.supplier.contactName || lot.supplier.phone || '',
               expiresAt:lot.expiryDate?.toISOString().slice(0,10) ?? '',
-              quantity:normalizedQuantity,unit:lot.unit,displayQuantity,displayUnit};
+              quantity:normalizedQuantity,unit:lot.unit,displayQuantity,displayUnit,
+              documentsStatus,sensoryStatus,storageCondition,handling};
           });
           body.ingredientReceipts=normalized;
         }
@@ -225,7 +234,10 @@ export class SupervisionService {
           const dishes=plan?.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name}))??[];
           inspection=validateFoodSafetyForm(itemId as 'processing'|'before_serving'|'food_sample',body.inspection,dishes,date);
         }
-        const evidence={evidenceRef:body.evidenceRef.trim(),ingredientReceipts:body.ingredientReceipts??[],...(inspection?{inspection}:{})};
+        const ingredientPass=itemId==='ingredient_receipt' && Array.isArray(body.ingredientReceipts)
+          ? body.ingredientReceipts.every((line:any)=>line.documentsStatus==='pass' && line.sensoryStatus==='pass')
+          : undefined;
+        const evidence={evidenceRef:body.evidenceRef.trim(),ingredientReceipts:body.ingredientReceipts??[],...(inspection?{inspection}:{}),...(ingredientPass!==undefined?{ingredientPass}:{})};
         checks[itemId] = {status:'reported',...evidence,history:[...(checks[itemId]?.history??[]),{...entry,action:'report',status:'reported',...evidence}]};
       } else if (action === 'check_reopen') {
         if (checks[itemId]?.status!=='confirmed')
@@ -233,6 +245,10 @@ export class SupervisionService {
         checks[itemId]={...checks[itemId],status:'revision_requested',history:[...(checks[itemId].history??[]),{...entry,action:'reopen',status:'revision_requested'}]};
       } else if (action === 'check_confirm' || action === 'check_revision') {
         if (checks[itemId]?.status !== 'reported') throw new ConflictException('Mục chưa chờ xác nhận.');
+        if(action==='check_confirm' && checks[itemId]?.ingredientPass===false)
+          throw new ConflictException('Lô nguyên liệu có kết quả Không đạt. BGH phải yêu cầu bổ sung/xử lý trước khi xác nhận.');
+        if(action==='check_confirm' && checks[itemId]?.ingredientPass===undefined && itemId==='ingredient_receipt')
+          throw new ConflictException('Báo cáo bước 1 theo mẫu cũ chưa có đánh giá cảm quan/chứng từ. Cần yêu cầu bổ sung.');
         if(action==='check_confirm' && checks[itemId]?.inspection?.isPass===false)
           throw new ConflictException('Kết quả kiểm tra có nội dung Không đạt. BGH phải yêu cầu bổ sung/xử lý, không được xác nhận đạt.');
         if(action==='check_confirm' && ['processing','before_serving','food_sample'].includes(itemId) && !checks[itemId]?.inspection)
