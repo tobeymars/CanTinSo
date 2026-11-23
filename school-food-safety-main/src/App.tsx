@@ -76,6 +76,7 @@ import KitchenLegalDocuments from "./KitchenLegalDocuments";
 import SupervisionStatusPanel from "./SupervisionStatusPanel";
 import SupervisionMealApproval from "./SupervisionMealApproval";
 import SupervisionJourneyActions from "./SupervisionJourneyActions";
+import SupervisionDateNotice, {todayInVietnam} from "./SupervisionDateNotice";
 import { isServerSupervisionScope, readServerSupervision, readSupervisionContext } from "./lib/supervisionApi";
 import { SUPERVISION_JOURNEY_EVENT, stagesForSchool, stageNames } from "./lib/supervisionJourney";
 import type { SupervisionMealType } from "./lib/supervisionStatus";
@@ -851,6 +852,7 @@ function SupervisionSection({
           </div>
         </div>
       </section>
+      <SupervisionDateNotice date={date} serverMode={isServerSupervisionScope({schoolId:school.id,serviceDate:date,mealType})}/>
       {error ? (
         <div className="error-panel" role="alert"><strong>Chưa tải được giám sát {mealLabel}</strong><p>Không sử dụng dữ liệu của bữa khác để thay thế.</p><button type="button" className="outline" onClick={onRetry}>Thử lại</button></div>
       ) : loading || !data ? (
@@ -1008,9 +1010,7 @@ function Shell() {
   // The bundled demo starts on 17/10/2026; real accounts must not inherit that historical date.
   useEffect(() => {
     if (isAuthenticatedWorkspace && date === "2026-10-17") {
-      const now = new Date();
-      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,10);
-      setDate(local);
+      setDate(todayInVietnam());
     }
   }, [isAuthenticatedWorkspace, date, setDate]);
   const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
