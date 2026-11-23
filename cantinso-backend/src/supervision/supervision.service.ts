@@ -215,7 +215,7 @@ export class SupervisionService {
           reopenedAt:entry.at,reopenedBy:user.sub,reopenReason:note,
           history:[...(journey[itemId].history??[]),{...entry,action:'reopen'}]};
       } else if (action === 'stage_confirm') {
-        if (!journey[itemId] || journey[itemId].confirmed) throw new ConflictException('Mốc không chờ xác nhận.');
+        if (!journey[itemId] || journey[itemId].confirmed || journey[itemId].revisionRequested) throw new ConflictException('Mốc chưa được bếp báo cáo bổ sung để xác nhận.');
         journey[itemId] = {...journey[itemId],confirmed:true,confirmedAt:entry.at,confirmedBy:user.sub,confirmationNote:note};
       } else {
         const kitchen = await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}});
