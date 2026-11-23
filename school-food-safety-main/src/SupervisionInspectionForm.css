@@ -54,3 +54,6 @@
 .sif-intake-checks>label{min-width:0;font-size:13px;display:grid;gap:7px}
 .sif-intake-checks :is(input:not([type=radio]),textarea){width:100%;max-width:100%;min-width:0;box-sizing:border-box;border:1px solid #cbd9e8;border-radius:9px;padding:10px;font:inherit;font-size:14px;background:#fff}
 @media(max-width:680px){.sif-intake-checks{grid-template-columns:1fr}.sif-intake-checks__wide{grid-column:1}}
+
+.sif-skip{display:flex!important;align-items:flex-start;gap:10px;font-size:13px;line-height:1.6;border:1px solid #d1dfef;border-radius:11px;background:#f2f7ff;padding:13px}
+.sif-skip input{margin-top:3px;flex:none;width:17px;height:17px;accent-color:#245bc4}
