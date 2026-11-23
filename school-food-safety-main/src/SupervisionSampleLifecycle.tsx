@@ -18,7 +18,7 @@ export default function SupervisionSampleLifecycle({scope,data,role}:{
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const sample=data.checks.food_sample?.inspection
-  if(!isDetailedInspection(sample))return null
+  if(!isDetailedInspection(sample) || sample.notApplicable || !sample.dishes.length)return null
   const holds=data.events.filter(event=>event.action==='sample_hold')
   const disposed=data.events.filter(event=>event.action==='sample_dispose')
   const canHold=['central_kitchen','school_kitchen','school_board'].includes(role)
