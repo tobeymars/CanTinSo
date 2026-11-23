@@ -11,6 +11,12 @@ import { CreateSchoolDto } from "./dto/create-school.dto";
 export class SchoolsController {
   constructor(private readonly schools: SchoolsService) {}
 
+  @Get("me")
+  @Roles("SCHOOL_ADMIN", "SCHOOL_KITCHEN")
+  getMySchool(@CurrentUser() user: AuthUser) {
+    return this.schools.getMySchool(user);
+  }
+
   @Get("me/overview")
   @Roles("SCHOOL_ADMIN")
   getMyOverview(@CurrentUser() user: AuthUser, @Query("date") date: string) {
