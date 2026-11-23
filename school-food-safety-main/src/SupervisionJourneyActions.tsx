@@ -74,7 +74,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   const dispatchReady = hasProcessing && hasSample
   const shouldExplainDispatch=serverMode && role==='central_kitchen' && !saved?.events.some(event=>event.status==='DISPATCHED')
   const isBoard = role === 'school_board'
-  const canConfirmArrival = serverMode && isBoard && centralDelivery && !locked && !mealApproved && !!serverQuery.data?.stages.DISPATCHED?.confirmed && !serverQuery.data?.stages.ARRIVED
+  const canConfirmArrival = serverMode && isBoard && centralDelivery && !locked && !mealApproved && !!serverQuery.data?.stages.DISPATCHED && !serverQuery.data?.stages.DISPATCHED?.revisionRequested && !serverQuery.data?.stages.ARRIVED
   const canUpdate = !!next || (isBoard && pending.length > 0) || canConfirmArrival
   const mealLabel = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
   const edit = (value: Editing) => { setEditing(value); setNote('');setLateReason(''); setPhoto(''); setPhotoName(''); setReceivedServings('');setArrivalCondition('GOOD');setReceiptChecked(false);setError('') }
