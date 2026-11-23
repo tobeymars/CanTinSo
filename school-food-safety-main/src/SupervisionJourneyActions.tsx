@@ -61,6 +61,13 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   const mealApproved=serverMode && !!serverQuery.data?.approvalCurrent
   const next = locked || mealApproved ? null : serverMode ? (()=>{const candidate=stages.find(stage=>!saved?.events.some(event=>event.status===stage) || serverQuery.data?.stages[stage]?.revisionRequested);return candidate && (candidate==='DISPATCHED' ? role==='central_kitchen' : role==='school_kitchen') ? candidate : null})() : getNextReportableStage(scope, school.mode, role)
   const pending = locked || mealApproved ? [] : saved?.events.filter(event => !event.confirmed && !('revisionRequested' in event && event.revisionRequested) && stages.includes(event.status)) ?? []
+  const hasProcessing = ['reported','confirmed'].includes(serverQuery.data?.checks.processing?.status ?? '') && (serverQuery.data?.checks.processing?.inspection as {isPass?:boolean}|undefined)?.isPass === true
+  const sampleRecord = serverQuery.data?.checks.food_sample
+  const sampleDetails = sampleRecord?.inspection as {notApplicable?:boolean;isPass?:boolean;dishes?:unknown[]}|undefined
+  const hasSample = ['reported','confirmed'].includes(sampleRecord?.status ?? '') && sampleDetails?.isPass===true &&
+    (sampleDetails.notApplicable===true || (Array.isArray(sampleDetails.dishes) && sampleDetails.dishes.length>0))
+  const dispatchReady = hasProcessing && hasSample
+  const shouldExplainDispatch=serverMode && role==='central_kitchen' && !saved?.events.some(event=>event.status==='DISPATCHED')
   const isBoard = role === 'school_board'
   const canUpdate = !!next || (isBoard && pending.length > 0)
   const mealLabel = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
@@ -94,6 +101,11 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
         {isBoard && pending.length > 0 && <button type="button" className="primary" onClick={() => edit({ action: 'confirm', stage: pending[0]!.status })}><ShieldCheck size={16}/>Xác nhận mốc ({pending.length})</button>}
       </div>}
     </div>
+    {shouldExplainDispatch && <div className="sif-guidance" role="status">
+      <strong>Trước khi xuất bếp</strong>
+      <p>Bếp phải hoàn thành báo cáo kiểm thực bước 2 và ghi nhận đã lấy mẫu theo từng món (hoặc có hồ sơ không bắt buộc lưu mẫu hợp lệ). {dispatchReady ? 'Đã có hồ sơ để đối chiếu thời điểm lấy mẫu trước khi xuất.' : 'Hiện chưa đủ hồ sơ để báo cáo Xuất bếp.'} <strong>Không phải chờ mẫu lưu đủ 24 giờ</strong>; 24 giờ chỉ là thời gian tối thiểu trước khi xem xét hủy mẫu.</p>
+      <small>Thời điểm lấy mẫu phải sau khi chế biến xong và không muộn hơn thời điểm Xuất bếp. Hệ thống kiểm tra lại khi lưu mốc.</small>
+    </div>}
     {notice && <div className="supervision-status-message" role="status"><CheckCircle2 size={16}/>{notice}<button aria-label="Đóng thông báo" onClick={() => setNotice('')}><X size={15}/></button></div>}
     <div className="supervision-stage-rows">
       {stages.map(status => {
@@ -125,7 +137,10 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
             setLoadingPhoto(true)
             void readPhoto(file).then(result => {setPhoto(result);setPhotoName(file.name)}).catch(caught => setError(caught instanceof Error ? caught.message : 'Không đọc được ảnh.')).finally(() => setLoadingPhoto(false))
           }}/>{photoName && <small>Đã chọn: {photoName}</small>}</label>}
-          {serverMode && dateKind==='past' && <label>Lý do bổ sung hồ sơ ngày đã qua *<textarea required minLength={10} maxLength={1000} rows={3} value={lateReason} onChange={event=>setLateReason(event.target.value)} placeholder="Nêu rõ vì sao cập nhật hoặc xác nhận muộn…"/></label>}
+                {serverMode && editing.action==='report' && editing.stage==='DISPATCHED' && <p className="sif-guidance">
+            Xác nhận món đã được kiểm thực và lấy mẫu lưu trước lúc xuất bếp. Không cần chờ 24 giờ; mẫu được giữ tại nơi bảo quản để phục vụ kiểm tra sau này.
+          </p>}
+    {serverMode && dateKind==='past' && <label>Lý do bổ sung hồ sơ ngày đã qua *<textarea required minLength={10} maxLength={1000} rows={3} value={lateReason} onChange={event=>setLateReason(event.target.value)} placeholder="Nêu rõ vì sao cập nhật hoặc xác nhận muộn…"/></label>}
           {editing.action==='reopen' && <p className="supervision-edit-guidance">Mốc chuyển về cần báo cáo bổ sung và xác nhận tổng thể trước đó không còn hiện hành. Bản cũ và người mở điều chỉnh vẫn được giữ trong lịch sử.</p>}
           <label>Ghi chú / nội dung đối chiếu <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={3} value={note} onChange={event => setNote(event.target.value)} placeholder="Ghi rõ hoạt động đã thực hiện…" /></label>
           {error && <p className="error" role="alert">{error}</p>}
