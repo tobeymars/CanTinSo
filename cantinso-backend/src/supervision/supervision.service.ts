@@ -250,7 +250,8 @@ export class SupervisionService {
           }
           if(itemId==='food_sample' && journey.DISPATCHED){
             const dispatchedAt=Date.parse(journey.DISPATCHED.at);
-            if(inspection.notApplicable!==true && inspection.dishes.some(line=>typeof line.takenAt==='string' && Date.parse(line.takenAt+':00+07:00')>dispatchedAt))
+            const sampleLines: {takenAt?:string}[] = inspection.dishes;
+            if(inspection.notApplicable!==true && sampleLines.some(line=>typeof line.takenAt==='string' && Date.parse(line.takenAt+':00+07:00')>dispatchedAt))
               throw new BadRequestException('Không thể ghi nhận mẫu lấy sau khi đã xuất bếp. Cần rà soát hồ sơ vận hành.');
           }
           if(itemId==='food_sample' && checks.before_serving?.inspection?.dishes){
