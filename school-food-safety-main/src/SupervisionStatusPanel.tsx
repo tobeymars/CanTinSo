@@ -21,6 +21,7 @@ import { supervisionIngredientCatalog } from './lib/inventory'
 import Select from './components/ui/Select'
 import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit } from './lib/supervisionUnits'
 import { InspectionEditor, InspectionReadout, newInspectionDraft } from './SupervisionInspectionForm'
+import SupervisionSampleLifecycle from './SupervisionSampleLifecycle'
 import type { InspectionDraft, InspectionKind } from './SupervisionInspectionForm'
 import { supervisionDateKind } from './SupervisionDateNotice'
 
@@ -207,6 +208,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
           </article>
         })}
       </div>
+      {serverMode && serverQuery.data && <SupervisionSampleLifecycle key={scope.schoolId+'-'+date+'-'+mealType} scope={scope} data={serverQuery.data} role={role}/>}
       <div className="supervision-check-footer">
         <p><ShieldAlert size={16}/> Nhật ký tự báo cáo không thay thế hồ sơ, biên bản hoặc kết luận của cơ quan có thẩm quyền. {serverMode ? 'Dữ liệu được ghi nhận trên hệ thống.' : 'Dữ liệu DEMO chỉ lưu trên trình duyệt này.'}</p>
         {(canReport || canConfirm) && <button type="button" className="text-button" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Ẩn lịch sử cập nhật' : 'Xem lịch sử cập nhật'}</button>}
