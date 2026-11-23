@@ -10,7 +10,7 @@ import { getNextReportableStage, getSavedJourney, stageNames, stagesForSchool, S
 import type { SupervisionMealType, SupervisionScope } from './lib/supervisionStatus'
 import { supervisionDateKind } from './SupervisionDateNotice'
 
-type Editing = { action: 'report' | 'confirm' | 'reopen' | 'arrival_confirm'; stage: JourneyStatus }
+type Editing = { action: 'report' | 'confirm' | 'reopen' | 'arrival_confirm' | 'arrival_resolve'; stage: JourneyStatus }
 function readPhoto(file: File): Promise<string> {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return Promise.reject(Error('Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP.'))
   if (file.size > 750 * 1024) return Promise.reject(Error('Ảnh tối đa 750 KB.'))
@@ -36,8 +36,14 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   const [editing, setEditing] = useState<Editing | null>(null)
   const [note, setNote] = useState('')
   const [receivedServings,setReceivedServings] = useState('')
-  const [arrivalCondition,setArrivalCondition] = useState<'GOOD'|'WITH_NOTES'>('GOOD')
   const [receiptChecked,setReceiptChecked] = useState(false)
+  const [arrivalTime,setArrivalTime] = useState('')
+  const [deliveryPerson,setDeliveryPerson] = useState('')
+  const [transportUnit,setTransportUnit] = useState('')
+  const [packaging,setPackaging] = useState<'OK'|'ISSUE'>('OK')
+  const [sensory,setSensory] = useState<'OK'|'ISSUE'>('OK')
+  const [arrivalResult,setArrivalResult] = useState<'ACCEPTED'|'CONDITIONAL'|'REJECTED'>('ACCEPTED')
+  const [dishChecks,setDishChecks] = useState<Record<string,{status:'MATCH'|'SHORT'|'MISSING';temperatureC:string}>>({})
   const [lateReason,setLateReason]=useState('')
   const [photo, setPhoto] = useState('')
   const [photoName, setPhotoName] = useState('')
@@ -75,16 +81,35 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   const shouldExplainDispatch=serverMode && role==='central_kitchen' && !saved?.events.some(event=>event.status==='DISPATCHED')
   const isBoard = role === 'school_board'
   const canConfirmArrival = serverMode && isBoard && centralDelivery && !locked && !mealApproved && !!serverQuery.data?.stages.DISPATCHED && !serverQuery.data?.stages.DISPATCHED?.revisionRequested && !serverQuery.data?.stages.ARRIVED
-  const canUpdate = !!next || (isBoard && pending.length > 0) || canConfirmArrival
+  const arrivalRecord=serverQuery.data?.stages.ARRIVED
+  const canResolveArrival=serverMode && isBoard && centralDelivery && !locked && !mealApproved &&
+    !!arrivalRecord?.confirmed && !!arrivalRecord.arrival?.result && arrivalRecord.arrival.result !== 'ACCEPTED'
+  const canUpdate = !!next || (isBoard && pending.length > 0) || canConfirmArrival || canResolveArrival
   const mealLabel = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
-  const isArrivalReceipt = (value: Editing) => serverMode && value.stage === 'ARRIVED' && (value.action === 'confirm' || value.action === 'arrival_confirm')
-  const edit = (value: Editing) => { setEditing(value); setNote('');setLateReason(''); setPhoto(''); setPhotoName(''); setReceivedServings('');setArrivalCondition('GOOD');setReceiptChecked(false);setError('') }
+  const isArrivalReceipt = (value: Editing) => serverMode && value.stage === 'ARRIVED' &&
+    (value.action === 'confirm' || value.action === 'arrival_confirm' || value.action === 'arrival_resolve')
+  const plannedDishes=contextQuery.data?.menu?.dishes??[]
+  const hasArrivalIssues = packaging==='ISSUE' || sensory==='ISSUE' ||
+    (contextQuery.data?.menu ? receivedServings!=='' && Number(receivedServings)!==contextQuery.data.menu.servings : false) ||
+    plannedDishes.some(dish=>dishChecks[dish.id]?.status!=='MATCH')
+  const edit = (value: Editing) => {
+    setEditing(value);setNote('');setLateReason('');setPhoto('');setPhotoName('');setReceivedServings('');
+    setReceiptChecked(false);setError('');
+    setArrivalTime(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}));
+    setDeliveryPerson('');setTransportUnit('');setPackaging('OK');setSensory('OK');setArrivalResult('ACCEPTED');
+    setDishChecks(Object.fromEntries((contextQuery.data?.menu?.dishes??[]).map(dish=>[dish.id,{status:'MATCH' as const,temperatureC:''}])))
+  }
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!editing) return
     try {
       if(serverMode){
-        await writeServerSupervision(scope,{action:editing.action==='report'?'stage_report':editing.action==='reopen'?'stage_reopen':editing.action==='arrival_confirm'?'stage_arrival_confirm':'stage_confirm',itemId:editing.stage,note,lateReason,photo,...(isArrivalReceipt(editing)?{receivedServings:Number(receivedServings),condition:arrivalCondition,receiptChecked}:{})})
+        await writeServerSupervision(scope,{action:editing.action==='report'?'stage_report':editing.action==='reopen'?'stage_reopen':editing.action==='arrival_confirm'?'stage_arrival_confirm':editing.action==='arrival_resolve'?'stage_arrival_resolve':'stage_confirm',itemId:editing.stage,note,lateReason,photo,...(isArrivalReceipt(editing)?{
+          receivedServings:Number(receivedServings),arrivalTime,deliveryPerson,transportUnit,packaging,sensory,
+          result:arrivalResult,receiptChecked,photo,
+          dishChecks:plannedDishes.map(dish=>({dishId:dish.id,status:dishChecks[dish.id]?.status??'MATCH',
+            temperatureC:dishChecks[dish.id]?.temperatureC === '' ? null : Number(dishChecks[dish.id]?.temperatureC)})),
+        }:{})})
         await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
       }else updateJourney({ scope, school, data, role, status: editing.stage, action: editing.action as 'report' | 'confirm', note, photo })
       setEditing(null)
@@ -107,6 +132,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
         {next && <button type="button" className="primary" onClick={() => edit({ action: 'report', stage: next })}><Pencil size={16}/>Cập nhật: {stageNames[next]}</button>}
         {isBoard && pending.length > 0 && <button type="button" className="primary" onClick={() => edit({ action: 'confirm', stage: pending[0]!.status })}><ShieldCheck size={16}/>Xác nhận mốc ({pending.length})</button>}
         {canConfirmArrival && <button type="button" className="primary" onClick={() => edit({action:'arrival_confirm',stage:'ARRIVED'})}><ShieldCheck size={16}/>Lập phiếu xác nhận Đến trường</button>}
+        {canResolveArrival && <button type="button" className="primary" onClick={() => edit({action:'arrival_resolve',stage:'ARRIVED'})}>Kiểm tra lại phiếu giao nhận</button>}
       </div>}
     </div>
     {shouldExplainDispatch && <div className="sif-guidance" role="status">
@@ -122,29 +148,82 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
         return <div className="supervision-stage-row" key={status}>
           <span className="supervision-check-icon">{event?.confirmed ? <CheckCircle2 size={18}/> : event ? <Clock3 size={18}/> : <Activity size={18}/>}</span>
           <div className="supervision-stage-info"><strong>{stageNames[status]}</strong><small>{event ? `${event.actorLabel} · ${event.time}${event.confirmedAt ? ' · BGH xác nhận' : ''}` : 'Chưa ghi nhận mới'}</small>{event?.confirmationNote && (role === 'school_board' || role === 'school_kitchen' || role === 'central_kitchen') && <small>Ghi chú xác nhận: {event.confirmationNote}</small>}
-            {serverMode && status === 'ARRIVED' && serverQuery.data?.stages.ARRIVED?.arrival && <small>Thực nhận: {serverQuery.data.stages.ARRIVED.arrival.receivedServings.toLocaleString('vi-VN')} suất · {serverQuery.data.stages.ARRIVED.arrival.condition === 'GOOD' ? 'Tình trạng tốt' : 'Có lưu ý khi tiếp nhận'}</small>}
+            {serverMode && status === 'ARRIVED' && serverQuery.data?.stages.ARRIVED?.arrival && <small>Thực nhận: {serverQuery.data.stages.ARRIVED.arrival.receivedServings.toLocaleString('vi-VN')} suất · {serverQuery.data.stages.ARRIVED.arrival.result === 'ACCEPTED' ? 'Đã chấp nhận' : serverQuery.data.stages.ARRIVED.arrival.result === 'REJECTED' ? 'Từ chối tiếp nhận' : serverQuery.data.stages.ARRIVED.arrival.result === 'CONDITIONAL' ? 'Tạm giữ chờ xử lý' : serverQuery.data.stages.ARRIVED.arrival.condition === 'GOOD' ? 'Tình trạng tốt' : 'Có lưu ý khi tiếp nhận'}</small>}
             {serverMode && serverQuery.data?.stages[status]?.lateReason && <small>Lý do ghi nhận muộn: {serverQuery.data.stages[status].lateReason}</small>}
             {serverMode && serverQuery.data?.stages[status]?.reopenReason && <small>BGH yêu cầu điều chỉnh: {serverQuery.data.stages[status].reopenReason}</small>}
             {serverMode && (serverQuery.data?.stages[status]?.history?.length??0)>0 && <details className="supervision-stage-revisions">
               <summary>Xem lịch sử điều chỉnh ({serverQuery.data?.stages[status]?.history?.length})</summary>
               <ol>{serverQuery.data?.stages[status]?.history?.map((entry,i)=><li key={i}>{entry.at?new Date(entry.at).toLocaleString('vi-VN'):''} · {entry.action==='reopen'?'BGH mở điều chỉnh':'Mốc đã báo cáo trước đó'} · {entry.note}{entry.lateReason?' · Lý do ghi muộn: '+entry.lateReason:''}</li>)}</ol>
             </details>}</div>
-          <div className="supervision-check-controls"><span className={`supervision-check-pill ${event?.confirmed ? 'confirmed' : event ? 'reported' : 'not_reported'}`}>{event?.confirmed ? 'Đã xác nhận' : needsRevision ? 'Cần báo cáo bổ sung' : event ? 'Chờ xác nhận' : 'Chưa cập nhật'}</span>{next === status && <button className="outline" type="button" onClick={() => edit({action:'report',stage:status})}>Cập nhật</button>}{status === 'ARRIVED' && canConfirmArrival && <button className="primary" type="button" onClick={() => edit({action:'arrival_confirm',stage:'ARRIVED'})}>Xác nhận Đến trường</button>}{isBoard && event && !event.confirmed && !needsRevision && !locked && !mealApproved && <button className="primary" type="button" onClick={() => edit({action:'confirm',stage:status})}>Xác nhận</button>}{isBoard && serverMode && event?.confirmed && !locked && <button type="button" className="outline" onClick={()=>edit({action:'reopen',stage:status})}>Mở điều chỉnh</button>}</div>
+          <div className="supervision-check-controls"><span className={`supervision-check-pill ${event?.confirmed ? 'confirmed' : event ? 'reported' : 'not_reported'}`}>{event?.confirmed ? 'Đã xác nhận' : needsRevision ? 'Cần báo cáo bổ sung' : event ? 'Chờ xác nhận' : 'Chưa cập nhật'}</span>{next === status && <button className="outline" type="button" onClick={() => edit({action:'report',stage:status})}>Cập nhật</button>}{status === 'ARRIVED' && canConfirmArrival && <button className="primary" type="button" onClick={() => edit({action:'arrival_confirm',stage:'ARRIVED'})}>Xác nhận Đến trường</button>}{status === 'ARRIVED' && canResolveArrival && <button className="primary" type="button" onClick={()=>edit({action:'arrival_resolve',stage:'ARRIVED'})}>Kiểm tra lại</button>}{isBoard && event && !event.confirmed && !needsRevision && !locked && !mealApproved && <button className="primary" type="button" onClick={() => edit({action:'confirm',stage:status})}>Xác nhận</button>}{isBoard && serverMode && event?.confirmed && !locked && <button type="button" className="outline" onClick={()=>edit({action:'reopen',stage:status})}>Mở điều chỉnh</button>}</div>
         </div>
       })}
     </div>
     <p className="supervision-stage-footnote">{saved?.events.length ? (serverMode ? 'Các mốc được lưu theo đúng bữa trên hệ thống. BGH phải xác nhận để ảnh phục vụ được công khai.' : 'Các mốc đã ghi nhận trong DEMO được lưu riêng theo bữa. BGH phải xác nhận để ảnh phục vụ được công khai.') : 'Đang hiển thị lịch trình minh họa ở nhật ký bên dưới. Khi bếp bắt đầu báo cáo, lịch trình sẽ chuyển sang các mốc ghi nhận mới của bữa này.'} Không phải chứng nhận an toàn thực phẩm.</p>
     {editing && <div className="supervision-edit-backdrop" role="presentation" onMouseDown={event => {if(event.target===event.currentTarget)setEditing(null)}}>
       <section role="dialog" aria-modal="true" aria-labelledby="edit-stage-title" className="supervision-edit-dialog">
-        <div className="dialog-head"><h2 id="edit-stage-title">{isArrivalReceipt(editing) ? 'Phiếu xác nhận Đến trường' : editing.action === 'report' ? 'Cập nhật mốc vận hành' : editing.action === 'reopen' ? 'Mở điều chỉnh mốc vận hành' : 'Xác nhận mốc vận hành'}</h2><button className="icon-button" type="button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
+        <div className="dialog-head"><h2 id="edit-stage-title">{isArrivalReceipt(editing) ? (editing.action==='arrival_resolve'?'Phiếu kiểm tra lại giao nhận':'Phiếu xác nhận Đến trường') : editing.action === 'report' ? 'Cập nhật mốc vận hành' : editing.action === 'reopen' ? 'Mở điều chỉnh mốc vận hành' : 'Xác nhận mốc vận hành'}</h2><button className="icon-button" type="button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
         <p className="supervision-edit-context">{school.name} · {date} · {mealLabel} · <strong>{stageNames[editing.stage]}</strong></p>
         <form className="supervision-edit-form" onSubmit={save}>
           {isArrivalReceipt(editing) && <>
-            <p className="supervision-edit-guidance">BGH kiểm tra thực tế trước khi xác nhận đã nhận suất ăn từ bếp trung tâm. Hệ thống tự lưu người xác nhận và thời điểm thực hiện.</p>
-            <label>Số suất ăn thực nhận *<input type="number" min="1" max="1000000" step="1" required value={receivedServings} onChange={event=>setReceivedServings(event.target.value)} placeholder="Nhập số suất đã nhận" /></label>
-            <label>Tình trạng khi nhận *<select value={arrivalCondition} onChange={event=>setArrivalCondition(event.target.value as 'GOOD'|'WITH_NOTES')}><option value="GOOD">Đạt khi kiểm tra giao nhận</option><option value="WITH_NOTES">Có vấn đề / chênh lệch cần ghi chú</option></select></label>
-            {contextQuery.data?.menu && <p className="supervision-edit-guidance">Số suất dự kiến theo thực đơn: <strong>{contextQuery.data.menu.servings.toLocaleString('vi-VN')}</strong>. Nếu thực nhận khác số dự kiến, nêu rõ trong ghi chú.</p>}
-            <label><input type="checkbox" required checked={receiptChecked} onChange={event=>setReceiptChecked(event.target.checked)}/> Tôi xác nhận đã kiểm tra số lượng, tình trạng và việc bàn giao thực tế tại trường.</label>
+            <p className="supervision-edit-guidance">BGH kiểm tra giao nhận thực tế. Người và thời điểm xác nhận được hệ thống lưu tự động. Phiếu có vấn đề sẽ tạm dừng quy trình phục vụ cho đến khi được kiểm tra lại và chấp nhận.</p>
+            {contextQuery.isLoading && <p className="supervision-edit-guidance">Đang tải thực đơn và thông tin bếp để đối chiếu…</p>}
+            {contextQuery.isError && <p className="error" role="alert">Không tải được thực đơn để đối chiếu. Không thể xác nhận.</p>}
+            <fieldset className="arrival-section">
+              <legend>A. Thông tin giao nhận</legend>
+              <div className="arrival-grid">
+                <div><small>Bếp giao</small><strong>{contextQuery.data?.kitchen?.name??'Đang tải…'}</strong></div>
+                <div><small>Giờ xuất bếp đã ghi nhận</small><strong>{serverQuery.data?.stages.DISPATCHED?.time??'Chưa có'}</strong></div>
+              </div>
+              <div className="arrival-grid">
+                <label>Giờ thực tế đến trường *<input type="time" required value={arrivalTime} onChange={event=>setArrivalTime(event.target.value)}/></label>
+                <label>Người giao hàng *<input required minLength={2} maxLength={120} value={deliveryPerson} onChange={event=>setDeliveryPerson(event.target.value)} placeholder="Họ tên người bàn giao"/></label>
+              </div>
+              <label>Đơn vị / phương tiện vận chuyển (nếu có)<input maxLength={150} value={transportUnit} onChange={event=>setTransportUnit(event.target.value)} placeholder="Tên đơn vị hoặc phương tiện vận chuyển"/></label>
+            </fieldset>
+            <fieldset className="arrival-section">
+              <legend>B. Số lượng và món ăn</legend>
+              <div className="arrival-grid">
+                <div><small>Số suất dự kiến theo thực đơn</small><strong>{contextQuery.data?.menu?.servings.toLocaleString('vi-VN')??'Chưa có'}</strong></div>
+                <label>Số suất thực nhận *<input type="number" min="1" max="1000000" step="1" required value={receivedServings} onChange={event=>setReceivedServings(event.target.value)} placeholder="Nhập số suất đã nhận"/></label>
+              </div>
+              <p className="arrival-help">Đối chiếu từng món theo thực đơn đã được BGH duyệt. Nhiệt độ là số đo thực tế (°C), không được tự điền theo ngưỡng mặc định.</p>
+              {plannedDishes.map(dish=><div className="arrival-dish" key={dish.id}>
+                <strong>{dish.name}</strong>
+                <label>Đối chiếu món<select value={dishChecks[dish.id]?.status??'MATCH'} onChange={event=>setDishChecks(old=>({...old,[dish.id]:{status:event.target.value as 'MATCH'|'SHORT'|'MISSING',temperatureC:old[dish.id]?.temperatureC??''}}))}>
+                  <option value="MATCH">Đủ, đúng món</option><option value="SHORT">Thiếu / sai lệch</option><option value="MISSING">Không nhận được món</option>
+                </select></label>
+                <label>Nhiệt độ đo (°C) nếu có<input type="number" step="0.1" min="-40" max="150" value={dishChecks[dish.id]?.temperatureC??''} onChange={event=>setDishChecks(old=>({...old,[dish.id]:{status:old[dish.id]?.status??'MATCH',temperatureC:event.target.value}}))} placeholder="Chưa đo"/></label>
+              </div>)}
+              {!plannedDishes.length && <p className="error">Chưa có thực đơn được duyệt, không thể xác nhận giao nhận.</p>}
+            </fieldset>
+            <fieldset className="arrival-section">
+              <legend>C. Kiểm tra chất lượng</legend>
+              <label>Tình trạng bao gói / niêm phong *<select value={packaging} onChange={event=>setPackaging(event.target.value as 'OK'|'ISSUE')}>
+                <option value="OK">Nguyên vẹn, không phát hiện bất thường</option><option value="ISSUE">Rách, hở hoặc có bất thường</option>
+              </select></label>
+              <label>Kiểm tra cảm quan *<select value={sensory} onChange={event=>setSensory(event.target.value as 'OK'|'ISSUE')}>
+                <option value="OK">Không phát hiện bất thường</option><option value="ISSUE">Có dấu hiệu bất thường</option>
+              </select></label>
+              <label>Ảnh giao nhận (không bắt buộc, JPG/PNG/WebP ≤ 750 KB)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{
+                setPhoto('');setPhotoName('');setError('')
+                const file=event.target.files?.[0];if(!file)return
+                setLoadingPhoto(true)
+                void readPhoto(file).then(value=>{setPhoto(value);setPhotoName(file.name)})
+                  .catch(caught=>setError(caught instanceof Error?caught.message:'Không đọc được ảnh giao nhận.'))
+                  .finally(()=>setLoadingPhoto(false))
+              }}/>{photoName&&<small>Đã chọn: {photoName}</small>}</label>
+            </fieldset>
+            <fieldset className="arrival-section">
+              <legend>D. Kết luận tiếp nhận</legend>
+              {hasArrivalIssues && <p className="arrival-warning" role="status">Đã phát hiện chênh lệch hoặc bất thường. Không thể chọn chấp nhận tiếp nhận. Cần ghi rõ hướng xử lý.</p>}
+              <label>Kết quả kiểm tra *<select value={arrivalResult} onChange={event=>setArrivalResult(event.target.value as 'ACCEPTED'|'CONDITIONAL'|'REJECTED')}>
+                <option value="ACCEPTED" disabled={hasArrivalIssues}>Chấp nhận tiếp nhận</option>
+                <option value="CONDITIONAL">Có sai lệch – tạm giữ chờ xử lý, chưa phục vụ</option>
+                <option value="REJECTED">Từ chối tiếp nhận</option>
+              </select></label>
+              <label className="arrival-attestation"><input type="checkbox" required checked={receiptChecked} onChange={event=>setReceiptChecked(event.target.checked)}/><span>Tôi xác nhận đã trực tiếp kiểm tra số lượng, món ăn và tình trạng bàn giao thực tế tại trường.</span></label>
+            </fieldset>
           </>}
           {editing.action === 'report' && editing.stage === 'READY' && <label>Ảnh thực tế khi sẵn sàng phục vụ <span aria-hidden="true">*</span><input type="file" accept="image/jpeg,image/png,image/webp" required={!photo} onChange={event => {
             setPhoto('');setPhotoName('');setError('')
@@ -158,9 +237,9 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
           </p>}
     {serverMode && dateKind==='past' && <label>Lý do bổ sung hồ sơ ngày đã qua *<textarea required minLength={10} maxLength={1000} rows={3} value={lateReason} onChange={event=>setLateReason(event.target.value)} placeholder="Nêu rõ vì sao cập nhật hoặc xác nhận muộn…"/></label>}
           {editing.action==='reopen' && <p className="supervision-edit-guidance">Mốc chuyển về cần báo cáo bổ sung và xác nhận tổng thể trước đó không còn hiện hành. Bản cũ và người mở điều chỉnh vẫn được giữ trong lịch sử.</p>}
-          <label>Ghi chú / nội dung đối chiếu <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={3} value={note} onChange={event => setNote(event.target.value)} placeholder={isArrivalReceipt(editing) ? 'Ghi tình trạng niêm phong, bao gói, số suất chênh lệch hoặc sự việc phát sinh…' : 'Ghi rõ hoạt động đã thực hiện…'} /></label>
+          <label>Ghi chú / nội dung đối chiếu <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={3} value={note} onChange={event => setNote(event.target.value)} placeholder={isArrivalReceipt(editing) ? 'Ghi rõ sai lệch, thời điểm kiểm tra, kết quả xử lý hoặc việc cần bổ sung…' : 'Ghi rõ hoạt động đã thực hiện…'} /></label>
           {error && <p className="error" role="alert">{error}</p>}
-          <div className="supervision-edit-buttons"><button className="outline" type="button" onClick={() => setEditing(null)}>Hủy</button><button className="primary" disabled={loadingPhoto || (editing.action === 'report' && editing.stage === 'READY' && !photo) || (isArrivalReceipt(editing) && (!receiptChecked || !Number.isSafeInteger(Number(receivedServings)) || Number(receivedServings) < 1))} type="submit">{editing.action === 'report' ? 'Lưu mốc · Chờ BGH xác nhận' : editing.action==='reopen'?'Mở điều chỉnh và lưu lịch sử':isArrivalReceipt(editing)?'Lưu phiếu và xác nhận Đến trường':serverMode ? 'Xác nhận' : 'Xác nhận DEMO'}</button></div>
+          <div className="supervision-edit-buttons"><button className="outline" type="button" onClick={() => setEditing(null)}>Hủy</button><button className="primary" disabled={loadingPhoto || (editing.action === 'report' && editing.stage === 'READY' && !photo) || (isArrivalReceipt(editing) && (!receiptChecked || !plannedDishes.length || !arrivalTime || !deliveryPerson.trim() || !Number.isSafeInteger(Number(receivedServings)) || Number(receivedServings) < 1 || (hasArrivalIssues && arrivalResult==='ACCEPTED')))} type="submit">{editing.action === 'report' ? 'Lưu mốc · Chờ BGH xác nhận' : editing.action==='reopen'?'Mở điều chỉnh và lưu lịch sử':isArrivalReceipt(editing)?(arrivalResult==='ACCEPTED'?'Lưu phiếu và xác nhận Đến trường':'Lưu phiếu và tạm dừng phục vụ'):serverMode ? 'Xác nhận' : 'Xác nhận DEMO'}</button></div>
         </form>
       </section>
     </div>}
