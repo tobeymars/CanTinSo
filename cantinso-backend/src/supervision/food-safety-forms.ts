@@ -26,7 +26,7 @@ const uniqueDish=(items:unknown,dishes:Dish[])=>{
   if(!dishes.length)fail('Chưa có thực đơn được duyệt cho trường, ngày và bữa.');
   if(!Array.isArray(items)||items.length!==dishes.length)fail('Phải kiểm tra đầy đủ từng món trong thực đơn đã duyệt.');
   const ids=new Set<string>();
-  for(const line of items){
+  for(const line of items as Record<string,unknown>[]){
     if(!line||typeof line!=='object'||typeof line.dishId!=='string'||ids.has(line.dishId)||!dishes.some(d=>d.id===line.dishId))
       fail('Danh sách món không đúng thực đơn hoặc bị trùng.');
     ids.add(line.dishId);
