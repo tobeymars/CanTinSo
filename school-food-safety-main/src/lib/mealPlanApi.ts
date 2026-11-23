@@ -35,6 +35,12 @@ export async function loadMealPlanWorkspace() {
     request<MealAgeGroup[]>('/meal-plans/age-groups'),
     request<MealPlanRow[]>('/meal-plans'),
   ]);
+  if (user?.role === 'SCHOOL_KITCHEN' && !user.kitchenId) {
+    // Receiving/service staff sees the school's approved menu, without access
+    // to dish editing or other schools served by the same central kitchen.
+    const school = await getMyAssignedSchool();
+    return { ageGroups, plans, schools: [{ id: school.id, name: school.name }], dishes: [] as ApprovedDishOption[] };
+  }
   if (user?.role === 'UBND_ADMIN') {
     // Danh sách trường phải lấy từ hồ sơ trường, không suy ra từ thực đơn:
     // trường mới tạo chưa có meal plan vẫn cần xuất hiện trong bộ lọc UBND.
