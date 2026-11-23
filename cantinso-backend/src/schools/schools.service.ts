@@ -8,6 +8,24 @@ import { CreateSchoolDto } from "./dto/create-school.dto";
 export class SchoolsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getMySchool(user: AuthUser) {
+    if (![UserRole.SCHOOL_ADMIN, UserRole.SCHOOL_KITCHEN].includes(user.role as UserRole) || !user.schoolId) {
+      throw new ForbiddenException("Tài khoản chưa được gán trường.");
+    }
+    const school = await this.prisma.school.findUnique({
+      where: { id: user.schoolId },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        address: true,
+        ward: { select: { id: true, name: true, code: true } },
+      },
+    });
+    if (!school) throw new ForbiddenException("Không tìm thấy trường được gán.");
+    return school;
+  }
+
   async getMyOverview(user: AuthUser, date: string) {
     if (user.role !== UserRole.SCHOOL_ADMIN || !user.schoolId) {
       throw new ForbiddenException("Tài khoản chưa được gán trường để xem tổng quan.");
