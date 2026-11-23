@@ -10,6 +10,7 @@
 - **Bước 3:** từ thực đơn được duyệt, mỗi món có số suất, giờ chia món xong/giờ bắt đầu ăn, tình trạng dụng cụ chia/che đậy/bảo quản, cảm quan, biện pháp xử lý.
 - **Lưu mẫu** là nghiệp vụ riêng, không phải bước kiểm thực thứ 4. Nếu bữa từ **30 suất**: từng món phải có mẫu riêng, tên món, số suất, loại đặc/lỏng, ít nhất 100 g hoặc 150 ml, thời gian lấy mẫu, người lấy, mã niêm phong, dụng cụ, vị trí, nhiệt độ 2–8°C, ghi chú chất lượng. Mẫu phải được lấy trước giờ bắt đầu ăn.
 - Bữa **1–29 suất** có thể ghi nhận minh bạch trường hợp không bắt buộc lưu mẫu theo ngưỡng của Quyết định 1246; API xác minh số suất từ thực đơn được duyệt và lưu lý do. Có thể chọn lưu mẫu tự nguyện thay vì miễn áp dụng.
+- **Xuất bếp trung tâm:** chỉ được báo cáo mốc DISPATCHED khi đã báo cáo kiểm thực bước 2 đạt và có hồ sơ lấy mẫu hợp lệ theo từng món, hoặc hồ sơ miễn lưu mẫu hợp lệ dưới 30 suất. Mỗi mốc lấy mẫu phải **sau khi món nấu xong và trước thời điểm xuất bếp**. **Không chờ 24 giờ** mới được xuất; 24 giờ chỉ là thời gian giữ mẫu tối thiểu trước khi hủy.
 - **Hủy mẫu:** sự kiện riêng cho từng món, chỉ nhân viên bếp, ghi người và thời gian thật, sau tối thiểu 24 giờ kể từ lúc lấy. Bắt buộc xác nhận không có nghi ngờ ngộ độc hoặc yêu cầu giữ mẫu. Có **Ghi nhận yêu cầu giữ mẫu**; khi đã giữ mẫu, hệ thống chặn hủy. Mở giữ mẫu cần quy trình thẩm quyền riêng, không tự bỏ chặn chỉ vì hết 24 giờ.
 
 ## Kiểm soát quyền và lịch sử
@@ -41,3 +42,11 @@
 ## Kiểm tra kỹ thuật
 
 Chạy `powershell -ExecutionPolicy Bypass -File .\check-supply-build.ps1` tại gốc repo. Kiểm thử chuyên môn: `npm run test:supervision-food` tại `cantinso-backend`. Không có migration mới vì dùng JSON và nhật ký sự kiện hiện có.
+
+## Kiểm thử bổ sung: lưu mẫu trước xuất bếp
+
+- Nấu xong 09:10, lấy mẫu 09:15, ghi Xuất bếp 09:20: được phép nếu các điều kiện khác hợp lệ, **không cần đợi sang ngày hôm sau**.
+- Không có kiểm thực bước 2 đạt, thiếu hồ sơ mẫu theo món, hoặc mẫu ghi lấy sau Xuất bếp: API từ chối.
+- Ghi mẫu có giờ lấy trước thời điểm món nấu xong: API từ chối.
+- Hủy mẫu lúc 09:20 cùng ngày: API từ chối, chỉ xem xét hủy sau đủ 24 giờ và không có yêu cầu giữ mẫu.
+- Bếp tại trường không có mốc Xuất bếp vận chuyển; quy tắc đặc thù này áp dụng cho tuyến bếp trung tâm.
