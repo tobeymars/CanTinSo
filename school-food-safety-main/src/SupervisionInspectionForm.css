@@ -48,3 +48,9 @@
 .sif-checkbox input{flex:none;width:17px;height:17px;margin:3px 0 0}
 .sif-lifecycle-form>div:last-child{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 @media(max-width:640px){.sif-lifecycle-items article{align-items:stretch}.sif-lifecycle-items article>div:last-child{justify-content:flex-start}}
+
+.sif-intake-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-top:13px;padding:14px;background:#f7faff;border:1px solid #dde7f1;border-radius:12px;min-width:0}
+.sif-intake-checks__wide{grid-column:1/-1}
+.sif-intake-checks>label{min-width:0;font-size:13px;display:grid;gap:7px}
+.sif-intake-checks :is(input:not([type=radio]),textarea){width:100%;max-width:100%;min-width:0;box-sizing:border-box;border:1px solid #cbd9e8;border-radius:9px;padding:10px;font:inherit;font-size:14px;background:#fff}
+@media(max-width:680px){.sif-intake-checks{grid-template-columns:1fr}.sif-intake-checks__wide{grid-column:1}}
