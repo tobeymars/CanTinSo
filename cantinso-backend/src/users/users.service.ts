@@ -198,8 +198,8 @@ export class UsersService {
       return { providerType: actor.role === UserRole.CENTRAL_KITCHEN ? "CENTRAL" as const : "SCHOOL" as const, assignmentId: null, startsAt: null, kitchen };
     }
 
-    if (actor.role !== UserRole.SCHOOL_ADMIN || !actor.schoolId) {
-      throw new ForbiddenException("Chỉ tài khoản Ban Giám hiệu đã được gán trường mới xem được thông tin bếp.");
+    if (![UserRole.SCHOOL_ADMIN, UserRole.SCHOOL_KITCHEN].includes(actor.role as UserRole) || !actor.schoolId) {
+      throw new ForbiddenException("Tài khoản chưa được gán trường để xem thông tin bếp phục vụ.");
     }
 
     const assignment = await this.prisma.kitchenSchoolAssignment.findFirst({
