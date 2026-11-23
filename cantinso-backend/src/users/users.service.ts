@@ -160,7 +160,7 @@ export class UsersService {
 
 
   async getMyKitchen(actor: AuthUser) {
-    if (actor.role === UserRole.CENTRAL_KITCHEN || actor.role === UserRole.SCHOOL_KITCHEN) {
+    if (actor.role === UserRole.CENTRAL_KITCHEN || (actor.role === UserRole.SCHOOL_KITCHEN && !!actor.kitchenId)) {
       if (!actor.kitchenId) {
         throw new ForbiddenException("Tài khoản bếp trung tâm chưa được gắn với hồ sơ bếp.");
       }
