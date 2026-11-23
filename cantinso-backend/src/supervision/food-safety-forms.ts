@@ -33,9 +33,15 @@ const uniqueDish=(items:unknown,dishes:Dish[])=>{
   }
   return items as Record<string,unknown>[];
 };
-export function validateFoodSafetyForm(kind:FoodSafetyKind,raw:unknown,approvedDishes:Dish[],serviceDate:string){
+export function validateFoodSafetyForm(kind:FoodSafetyKind,raw:unknown,approvedDishes:Dish[],serviceDate:string,plannedServings?:number){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))fail('Thiếu nội dung biểu mẫu chuyên môn.');
   const data=raw as Record<string,unknown>;
+  if(kind==='food_sample' && data.notApplicable===true){
+    if(typeof plannedServings!=='number'||!Number.isSafeInteger(plannedServings)||plannedServings<1||plannedServings>=30 || approvedDishes.length===0)
+      fail('Chỉ được ghi không bắt buộc lưu mẫu khi bữa đã duyệt có từ 1 đến 29 suất.');
+    return {kind,notApplicable:true,reason:str(data.reason,'lý do không áp dụng lưu mẫu',1000),
+      inspector:'',location:'',checkedAt:'',isPass:true,dishes:[],standard:'1246/QD-BYT-2017',version:1};
+  }
   const inspector=str(data.inspector,'người kiểm tra');
   const location=str(data.location,'địa điểm kiểm tra');
   const checkedAt=moment(data.checkedAt,'kiểm tra',serviceDate);
