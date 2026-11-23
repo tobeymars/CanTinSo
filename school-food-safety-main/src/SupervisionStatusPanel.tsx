@@ -20,6 +20,8 @@ import type { IngredientReceiptLine } from './lib/supervisionStatus'
 import { supervisionIngredientCatalog } from './lib/inventory'
 import Select from './components/ui/Select'
 import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit } from './lib/supervisionUnits'
+import { InspectionEditor, InspectionReadout, newInspectionDraft } from './SupervisionInspectionForm'
+import type { InspectionDraft, InspectionKind } from './SupervisionInspectionForm'
 import { supervisionDateKind } from './SupervisionDateNotice'
 
 const labels: Record<CheckStatus, string> = {
@@ -71,6 +73,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   const [lateReason,setLateReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
   const [ingredientRows, setIngredientRows] = useState<IngredientDraftRow[]>([])
+  const [inspectionDraft,setInspectionDraft] = useState<InspectionDraft | null>(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showHistory, setShowHistory] = useState(false)
@@ -114,6 +117,10 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
     setLateReason('')
     setEvidenceRef('')
     const previousIngredients = checks.find(item => item.id === id)?.history.filter(item => item.action === 'report').at(-1)?.ingredientReceipts
+    const inspectionKind=['processing','before_serving','food_sample'].includes(id) ? id as InspectionKind : null
+    const previousInspection=serverQuery.data?.checks[id]?.inspection
+    setInspectionDraft(inspectionKind && action==='report' && contextQuery.data?.menu
+      ? newInspectionDraft(contextQuery.data.menu,previousInspection) : null)
     setIngredientRows(id === 'ingredient_receipt' && action === 'report'
       ? Array.isArray(previousIngredients) && previousIngredients.length > 0
         ? previousIngredients.map(item => createIngredientRow(item.itemId, String(item.displayQuantity ?? item.quantity), item.displayUnit ?? item.unit))
@@ -138,7 +145,10 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
           })
         : undefined
       if (serverMode) {
-        await writeServerSupervision(scope,{action:editing.action==='report'?'check_report':editing.action==='confirm'?'check_confirm':editing.action==='reopen'?'check_reopen':'check_revision',itemId:editing.id,note,lateReason,evidenceRef,ingredientReceipts})
+        const hasStructuredInspection=editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id)
+        if(hasStructuredInspection && (!inspectionDraft || !contextQuery.data?.menu?.dishes.length))throw Error('Chưa có thực đơn được duyệt và biểu mẫu chi tiết để kiểm thực.')
+        const inspection=hasStructuredInspection?{...inspectionDraft!,dishes:inspectionDraft!.dishes.map(line=>({...line,servings:Number(line.servings),amount:Number(line.amount),temperature:Number(line.temperature)}))}:undefined
+        await writeServerSupervision(scope,{action:editing.action==='report'?'check_report':editing.action==='confirm'?'check_confirm':editing.action==='reopen'?'check_reopen':'check_revision',itemId:editing.id,note,lateReason,evidenceRef,ingredientReceipts,inspection})
         await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
       } else updateSupervisionStatus({ scope, id: editing.id, action: editing.action as CheckAction, role, schoolMode: school.mode, note, evidenceRef, ingredientReceipts })
       setEditing(null)
@@ -184,6 +194,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
               <strong>{def.label}</strong>
               <p>{def.description}</p>
               {def.id === 'ingredient_receipt' && Array.isArray(reportedIngredients) && reportedIngredients.length > 0 && (canReport || canConfirm) && <div className="supervision-ingredient-summary"><strong>{reportedIngredients.length} nguyên liệu đã ghi nhận</strong><span>{reportedIngredients.map(line => `${line.ingredientName}: ${(line.displayQuantity ?? line.quantity).toLocaleString('vi-VN')} ${line.displayUnit ?? line.unit}`).join(' · ')}</span></div>}
+              {serverMode && ['processing','before_serving','food_sample'].includes(def.id) && serverQuery.data?.checks[def.id]?.inspection && <details className="sif-report-details"><summary>Xem nội dung kiểm thực đã báo cáo</summary><InspectionReadout inspection={serverQuery.data.checks[def.id].inspection}/></details>}
               {latest && (canReport || canConfirm) && <small>{latest.actorLabel} · {formatTimestamp(latest.recordedAt)} · {latest.evidenceRef ? `Tham chiếu: ${latest.evidenceRef}` : 'Không có tham chiếu'}</small>}
               {showHistory && (canReport || canConfirm) && item.history.length > 0 && <ol className="supervision-status-history">{item.history.map(entry => <li key={entry.id}><strong>{actionLabels[entry.action]}</strong> · {formatTimestamp(entry.recordedAt)} · {entry.note}</li>)}</ol>}
             </div>
@@ -272,10 +283,15 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
               const lines = checks.find(item => item.id === editing.id)?.history.filter(item => item.action === 'report').at(-1)?.ingredientReceipts
               return Array.isArray(lines) && lines.length > 0 ? <IngredientReceiptDetails lines={lines} serviceDate={date}/> : <p className="error" role="alert">Bản báo cáo chưa có danh sách nguyên liệu để đối chiếu.</p>
             })()}
+            {serverMode && editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id) && (
+              contextQuery.data?.menu && inspectionDraft ? <InspectionEditor kind={editing.id as InspectionKind} menu={contextQuery.data.menu} value={inspectionDraft} onChange={setInspectionDraft}/>
+              : <p role="alert" className="error">Chưa có thực đơn được duyệt cho trường, ngày và bữa này. Cần duyệt thực đơn trước khi ghi kiểm thực.</p>
+            )}
+            {serverMode && editing.action!=='report' && ['processing','before_serving','food_sample'].includes(editing.id) && <InspectionReadout inspection={serverQuery.data?.checks[editing.id]?.inspection}/>}
             {serverMode && dateKind==='past' && <label>Lý do thực hiện bổ sung cho ngày đã qua *<textarea required minLength={10} maxLength={1000} rows={3} value={lateReason} onChange={event=>setLateReason(event.target.value)} placeholder="Nêu nguyên nhân ghi nhận muộn hoặc điều chỉnh sau ngày phục vụ…"/></label>}
             <label>Ghi chú / nội dung ghi nhận <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Nhập thông tin đối chiếu hoặc nội dung cần bổ sung…" /></label>
             {error && <p className="error" role="alert">{error}</p>}
-            <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary">{editing.action === 'report' ? 'Lưu và gửi BGH xác nhận' : editing.action === 'confirm' ? (serverMode ? 'Xác nhận' : 'Xác nhận DEMO') : editing.action === 'reopen' ? 'Mở điều chỉnh và lưu lịch sử' : 'Gửi yêu cầu bổ sung'}</button></div>
+            <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary" disabled={serverMode && editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id) && !inspectionDraft}>{editing.action === 'report' ? 'Lưu và gửi BGH xác nhận' : editing.action === 'confirm' ? (serverMode ? 'Xác nhận' : 'Xác nhận DEMO') : editing.action === 'reopen' ? 'Mở điều chỉnh và lưu lịch sử' : 'Gửi yêu cầu bổ sung'}</button></div>
           </form>
         </section>
       </div>}
