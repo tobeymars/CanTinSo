@@ -16,6 +16,17 @@ const canonical = (value: unknown): string => JSON.stringify(value, (_key, entry
     ? Object.fromEntries(Object.entries(entry).sort(([a],[b])=>a.localeCompare(b)))
     : entry);
 
+const validateArrivalReceipt = (body: any) => {
+  const receivedServings = body.receivedServings;
+  if (!Number.isSafeInteger(receivedServings) || receivedServings < 1 || receivedServings > 1000000)
+    throw new BadRequestException('Số suất thực nhận phải là số nguyên từ 1 đến 1.000.000.');
+  if (body.condition !== 'GOOD' && body.condition !== 'WITH_NOTES')
+    throw new BadRequestException('Phải ghi nhận tình trạng thức ăn khi tiếp nhận.');
+  if (body.receiptChecked !== true)
+    throw new BadRequestException('BGH phải xác nhận đã kiểm tra thực tế trước khi lưu.');
+  return {receivedServings,condition:body.condition as 'GOOD'|'WITH_NOTES',receiptChecked:true};
+};
+
 @Injectable()
 export class SupervisionService {
   constructor(private readonly prisma: PrismaService) {}
@@ -311,14 +322,7 @@ export class SupervisionService {
         if (kitchen?.type !== 'CENTRAL') throw new ConflictException('Bếp tại trường không có mốc Đến trường.');
         if (!journey.DISPATCHED || journey.DISPATCHED.revisionRequested) throw new ConflictException('Bếp trung tâm phải báo cáo Xuất bếp hợp lệ trước khi tiếp nhận.');
         if (journey.ARRIVED) throw new ConflictException('Mốc Đến trường đã có hồ sơ. Vui lòng sử dụng quy trình duyệt hoặc điều chỉnh hiện có.');
-        const receivedServings = body.receivedServings;
-        if (!Number.isSafeInteger(receivedServings) || receivedServings < 1 || receivedServings > 1000000)
-          throw new BadRequestException('Số suất thực nhận phải là số nguyên từ 1 đến 1.000.000.');
-        if (body.condition !== 'GOOD' && body.condition !== 'WITH_NOTES')
-          throw new BadRequestException('Phải ghi nhận tình trạng thức ăn khi tiếp nhận.');
-        if (body.receiptChecked !== true)
-          throw new BadRequestException('BGH phải xác nhận đã kiểm tra thực tế trước khi lưu.');
-        const arrival = {receivedServings,condition:body.condition,receiptChecked:true};
+        const arrival = validateArrivalReceipt(body);
         journey.ARRIVED = {...entry,status:'ARRIVED',
           time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),
           confirmed:true,confirmedAt:entry.at,confirmedBy:user.sub,confirmationNote:note,
@@ -330,7 +334,8 @@ export class SupervisionService {
           history:[...(journey[itemId].history??[]),{...entry,action:'reopen'}]};
       } else if (action === 'stage_confirm') {
         if (!journey[itemId] || journey[itemId].confirmed || journey[itemId].revisionRequested) throw new ConflictException('Mốc chưa được bếp báo cáo bổ sung để xác nhận.');
-        journey[itemId] = {...journey[itemId],confirmed:true,confirmedAt:entry.at,confirmedBy:user.sub,confirmationNote:note};
+        const arrival = itemId === 'ARRIVED' ? validateArrivalReceipt(body) : undefined;
+        journey[itemId] = {...journey[itemId],confirmed:true,confirmedAt:entry.at,confirmedBy:user.sub,confirmationNote:note,...(arrival?{arrival}:{})};
       } else {
         const kitchen = await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}});
         const required = kitchen?.type==='CENTRAL' ? stages : ['PLATED','READY'];
@@ -340,7 +345,7 @@ export class SupervisionService {
         approvals.push({...entry,snapshot});
       }
       const updated = await tx.supervisionMeal.update({where:this.key(s),data:{checks:checks as Prisma.InputJsonValue,stages:journey as Prisma.InputJsonValue,approvals:approvals as Prisma.InputJsonValue}});
-      await tx.supervisionEvent.create({data:{id:eventId,mealId:updated.id,actorId:user.sub,actorRole:user.role,action,itemId:typeof itemId==='string'?itemId:'meal',payload:{note,...(action==='stage_arrival_confirm'?{receivedServings:body.receivedServings,condition:body.condition,receiptChecked:true}:{}),...(lateReason?{lateReason}:{})}}});
+      await tx.supervisionEvent.create({data:{id:eventId,mealId:updated.id,actorId:user.sub,actorRole:user.role,action,itemId:typeof itemId==='string'?itemId:'meal',payload:{note,...((action==='stage_arrival_confirm' || (action==='stage_confirm' && itemId==='ARRIVED'))?{receivedServings:body.receivedServings,condition:body.condition,receiptChecked:true}:{}),...(lateReason?{lateReason}:{})}}});
       return {success:true,id:eventId};
       },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
     } catch(error) {
