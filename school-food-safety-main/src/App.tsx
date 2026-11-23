@@ -1021,13 +1021,6 @@ function Shell() {
   const realKitchenQuery = useQuery({ queryKey: ["my-kitchen-context"], queryFn: fetchMyKitchenContext, enabled: isRealKitchenAccount });
   // SCHOOL_KITCHEN without kitchenId is school-side meal receiving staff, not a kitchen operator.
   const isSchoolKitchenReceiver = storedUser?.role === "SCHOOL_KITCHEN" && !storedUser.kitchenId;
-  useEffect(() => {
-    // School-side receiving users must never fall back to legacy DEMO pages
-    // by navigating to an old URL directly.
-    if (isSchoolKitchenReceiver && !["/", "/thuc-don", "/giam-sat"].includes(location.pathname)) {
-      navigate("/", { replace: true });
-    }
-  }, [isSchoolKitchenReceiver, location.pathname, navigate]);
   const schoolQuery = useQuery({
     queryKey: ["schools", isWardWorkspace ? "ward-scoped" : isRealSchoolAdmin ? "school-account" : isSchoolKitchenReceiver ? "receiver-account" : isRealOnSiteKitchen ? "on-site-kitchen-account" : "demo", isRealSchoolAdmin ? date : ""],
     queryFn: async (): Promise<School[]> => {
@@ -1148,7 +1141,6 @@ function Shell() {
   const parentReadyPhoto = parentReadyEvent?.confirmed ? parentReadyEvent.photos[0] : undefined;
   const isWardAdminAccount = getStoredUser()?.role === "UBND_ADMIN";
   const adminNav = adminNavigation.filter((item) => {
-    if (isSchoolKitchenReceiver && !["/", "/thuc-don", "/giam-sat"].includes(item.path)) return false;
     if (item.path === "/duyet-mon" && role !== "school_board") return false;
     if (item.path === "/quan-ly-hoc-sinh" && role !== "school_board") return false;
     if (item.path === "/quan-ly-tai-khoan" && role !== "school_board") return false;
@@ -1164,7 +1156,7 @@ function Shell() {
         ? [...adminNav, ...(role === "culture_social_office" ? [{ path: "/mon-da-duyet", label: "Món ăn trường đã duyệt", icon: ShieldCheck }, ...(isWardAdminAccount ? [{ path: "/quan-ly-truong", label: "Quản lý trường học", icon: SchoolIcon }, { path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])] : [])]
         : role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN"
           ? [...adminNav, { path: "/quan-ly-bep", label: "Quản lý bếp", icon: CookingPot }]
-        : role === "school_kitchen" && !isSchoolKitchenReceiver
+        : role === "school_kitchen"
           ? [...adminNav.slice(0, 2), { path: "/tao-mon", label: "Tạo món & dinh dưỡng", icon: CookingPot }, ...adminNav.slice(2)]
           : role === "central_kitchen" && centralKitchenRouteAccess[kitchenRole].includes("/tao-mon")
             ? [...adminNav.slice(0, 2), { path: "/tao-mon", label: "Tạo món & dinh dưỡng", icon: CookingPot }, ...adminNav.slice(2)]
