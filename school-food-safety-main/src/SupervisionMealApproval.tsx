@@ -11,7 +11,7 @@ import {
 } from './lib/supervisionApproval'
 import { SUPERVISION_STATUS_EVENT, SUPERVISION_STATUS_STORAGE_KEY } from './lib/supervisionStatus'
 import type { SupervisionMealType, SupervisionScope } from './lib/supervisionStatus'
-import SupervisionDateNotice, { supervisionDateKind } from './SupervisionDateNotice'
+import { supervisionDateKind } from './SupervisionDateNotice'
 import { CHECK_DEFINITIONS } from './lib/supervisionStatus'
 import { SUPERVISION_JOURNEY_EVENT, stageNames } from './lib/supervisionJourney'
 
@@ -89,7 +89,6 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
       </div>
       {isBoard && !dateLocked && !status.approved && <button type="button" className="primary" disabled={!status.ready} onClick={() => {setNote('');setLateReason('');setError('');setConfirming(true)}}><ClipboardCheck size={17}/>Xác nhận tổng thể</button>}
     </div>
-    <SupervisionDateNotice date={date} serverMode={serverMode}/>
     <div className="supervision-approval-summary">
       <span className={`supervision-check-pill ${status.approved ? 'confirmed' : status.stale ? 'revision_requested' : 'reported'}`}>
         {status.approved ? <CheckCircle2 size={15}/> : status.stale ? <AlertCircle size={15}/> : <Clock3 size={15}/>}
