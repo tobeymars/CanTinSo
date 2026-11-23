@@ -48,7 +48,7 @@ export default function SupervisionSampleLifecycle({scope,data,role}:{
         const date=new Date(takenAt+':00+07:00')
         const eligible=Number.isFinite(date.getTime())&&Date.now()-date.getTime()>=24*60*60*1000
         return <article key={line.dishId}>
-          <div><strong>{line.dishName}</strong><small>Lấy mẫu: {takenAt.replace('T',' ')} · Lượng mẫu: {line.amount} {line.unit} · Mã niêm phong: {String(line.sealCode??'')}</small></div>
+          <div><strong>{line.dishName}</strong><small>Lấy mẫu: {takenAt.replace('T',' ')} · Lượng mẫu: {String(line.amount ?? '')} {String(line.unit ?? '')} · Mã niêm phong: {String(line.sealCode??'')}</small></div>
           {previous?<span className="sif-complete">Đã hủy: {new Date(previous.payload.disposedAt??previous.createdAt).toLocaleString('vi-VN')} · {previous.payload.disposedBy}</span>:
             <div><small>{eligible?'Đã đủ 24 giờ':'Chưa đủ 24 giờ lưu mẫu'}</small>
               {canDispose&&holds.length===0&&<button type="button" className="outline" disabled={!eligible} onClick={()=>{setActive(line.dishId);setError('');setNote('')}}>Ghi nhận hủy</button>}
