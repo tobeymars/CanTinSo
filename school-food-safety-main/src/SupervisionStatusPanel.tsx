@@ -190,6 +190,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             <div className="supervision-check-controls">
               <span className={`supervision-check-pill ${item.status}`}>{item.status === 'confirmed' ? <CheckCircle2 size={13}/> : <Clock3 size={13}/>} {statusLabel(item.status)}</span>
               {canReport && (item.status === 'not_reported' || item.status === 'revision_requested') && <button className="outline" type="button" onClick={() => start(def.id, 'report')}>Cập nhật</button>}
+              {canConfirm && serverMode && item.status === 'confirmed' && <button className="outline" type="button" onClick={() => start(def.id, 'reopen')}>Mở điều chỉnh</button>}
               {canConfirm && item.status === 'reported' && <><button className="primary" type="button" onClick={() => start(def.id, 'confirm')}>Xác nhận</button><button className="outline" type="button" onClick={() => start(def.id, 'request_revision')}>Yêu cầu bổ sung</button></>}
             </div>
           </article>
