@@ -81,7 +81,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   const dateKind=serverMode?supervisionDateKind(date):'today'
   const locked=dateKind==='future'
   const mealApproved=serverMode && !!serverQuery.data?.approvalCurrent
-  const next = locked || mealApproved ? null : serverMode ? (()=>{const candidate=stages.find(stage=>!saved?.events.some(event=>event.status===stage) || serverQuery.data?.stages[stage]?.revisionRequested);return candidate && (candidate==='DISPATCHED' ? role==='central_kitchen' : role==='school_kitchen') ? candidate : null})() : getNextReportableStage(scope, school.mode, role)
+  const next = locked || mealApproved ? null : serverMode ? (()=>{const candidate=stages.find(stage=>!saved?.events.some(event=>event.status===stage) || serverQuery.data?.stages[stage]?.revisionRequested);return candidate && (candidate==='DISPATCHED' ? role==='central_kitchen' : candidate==='ARRIVED' ? false : role==='school_kitchen') ? candidate : null})() : getNextReportableStage(scope, school.mode, role)
   const pending = locked || mealApproved ? [] : saved?.events.filter(event => !event.confirmed && !('revisionRequested' in event && event.revisionRequested) && stages.includes(event.status)) ?? []
   const hasProcessing = ['reported','confirmed'].includes(serverQuery.data?.checks.processing?.status ?? '') && (serverQuery.data?.checks.processing?.inspection as {isPass?:boolean}|undefined)?.isPass === true
   const sampleRecord = serverQuery.data?.checks.food_sample
