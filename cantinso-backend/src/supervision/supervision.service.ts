@@ -319,6 +319,16 @@ export class SupervisionService {
           servingReport=validateServingStageReport(body,itemId,
             revision?.items.map(row=>({id:row.id,name:row.dishVersion.dish.name}))??[],
             revision?.ageGroups.reduce((total,row)=>total+row.plannedServings,0)??0,date);
+          if(itemId==='PLATED' && required[0]==='DISPATCHED') {
+            const accepted=journey.ARRIVED?.arrival;
+            if(!accepted || accepted.result!=='ACCEPTED')
+              throw new ConflictException('Chưa có phiếu tiếp nhận được BGH chấp nhận.');
+            if(servingReport.actualServings>accepted.receivedServings)
+              throw new BadRequestException('Số suất chia không thể vượt số suất đã tiếp nhận tại trường.');
+            if(servingReport.portionStartAt && accepted.arrivalTime &&
+              servingReport.portionStartAt<accepted.arrivalTime)
+              throw new BadRequestException('Giờ bắt đầu chia suất không thể trước giờ thức ăn đến trường.');
+          }
           if(itemId==='READY') {
             if(!journey.PLATED?.confirmed || journey.PLATED?.revisionRequested)
               throw new ConflictException('Mốc Ra món phải được BGH xác nhận trước khi chuyển Sẵn sàng phục vụ.');
@@ -372,6 +382,8 @@ export class SupervisionService {
       } else if (action === 'stage_confirm') {
         if (!journey[itemId] || journey[itemId].confirmed || journey[itemId].revisionRequested) throw new ConflictException('Mốc chưa được bếp báo cáo bổ sung để xác nhận.');
         let arrival;
+        if(itemId==='PLATED' && journey[itemId]?.serving?.hasIssue)
+          throw new ConflictException('Phiếu Ra món còn sai lệch hoặc bất thường. BGH yêu cầu xử lý và báo cáo bổ sung, chưa được xác nhận.');
         if(itemId==='READY' && (!journey.PLATED?.confirmed || journey.PLATED?.revisionRequested))
           throw new ConflictException('Ra món chưa được BGH xác nhận.');
         if(itemId==='READY' && !journey[itemId]?.serving)
