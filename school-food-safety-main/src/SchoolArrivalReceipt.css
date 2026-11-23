@@ -16,3 +16,7 @@
 .supervision-edit-form .arrival-attestation span{flex:1}
 [data-theme=dark] .supervision-edit-form .arrival-warning{background:#49371e;color:#ffe0ab}
 @media(max-width:630px){.supervision-edit-form .arrival-grid{grid-template-columns:1fr}.supervision-edit-form .arrival-dish{grid-template-columns:1fr}.supervision-edit-form .arrival-dish>strong{padding-top:5px}}
+
+.arrival-saved{display:grid;gap:8px;padding:10px 0;font-size:12px;line-height:1.6;color:var(--muted)}
+.arrival-saved ul{padding-left:19px;display:grid;gap:4px}
+.arrival-saved-photo{max-height:160px;max-width:100%;object-fit:contain;border-radius:8px}
