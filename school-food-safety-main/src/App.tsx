@@ -818,7 +818,7 @@ function SupervisionSection({
         <div>
           <span className="section-kicker">GIÁM SÁT AN TOÀN THEO TỪNG BỮA</span>
           <h2 id="supervision-meal-title">Giám sát & an toàn · {mealLabel}</h2>
-          <p>Nhật ký, ảnh đã duyệt, QR món ăn và hồ sơ kiểm tra riêng cho mỗi bữa. Mọi vai trò xem cùng nguồn dữ liệu công khai.</p>
+          <p><strong>Ngày phục vụ: {new Date(date+'T12:00:00').toLocaleDateString('vi-VN')}</strong> · Nhật ký, ảnh đã duyệt, QR món ăn và hồ sơ kiểm tra riêng cho mỗi bữa.</p>
         </div>
         <div className="supervision-meal-selector">
           <span className="supervision-meal-selector-label">CHỌN BỮA TRONG NGÀY</span>
