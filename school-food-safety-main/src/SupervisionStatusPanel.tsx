@@ -49,6 +49,10 @@ function IngredientReceiptDetails({ lines, serviceDate }: { lines: readonly Ingr
           <div><dt>Nhà cung cấp</dt><dd>{line.supplierName}</dd></div>
           <div><dt>Người cấp / liên hệ</dt><dd>{line.supplierContact}</dd></div>
           <div><dt>Hạn sử dụng</dt><dd>{formatDate(line.expiresAt)} <em className={expiredAtService ? 'expired' : ''}>{expiredAtService ? 'Quá hạn tại ngày bữa ăn' : 'Còn hạn tại ngày bữa ăn'}</em></dd></div>
+          {line.documentsStatus&&<div><dt>Chứng từ</dt><dd>{line.documentsStatus==='pass'?'Đạt':'Không đạt'}</dd></div>}
+          {line.sensoryStatus&&<div><dt>Cảm quan</dt><dd>{line.sensoryStatus==='pass'?'Đạt':'Không đạt'}</dd></div>}
+          {line.storageCondition&&<div><dt>Bảo quản</dt><dd>{line.storageCondition}</dd></div>}
+          {line.handling&&<div><dt>Xử lý / ghi chú</dt><dd>{line.handling}</dd></div>
         </dl>
       </article>
     })}
