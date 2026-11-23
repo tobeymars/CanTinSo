@@ -8,7 +8,7 @@ import type { ViewRole } from './lib/store'
 import type { JourneyStatus } from './lib/supervisionJourney'
 import { getNextReportableStage, getSavedJourney, stageNames, stagesForSchool, SUPERVISION_JOURNEY_EVENT, updateJourney } from './lib/supervisionJourney'
 import type { SupervisionMealType, SupervisionScope } from './lib/supervisionStatus'
-import SupervisionDateNotice, { supervisionDateKind } from './SupervisionDateNotice'
+import { supervisionDateKind } from './SupervisionDateNotice'
 
 type Editing = { action: 'report' | 'confirm' | 'reopen'; stage: JourneyStatus }
 function readPhoto(file: File): Promise<string> {
@@ -94,7 +94,6 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
         {isBoard && pending.length > 0 && <button type="button" className="primary" onClick={() => edit({ action: 'confirm', stage: pending[0]!.status })}><ShieldCheck size={16}/>Xác nhận mốc ({pending.length})</button>}
       </div>}
     </div>
-    <SupervisionDateNotice date={date} serverMode={serverMode}/>
     {notice && <div className="supervision-status-message" role="status"><CheckCircle2 size={16}/>{notice}<button aria-label="Đóng thông báo" onClick={() => setNotice('')}><X size={15}/></button></div>}
     <div className="supervision-stage-rows">
       {stages.map(status => {
