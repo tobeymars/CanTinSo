@@ -6,6 +6,7 @@
     "build": "nest build",
     "test:units": "tsx --test src/supply/quantity-units.spec.ts",
     "test:supervision-dates": "tsx --test src/supervision/supervision-date-policy.spec.ts",
+    "test:supervision-arrival": "tsx --test src/supervision/arrival-receipt.spec.ts",
     "test:supervision-food": "tsx --test src/supervision/food-safety-forms.spec.ts src/supervision/dispatch-sample-policy.spec.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
