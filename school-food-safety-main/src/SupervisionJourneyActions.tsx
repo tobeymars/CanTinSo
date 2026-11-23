@@ -9,6 +9,7 @@ import type { JourneyStatus } from './lib/supervisionJourney'
 import { getNextReportableStage, getSavedJourney, stageNames, stagesForSchool, SUPERVISION_JOURNEY_EVENT, updateJourney } from './lib/supervisionJourney'
 import type { SupervisionMealType, SupervisionScope } from './lib/supervisionStatus'
 import { supervisionDateKind } from './SupervisionDateNotice'
+import './SchoolArrivalReceipt.css'
 
 type Editing = { action: 'report' | 'confirm' | 'reopen' | 'arrival_confirm' | 'arrival_resolve'; stage: JourneyStatus }
 function readPhoto(file: File): Promise<string> {
