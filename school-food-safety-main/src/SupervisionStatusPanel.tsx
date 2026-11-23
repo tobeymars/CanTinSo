@@ -52,7 +52,7 @@ function IngredientReceiptDetails({ lines, serviceDate }: { lines: readonly Ingr
           {line.documentsStatus&&<div><dt>Chứng từ</dt><dd>{line.documentsStatus==='pass'?'Đạt':'Không đạt'}</dd></div>}
           {line.sensoryStatus&&<div><dt>Cảm quan</dt><dd>{line.sensoryStatus==='pass'?'Đạt':'Không đạt'}</dd></div>}
           {line.storageCondition&&<div><dt>Bảo quản</dt><dd>{line.storageCondition}</dd></div>}
-          {line.handling&&<div><dt>Xử lý / ghi chú</dt><dd>{line.handling}</dd></div>
+          {line.handling&&<div><dt>Xử lý / ghi chú</dt><dd>{line.handling}</dd></div>}
         </dl>
       </article>
     })}
