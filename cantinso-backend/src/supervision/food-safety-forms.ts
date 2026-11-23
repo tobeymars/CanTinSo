@@ -27,9 +27,12 @@ const uniqueDish=(items:unknown,dishes:Dish[])=>{
   if(!Array.isArray(items)||items.length!==dishes.length)fail('Phải kiểm tra đầy đủ từng món trong thực đơn đã duyệt.');
   const ids=new Set<string>();
   for(const line of items as Record<string,unknown>[]){
-    if(!line||typeof line!=='object'||typeof line.dishId!=='string'||ids.has(line.dishId)||!dishes.some(d=>d.id===line.dishId))
+    const dishId=line?.dishId;
+    if(typeof dishId!=='string')
       fail('Danh sách món không đúng thực đơn hoặc bị trùng.');
-    ids.add(line.dishId);
+    if(ids.has(dishId as string)||!dishes.some(d=>d.id===dishId))
+      fail('Danh sách món không đúng thực đơn hoặc bị trùng.');
+    ids.add(dishId as string);
   }
   return items as Record<string,unknown>[];
 };
