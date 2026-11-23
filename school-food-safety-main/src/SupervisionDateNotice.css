@@ -6,3 +6,8 @@
 }
 .supervision-date-notice svg{flex:none;margin-top:2px}
 @media(max-width:640px){.supervision-date-notice{padding:12px;font-size:12px}}
+
+.supervision-stage-revisions{margin-top:9px;font-size:12px;line-height:1.65;color:var(--muted,#52657e)}
+.supervision-stage-revisions summary{cursor:pointer;color:var(--primary,#245ec5);font-weight:650}
+.supervision-stage-revisions ol{margin:7px 0 0;padding-left:20px}
+.supervision-stage-revisions li{padding:4px 0;overflow-wrap:anywhere}
