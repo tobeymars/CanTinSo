@@ -41,7 +41,7 @@ export function validateArrivalReceipt(
   if (deliveryPerson.length < 2 || deliveryPerson.length > 120 || transportUnit.length > 150)
     throw new BadRequestException('Cần ghi người giao (2–120 ký tự), đơn vị vận chuyển tối đa 150 ký tự.');
   const receivedServings = body.receivedServings;
-  if (!Number.isSafeInteger(receivedServings) || receivedServings < 1 || receivedServings > 1000000)
+  if (!Number.isSafeInteger(receivedServings) || receivedServings < 0 || receivedServings > 1000000)
     throw new BadRequestException('Số suất thực nhận phải là số nguyên từ 1 đến 1.000.000.');
   const packaging = body.packaging, sensory = body.sensory, result = body.result;
   if (!['OK','ISSUE'].includes(packaging) || !['OK','ISSUE'].includes(sensory))
@@ -70,7 +70,7 @@ export function validateArrivalReceipt(
   const note = typeof body.note === 'string' ? body.note.trim() : '';
   if ((hasIssue || result !== 'ACCEPTED') && note.length < 10)
     throw new BadRequestException('Khi có chênh lệch hoặc từ chối tiếp nhận, phải ghi rõ sai lệch và hướng xử lý (ít nhất 10 ký tự).');
-  if (hasIssue && result === 'ACCEPTED')
+  if ((hasIssue || receivedServings === 0) && result === 'ACCEPTED')
     throw new ConflictException('Có bất thường hoặc số suất chênh lệch. Không thể xác nhận đủ điều kiện phục vụ.');
   const photo = typeof body.photo === 'string' && body.photo.trim() ? body.photo : null;
   if (photo && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo) || photo.length > 1100000))
