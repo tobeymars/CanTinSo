@@ -29,7 +29,6 @@ export function MealJourneyProgress({
   schoolId,
   serviceDate,
   mealType = 'LUNCH',
-  role,
   onReadyPhotoClick,
 }: {
   data: DayData
