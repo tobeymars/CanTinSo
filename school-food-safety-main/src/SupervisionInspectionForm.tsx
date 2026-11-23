@@ -111,7 +111,7 @@ export function InspectionEditor({kind,menu,value,onChange}:{
         </>}
       </section>
     })}
-    {kind==='food_sample'&&<p className="sif-guidance">Mỗi món có mẫu và niêm phong riêng. Bảo quản 2–8°C ít nhất 24 giờ; không tự hủy mẫu khi nghi ngờ ngộ độc hoặc có yêu cầu của cơ quan quản lý. Việc hủy mẫu là sự kiện riêng sau thời gian lưu.</p>}
+    {kind==='food_sample'&&<p className="sif-guidance"><strong>Lưu mẫu trước khi xuất bếp, không chờ đủ 24 giờ mới giao thức ăn.</strong> Lấy mẫu riêng cho từng món sau khi chế biến xong, niêm phong và bảo quản ở 2–8°C. Thức ăn còn lại được vận chuyển, phục vụ bình thường khi đáp ứng điều kiện an toàn. Chỉ được xem xét hủy mẫu sau tối thiểu 24 giờ; không tự hủy khi nghi ngờ ngộ độc hoặc có yêu cầu của cơ quan có thẩm quyền.</p>}
   </fieldset>
 }
 
