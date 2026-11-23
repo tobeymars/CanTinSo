@@ -47,6 +47,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const getManagedUsers = () => request<ManagedUser[]>("/users");
 export const getManagedSchools = () => request<ManagedSchool[]>("/schools");
+export type AssignedSchool = Pick<ManagedSchool, "id" | "name" | "code" | "address" | "ward">;
+export const getMyAssignedSchool = () => request<AssignedSchool>("/schools/me");
 
 export type CreateManagedSchoolPayload = {
   name: string;
