@@ -133,8 +133,8 @@ export class SupervisionService {
       if(sampleLifecycle){
         const inspection=checks['food_sample']?.inspection;
         if(!inspection || !Array.isArray(inspection.dishes) || inspection.dishes.length===0)throw new ConflictException('Chưa có hồ sơ lấy mẫu đã ghi nhận.');
-        if(!['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role) && action==='sample_dispose')
-          throw new ForbiddenException('Chỉ nhân viên bếp được ghi nhận hủy mẫu.');
+        if(action==='sample_dispose' && (!['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role) || user.kitchenId !== s.kitchenId))
+          throw new ForbiddenException('Chỉ nhân viên thuộc bếp lưu mẫu mới được ghi nhận hủy mẫu.');
         if(action==='sample_hold'){
           const holds=await tx.supervisionEvent.findMany({where:{mealId:current.id,action:{in:['sample_hold','sample_dispose']}}});
           if(holds.some(row=>row.action==='sample_hold'))throw new ConflictException('Đã có yêu cầu giữ mẫu; không được tự hủy.');
