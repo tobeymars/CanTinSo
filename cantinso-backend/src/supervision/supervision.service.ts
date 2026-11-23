@@ -127,7 +127,7 @@ export class SupervisionService {
         throw new ConflictException('Bữa đã được BGH xác nhận tổng thể. BGH cần mở điều chỉnh mục cụ thể trước khi cập nhật.');
       if(sampleLifecycle){
         const inspection=checks['food_sample']?.inspection;
-        if(!inspection || !Array.isArray(inspection.dishes))throw new ConflictException('Chưa có hồ sơ lấy mẫu đã ghi nhận.');
+        if(!inspection || !Array.isArray(inspection.dishes) || inspection.dishes.length===0)throw new ConflictException('Chưa có hồ sơ lấy mẫu đã ghi nhận.');
         if(!['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role) && action==='sample_dispose')
           throw new ForbiddenException('Chỉ nhân viên bếp được ghi nhận hủy mẫu.');
         if(action==='sample_hold'){
@@ -230,10 +230,11 @@ export class SupervisionService {
           const plan=await tx.mealPlan.findUnique({
             where:{schoolId_serviceDate_mealType:{schoolId:s.schoolId,serviceDate:s.serviceDate,mealType:s.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
             include:{revisions:{where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,
-              include:{items:{include:{dishVersion:{include:{dish:true}}}}}}}
+              include:{items:{include:{dishVersion:{include:{dish:true}}}},ageGroups:{select:{plannedServings:true}}}}}
           });
           const dishes=plan?.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name}))??[];
-          inspection=validateFoodSafetyForm(itemId as 'processing'|'before_serving'|'food_sample',body.inspection,dishes,date);
+          const plannedServings=plan?.revisions[0]?.ageGroups.reduce((sum,item)=>sum+item.plannedServings,0);
+          inspection=validateFoodSafetyForm(itemId as 'processing'|'before_serving'|'food_sample',body.inspection,dishes,date,plannedServings);
           if(itemId==='food_sample' && checks.before_serving?.inspection?.dishes){
             for(const sample of inspection.dishes){
               const served=checks.before_serving.inspection.dishes.find((line:any)=>line.dishId===sample.dishId);
