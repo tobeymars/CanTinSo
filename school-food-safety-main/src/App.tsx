@@ -93,6 +93,7 @@ const CanteenGallery = lazy(() => import("./CanteenGallery"));
 const PortionTracePage = lazy(() => import("./PortionTracePage"));
 const RealDishQrTracePage = lazy(() => import("./RealDishQrTracePage"));
 const BoardingMenuManager = lazy(() => import("./BoardingMenuManager"));
+const RealBoardingMenuManager = lazy(() => import("./RealBoardingMenuManager"));
 const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
 const DishApprovalInbox = lazy(() => import("./DishApprovalInbox"));
 const FeedbackForm = lazy(() => import("./FeedbackForm"));
@@ -1631,7 +1632,7 @@ function Shell() {
                 <>
                  {isSchoolKitchenReceiver && location.pathname === "/thuc-don" && (
                     <Suspense fallback={<div className="loading-grid"><div className="skeleton"/></div>}>
-                      <SchoolReceiverWorkspace schoolId={school.id} schoolName={school.name} date={date} view="menu"/>
+                      <RealBoardingMenuManager selectedDate={date} readOnly />
                     </Suspense>
                   )}
                   {location.pathname === "/giam-sat" && (
