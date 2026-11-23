@@ -20,7 +20,7 @@ async function call<T>(scope: SupervisionScope, init?: RequestInit, suffix = '')
 export type ServerSupervision = {
   checks: Record<string,{status:string;evidenceRef?:string;ingredientReceipts?:unknown[];history?:unknown[]}>
   stages: Record<string,{confirmed:boolean;revisionRequested?:boolean;photos?:string[];note?:string;time?:string;confirmedAt?:string;confirmationNote?:string;reopenReason?:string;reopenedAt?:string;history?:{action?:string;at?:string;note?:string;lateReason?:string}[]}>
-  approvals: {snapshot:string;at:string;note:string}[]
+  approvals: {snapshot:string;at:string;note:string;lateReason?:string}[]
   approvalCurrent:boolean
 }
 export const readServerSupervision = (scope: SupervisionScope) => call<ServerSupervision>(scope)
