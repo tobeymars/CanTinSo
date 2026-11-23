@@ -6,7 +6,12 @@ export type ServingStageReport = {
   handlerName: string;
   sanitaryCondition: 'PASS' | 'ISSUE';
   discrepancyNote: string | null;
-  dishChecks: Array<{ dishId: string; name: string; status: 'PASS' | 'ISSUE' }>;
+  portionStartAt?: string;
+  distributionArea?: string;
+  handHygieneChecked?: boolean;
+  foodCondition?: 'PASS'|'ISSUE';
+  hasIssue?: boolean;
+  dishChecks: Array<{ dishId: string; name: string; status: 'PASS' | 'ISSUE'; portions?: number }>;
 };
 
 type Dish = { id: string; name: string };
@@ -42,8 +47,35 @@ export function validateServingStageReport(body: any, stage: 'PLATED' | 'READY',
       throw new BadRequestException('Chọn Đạt hoặc Có bất thường cho từng món.');
     return {dishId:line.dishId,name:expected.get(line.dishId)!,status:line.status as 'PASS'|'ISSUE'};
   });
+  let portionStartAt: string | undefined;
+  let distributionArea: string | undefined;
+  let foodCondition: 'PASS'|'ISSUE'|undefined;
+  let handHygieneChecked: boolean|undefined;
+  if (stage==='PLATED') {
+    portionStartAt=typeof body.portionStartAt==='string'?body.portionStartAt.trim():'';
+    if (!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(portionStartAt))
+      throw new BadRequestException('Cần ghi giờ bắt đầu chia suất theo HH:mm.');
+    if (portionStartAt>occurredAt)
+      throw new BadRequestException('Giờ bắt đầu chia suất không được sau giờ hoàn tất ra món.');
+    distributionArea=typeof body.distributionArea==='string'?body.distributionArea.trim():'';
+    if(distributionArea.length<2||distributionArea.length>160)
+      throw new BadRequestException('Cần ghi vị trí chia suất (2–160 ký tự).');
+    handHygieneChecked=body.handHygieneChecked===true;
+    if(!handHygieneChecked)
+      throw new BadRequestException('Phải xác nhận vệ sinh cá nhân trước khi chia suất.');
+    foodCondition=body.foodCondition;
+    if(foodCondition!=='PASS'&&foodCondition!=='ISSUE')
+      throw new BadRequestException('Phải kiểm tra tình trạng thực phẩm khi chia suất.');
+    for(const dish of dishChecks) {
+      const reported=body.dishChecks.find((row:any)=>row.dishId===dish.dishId);
+      if(!Number.isSafeInteger(reported.portions)||reported.portions<0||reported.portions>1000000)
+        throw new BadRequestException('Phải nhập số suất đã chia cho từng món.');
+      dish.portions=reported.portions;
+    }
+  }
   const discrepancyNote=typeof body.discrepancyNote==='string'?body.discrepancyNote.trim():'';
-  const hasIssue=actualServings!==plannedServings || sanitaryCondition==='ISSUE' || dishChecks.some(d=>d.status==='ISSUE');
+  const hasIssue=actualServings!==plannedServings || sanitaryCondition==='ISSUE' || foodCondition==='ISSUE' ||
+    dishChecks.some(d=>d.status==='ISSUE'||(stage==='PLATED'&&d.portions!==actualServings));
   if (hasIssue && discrepancyNote.length<10)
     throw new BadRequestException('Có chênh lệch hoặc bất thường; phải ghi hướng xử lý ít nhất 10 ký tự.');
   if(discrepancyNote.length>1000)
@@ -52,5 +84,7 @@ export function validateServingStageReport(body: any, stage: 'PLATED' | 'READY',
     throw new ConflictException('Chưa xử lý hết bất thường; không được ghi Sẵn sàng phục vụ.');
   if(stage==='READY' && body.servingAreaChecked!==true)
     throw new BadRequestException('Phải xác nhận đã kiểm tra khu vực phục vụ.');
-  return {actualServings,occurredAt,handlerName,sanitaryCondition,discrepancyNote:discrepancyNote||null,dishChecks};
+  return {actualServings,occurredAt,handlerName,sanitaryCondition,discrepancyNote:discrepancyNote||null,dishChecks,
+    ...(stage==='PLATED'?{portionStartAt,distributionArea,handHygieneChecked,foodCondition,hasIssue}:{}),
+  };
 }
