@@ -31,9 +31,10 @@ export function validateArrivalReceipt(
     throw new BadRequestException('Thời gian đến trường không thể ở tương lai.');
   // When dispatch was recorded on the actual service date, arrival cannot precede it.
   const dispatchDate = new Date(dispatchedAt);
-  const dispatchLocalDate = new Intl.DateTimeFormat('en-CA', {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(dispatchDate);
+  }).formatToParts(dispatchDate).map(part=>[part.type,part.value]));
+  const dispatchLocalDate = [parts.year,parts.month,parts.day].join('-');
   if (dispatchLocalDate === date && arrivalAt.getTime() < dispatchDate.getTime() - 60000)
     throw new BadRequestException('Giờ đến trường không thể trước thời điểm Xuất bếp.');
   const deliveryPerson = typeof body.deliveryPerson === 'string' ? body.deliveryPerson.trim() : '';
