@@ -9,7 +9,7 @@ export class SchoolsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMySchool(user: AuthUser) {
-    if (![UserRole.SCHOOL_ADMIN, UserRole.SCHOOL_KITCHEN].includes(user.role as UserRole) || !user.schoolId) {
+    if ((user.role !== UserRole.SCHOOL_ADMIN && user.role !== UserRole.SCHOOL_KITCHEN) || !user.schoolId) {
       throw new ForbiddenException("Tài khoản chưa được gán trường.");
     }
     const school = await this.prisma.school.findUnique({
