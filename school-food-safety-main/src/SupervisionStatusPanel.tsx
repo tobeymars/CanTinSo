@@ -79,6 +79,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   const [evidenceRef, setEvidenceRef] = useState('')
   const [ingredientRows, setIngredientRows] = useState<IngredientDraftRow[]>([])
   const [inspectionDraft,setInspectionDraft] = useState<InspectionDraft | null>(null)
+  const [skipSample,setSkipSample] = useState(false)
+  const [skipReason,setSkipReason] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showHistory, setShowHistory] = useState(false)
@@ -124,6 +126,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
     const previousIngredients = checks.find(item => item.id === id)?.history.filter(item => item.action === 'report').at(-1)?.ingredientReceipts
     const inspectionKind=['processing','before_serving','food_sample'].includes(id) ? id as InspectionKind : null
     const previousInspection=serverQuery.data?.checks[id]?.inspection
+    setSkipSample(!!(action==='report' && id==='food_sample' && (previousInspection as {notApplicable?:boolean}|undefined)?.notApplicable))
+    setSkipReason(typeof (previousInspection as {reason?:string}|undefined)?.reason==='string'?(previousInspection as {reason:string}).reason:'')
     setInspectionDraft(inspectionKind && action==='report' && contextQuery.data?.menu
       ? newInspectionDraft(contextQuery.data.menu,previousInspection) : null)
     setIngredientRows(id === 'ingredient_receipt' && action === 'report'
@@ -152,7 +156,9 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
       if (serverMode) {
         const hasStructuredInspection=editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id)
         if(hasStructuredInspection && (!inspectionDraft || !contextQuery.data?.menu?.dishes.length))throw Error('Chưa có thực đơn được duyệt và biểu mẫu chi tiết để kiểm thực.')
-        const inspection=hasStructuredInspection?{...inspectionDraft!,dishes:inspectionDraft!.dishes.map(line=>({...line,servings:Number(line.servings),amount:Number(line.amount),temperature:Number(line.temperature)}))}:undefined
+        const inspection=hasStructuredInspection?(editing.id==='food_sample' && skipSample
+          ? {kind:'food_sample',notApplicable:true,reason:skipReason}
+          : {...inspectionDraft!,dishes:inspectionDraft!.dishes.map(line=>({...line,servings:Number(line.servings),amount:Number(line.amount),temperature:Number(line.temperature)}))}):undefined
         await writeServerSupervision(scope,{action:editing.action==='report'?'check_report':editing.action==='confirm'?'check_confirm':editing.action==='reopen'?'check_reopen':'check_revision',itemId:editing.id,note,lateReason,evidenceRef,ingredientReceipts,inspection})
         await queryClient.invalidateQueries({queryKey:['supervision-server',scope.schoolId,scope.serviceDate,scope.mealType]})
       } else updateSupervisionStatus({ scope, id: editing.id, action: editing.action as CheckAction, role, schoolMode: school.mode, note, evidenceRef, ingredientReceipts })
@@ -297,10 +303,15 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
               const lines = checks.find(item => item.id === editing.id)?.history.filter(item => item.action === 'report').at(-1)?.ingredientReceipts
               return Array.isArray(lines) && lines.length > 0 ? <IngredientReceiptDetails lines={lines} serviceDate={date}/> : <p className="error" role="alert">Bản báo cáo chưa có danh sách nguyên liệu để đối chiếu.</p>
             })()}
-            {serverMode && editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id) && (
-              contextQuery.data?.menu && inspectionDraft ? <InspectionEditor kind={editing.id as InspectionKind} menu={contextQuery.data.menu} value={inspectionDraft} onChange={setInspectionDraft}/>
-              : <p role="alert" className="error">Chưa có thực đơn được duyệt cho trường, ngày và bữa này. Cần duyệt thực đơn trước khi ghi kiểm thực.</p>
-            )}
+            {serverMode && editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id) && <>
+              {editing.id==='food_sample' && contextQuery.data?.menu && contextQuery.data.menu.servings>0 && contextQuery.data.menu.servings<30 && <label className="sif-skip"> <input type="checkbox" checked={skipSample} onChange={event=>setSkipSample(event.target.checked)}/>
+                Bữa ăn dưới 30 suất ({contextQuery.data.menu.servings} suất): ghi nhận không bắt buộc lưu mẫu theo Quyết định 1246/QĐ-BYT
+              </label>}
+              {skipSample && editing.id==='food_sample'?<label>Lý do không áp dụng lưu mẫu (1–29 suất) *
+                <textarea required minLength={1} maxLength={1000} rows={3} value={skipReason} onChange={event=>setSkipReason(event.target.value)} placeholder="Ghi rõ số suất thực tế, căn cứ và người chịu trách nhiệm..."/></label>
+              :contextQuery.data?.menu && inspectionDraft ? <InspectionEditor kind={editing.id as InspectionKind} menu={contextQuery.data.menu} value={inspectionDraft} onChange={setInspectionDraft}/>
+              :<p role="alert" className="error">Chưa có thực đơn được duyệt cho trường, ngày và bữa này. Cần duyệt thực đơn trước khi ghi kiểm thực.</p>}
+            </>}
             {serverMode && editing.action!=='report' && ['processing','before_serving','food_sample'].includes(editing.id) && <InspectionReadout inspection={serverQuery.data?.checks[editing.id]?.inspection}/>}
             {serverMode && dateKind==='past' && <label>Lý do thực hiện bổ sung cho ngày đã qua *<textarea required minLength={10} maxLength={1000} rows={3} value={lateReason} onChange={event=>setLateReason(event.target.value)} placeholder="Nêu nguyên nhân ghi nhận muộn hoặc điều chỉnh sau ngày phục vụ…"/></label>}
             <label>Ghi chú / nội dung ghi nhận <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Nhập thông tin đối chiếu hoặc nội dung cần bổ sung…" /></label>
