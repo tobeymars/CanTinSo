@@ -5,6 +5,7 @@
   "scripts": {
     "build": "nest build",
     "test:units": "tsx --test src/supply/quantity-units.spec.ts",
+    "test:stock-vouchers": "tsx --test src/supply/stock-voucher-policy.spec.ts",
     "test:supervision-dates": "tsx --test src/supervision/supervision-date-policy.spec.ts",
     "test:supervision-arrival": "tsx --test src/supervision/arrival-receipt.spec.ts",
     "test:supervision-serving": "tsx --test src/supervision/serving-stage-form.spec.ts",
