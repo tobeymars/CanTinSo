@@ -80,6 +80,29 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
       setError(caught instanceof Error ? caught.message : 'Không thể xác nhận tổng thể.')
     }
   }
+  // Dữ liệu thật: bảng giám sát chỉ đọc cho BGH và cơ quan quản lý.
+  // Các phiên bản đã phê duyệt theo quy trình cũ chỉ nằm trong lịch sử.
+  if(serverMode) return <section className="card supervision-meal-approval" aria-label={`Tổng hợp hồ sơ giám sát ${label}`}>
+    <div className="card-header supervision-checklist-header"><div>
+      <div className="section-kicker">TỔNG HỢP HỒ SƠ THEO BỮA</div>
+      <h2><ShieldCheck size={20}/> Tiến độ giám sát & an toàn · {label}</h2>
+      <p className="muted">Bếp tự ghi nhận và chịu trách nhiệm hồ sơ vận hành. BGH theo dõi dữ liệu của trường, không phải xác nhận từng mốc của bếp.</p>
+    </div></div>
+    <div className="supervision-approval-summary">
+      <span className={`supervision-check-pill ${status.ready?'confirmed':'reported'}`}>
+        {status.ready?<CheckCircle2 size={15}/>:<Clock3 size={15}/>}
+        {status.ready?'Các nội dung đã được ghi nhận':'Còn nội dung chưa hoàn tất'}
+      </span>
+      <span>Kiểm thực và lưu mẫu: <strong>{status.confirmedChecks}/{status.requiredChecks}</strong></span>
+      <span>Mốc vận hành: <strong>{status.confirmedStages}/{status.requiredStages}</strong></span>
+    </div>
+    {!status.ready&&<div className="supervision-approval-pending"><strong>Nội dung cần hoàn thiện:</strong><ul>{status.pendingDetails.map(detail=><li key={detail}>{labelPending(detail)}</li>)}</ul></div>}
+    {history.length>0&&<div className="supervision-approval-history">
+      <button type="button" className="text-button" aria-expanded={showHistory} onClick={()=>setShowHistory(value=>!value)}>{showHistory?'Ẩn lịch sử quy trình cũ':`Xem lịch sử phê duyệt cũ (${history.length})`}</button>
+      {showHistory&&<ol>{[...history].reverse().map(item=><li key={item.id}>{new Date(item.confirmedAt).toLocaleString('vi-VN')} · {item.actorLabel} · {item.note}</li>)}</ol>}
+    </div>}
+    <p className="supervision-approval-disclaimer">Đây là trạng thái ghi nhận nội bộ, không thay thế hồ sơ kiểm thực hoặc kết luận của cơ quan có thẩm quyền. Mọi thay đổi sau khi lưu đều có nhật ký điều chỉnh.</p>
+  </section>
   return <section className="card supervision-meal-approval" aria-label={`Xác nhận tổng thể Giám sát và an toàn ${label}`}>
     <div className="card-header supervision-checklist-header">
       <div>
