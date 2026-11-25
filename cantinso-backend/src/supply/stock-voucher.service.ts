@@ -10,7 +10,7 @@ export class StockVoucherService {
   private async scope(user:AuthUser,kitchenId:string){
     const kitchen=await this.supply.permitted(user,kitchenId);
     const receivingSchool=user.role==='SCHOOL_ADMIN'&&kitchen.type==='CENTRAL';
-    return {where:{kitchenId,...(receivingSchool?{kind:'ISSUE',schoolId:user.schoolId}: {})},
+    return {where:{kitchenId,...(receivingSchool?{kind:{in:['ISSUE','RETURN']},schoolId:user.schoolId}: {})},
       receivingSchool};
   }
   async list(user:AuthUser,kitchenId:string){
