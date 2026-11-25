@@ -52,7 +52,7 @@ export type SupplyApprovedRequirements={
 }
 export const getSupplyApprovedPlans=(kitchenId:string)=>request<SupplyApprovedPlan[]>(kitchenPath(kitchenId)+'/approved-plans')
 export const getSupplyIngredientRequirements=(kitchenId:string,revisionId:string)=>request<SupplyApprovedRequirements>(kitchenPath(kitchenId)+'/approved-plans/'+encodeURIComponent(revisionId)+'/requirements')
-export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;unit:string;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'SNACK';voucherNumber:string;inspection:StockInspection;evidences:StockEvidenceInput[];mealPlanRevisionId?:string;ingredientId?:string})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
+export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;unit:string;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'DINNER'|'SNACK';voucherNumber:string;inspection:StockInspection;evidences:StockEvidenceInput[];mealPlanRevisionId?:string;ingredientId?:string})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
 export const updateSupplySupplierStatus=(kitchenId:string,supplierId:string,status:'ACTIVE'|'INACTIVE')=>request<SupplySupplier>(kitchenPath(kitchenId)+'/suppliers/'+encodeURIComponent(supplierId)+'/status',{method:'PATCH',body:JSON.stringify({status})})
 
 export type SupplyFinance = {
