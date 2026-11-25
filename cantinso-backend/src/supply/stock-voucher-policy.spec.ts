@@ -42,3 +42,17 @@ test('reject invalid time and non numeric measured temperature',()=>{
  assert.throws(()=>validateStockInspection({...inspection(),actualTime:'99:99'},'RECEIPT'),/HH:mm/);
  assert.throws(()=>validateStockInspection({...inspection(),temperatureC:'bad'},'RECEIPT'),/Nhiệt độ/);
 });
+
+test('return requires photo of unused stock and weighing proof',()=>{
+ const files=[
+  {category:'RETURN_PHOTO',filename:'return.jpg',mimeType:'image/jpeg',base64:jpeg},
+  {category:'SCALE_PHOTO',filename:'scale.jpg',mimeType:'image/jpeg',base64:jpeg},
+ ];
+ const valid=validateStockEvidence(files,'RETURN');
+ assert.equal(valid.length,2);
+ assert.throws(()=>validateStockEvidence(receiptFiles(),'RETURN'),/RETURN_PHOTO/);
+});
+test('return inspection must verify storage and safe handling',()=>{
+ assert.throws(()=>validateStockInspection({...inspection(),transport:'PENDING'},'RETURN'),/transport/);
+ assert.equal(validateStockInspection(inspection(),'RETURN').checks.transport,'PASS');
+});
