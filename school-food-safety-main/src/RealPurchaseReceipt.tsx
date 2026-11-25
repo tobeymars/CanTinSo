@@ -7,8 +7,8 @@ import { StockEvidenceFields,StockInspectionFields,emptyInspection } from './Sto
 import type { SupplyIngredient,SupplySupplier } from './lib/supplyApi'
 import { convertReceiptQuantity, receiptUnitOptions, formatReceiptQuantity, preferredReceiptUnit } from './lib/supervisionUnits'
 
-type Line={key:number;ingredientId:string;lotCode:string;quantity:string;unit:string;unitPrice:string;expiryDate:string;storageLocation:string}
-const blank=(key:number):Line=>({key,ingredientId:'',lotCode:'',quantity:'',unit:'',unitPrice:'',expiryDate:'',storageLocation:''})
+type Line={key:number;ingredientId:string;lotCode:string;quantity:string;deliveredQuantity:string;rejectionReason:string;origin:string;producer:string;packagingStatus:'PASS'|'PENDING';sensoryStatus:'PASS'|'PENDING';unit:string;unitPrice:string;expiryDate:string;storageLocation:string}
+const blank=(key:number):Line=>({key,ingredientId:'',lotCode:'',quantity:'',deliveredQuantity:'',rejectionReason:'',origin:'',producer:'',packagingStatus:'PENDING',sensoryStatus:'PENDING',unit:'',unitPrice:'',expiryDate:'',storageLocation:''})
 const cash=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
 export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,canEdit,busy,execute,onSaved}:{
   kitchenId:string;ingredients:SupplyIngredient[];suppliers:SupplySupplier[];canEdit:boolean;busy:boolean;
@@ -33,10 +33,12 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
         const base=ingredients.find(item=>item.id===line.ingredientId)?.unit
         const normalized=base?convertReceiptQuantity(Number(line.quantity),line.unit||base,base):null
         if(normalized===null||normalized<=0||Math.abs(normalized*1000-Math.round(normalized*1000))>0.0000001)throw new Error('Số lượng sau quy đổi phải có tối đa 3 chữ số thập phân theo đơn vị kho.')
+        if(Number(line.deliveredQuantity)<Number(line.quantity))throw new Error('Số hàng giao không được thấp hơn số hàng chấp nhận nhập.')
+        if(Number(line.deliveredQuantity)>Number(line.quantity)&&line.rejectionReason.trim().length<10)throw new Error('Cần nêu lý do chênh lệch hàng giao và thực nhập tối thiểu 10 ký tự.')
       }
       await createSupplyPurchase(kitchenId,{number,supplierId,invoiceNumber,reference,description,
         inspection:{...inspection,documentNumber:invoiceNumber||reference||number},evidences,
-        lines:lines.map(line=>({ingredientId:line.ingredientId,lotCode:line.lotCode,quantity:Number(line.quantity),unit:line.unit,
+        lines:lines.map(line=>({ingredientId:line.ingredientId,lotCode:line.lotCode,quantity:Number(line.quantity),deliveredQuantity:Number(line.deliveredQuantity),rejectionReason:line.rejectionReason,origin:line.origin,producer:line.producer,packagingStatus:line.packagingStatus,sensoryStatus:line.sensoryStatus,unit:line.unit,
           unitPrice:Number(line.unitPrice),expiryDate:line.expiryDate,storageLocation:line.storageLocation}))})
       setNumber('');setSupplierId('');setInvoiceNumber('');setReference('');setDescription('');setLines([blank(1)]);setNextId(2);setInspection(emptyInspection());setEvidences([]);onSaved()
     },'Đã ghi sổ nhập kho kèm biên bản kiểm nhận, ảnh và chứng từ.')
@@ -67,13 +69,19 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
           </div>
           <div className="supply-form-grid supply-form-grid--receipt">
             <label className="supply-wide">Nguyên liệu *
-              <select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:preferredReceiptUnit(ingredients.find(item=>item.id===e.target.value)?.unit??''),quantity:'',unitPrice:''})}>
+              <select aria-label={'Nguyên liệu dòng '+(index+1)} required value={line.ingredientId} onChange={e=>change(line.key,{ingredientId:e.target.value,unit:preferredReceiptUnit(ingredients.find(item=>item.id===e.target.value)?.unit??''),quantity:'',deliveredQuantity:'',unitPrice:''})}>
                 <option value="">Chọn nguyên liệu từ danh mục</option>
                 {ingredients.map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}
               </select>
             </label>
             <label>Mã lô *<input aria-label={'Mã lô dòng '+(index+1)} required maxLength={100} value={line.lotCode} onChange={e=>change(line.key,{lotCode:e.target.value})} placeholder="Ví dụ: LO-2026-001"/></label>
-            <label>Số lượng nhập *<input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.000001" step="any" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})} placeholder="Nhập số lượng"/></label>
+            <label>Số lượng hàng giao *<input type="number" min="0.000001" step="any" required value={line.deliveredQuantity} onChange={e=>change(line.key,{deliveredQuantity:e.target.value})} placeholder="Số hàng giao"/></label>
+            <label>Số lượng chấp nhận nhập kho *<input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.000001" step="any" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})} placeholder="Thực nhập"/></label>
+            <label>Xuất xứ/nguồn gốc *<input required maxLength={160} value={line.origin} onChange={e=>change(line.key,{origin:e.target.value})} placeholder="Địa điểm / cơ sở xuất xứ"/></label>
+            <label>Đơn vị sản xuất/đóng gói *<input required maxLength={160} value={line.producer} onChange={e=>change(line.key,{producer:e.target.value})}/></label>
+            <label>Đánh giá bao gói *<select required value={line.packagingStatus} onChange={e=>change(line.key,{packagingStatus:e.target.value as Line['packagingStatus']})}><option value="PENDING">Chưa kiểm tra</option><option value="PASS">Đạt</option></select></label>
+            <label>Đánh giá cảm quan *<select required value={line.sensoryStatus} onChange={e=>change(line.key,{sensoryStatus:e.target.value as Line['sensoryStatus']})}><option value="PENDING">Chưa kiểm tra</option><option value="PASS">Đạt</option></select></label>
+            {Number(line.deliveredQuantity)>Number(line.quantity)&&<label>Lý do hàng giao khác lượng thực nhập *<textarea required minLength={10} maxLength={500} rows={2} value={line.rejectionReason} onChange={e=>change(line.key,{rejectionReason:e.target.value})} placeholder="Số lượng không nhận và lý do xử lý"/></label>}
             <label>Đơn vị nhập *
               <select required aria-label={'Đơn vị nhập dòng '+(index+1)} value={line.unit} onChange={e=>{
                 const converted=convertReceiptQuantity(Number(line.quantity),line.unit||base,e.target.value)
@@ -85,7 +93,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
                 if(line.quantity&&rounded!==null&&Math.round(converted*rounded)!==Math.round(Number(line.quantity)*Number(line.unitPrice))){
                   window.alert('Đổi đơn vị có thể làm thay đổi thành tiền do làm tròn đơn giá. Giữ đơn vị hiện tại để bảo toàn chứng từ.');return
                 }
-                change(line.key,{unit:e.target.value,quantity:line.quantity?String(converted):line.quantity,unitPrice:rounded!==null?String(rounded):line.unitPrice})
+                change(line.key,{unit:e.target.value,quantity:line.quantity?String(converted):line.quantity,deliveredQuantity:line.deliveredQuantity?(convertReceiptQuantity(Number(line.deliveredQuantity),line.unit||base,e.target.value)?.toString()??line.deliveredQuantity):'',unitPrice:rounded!==null?String(rounded):line.unitPrice})
               }}>
                 <option value="" disabled>Chọn đơn vị</option>
                 {receiptUnitOptions(base).map(unit=><option key={unit} value={unit}>{unit}</option>)}
