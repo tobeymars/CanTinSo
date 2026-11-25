@@ -41,7 +41,18 @@ export const returnSupplyIssue=(kitchenId:string,sourceVoucherId:string,input:{v
 export const getStockVouchers=(kitchenId:string)=>request<StockVoucher[]>(kitchenPath(kitchenId)+'/vouchers')
 export const downloadStockVoucherEvidence=(kitchenId:string,voucherId:string,evidenceId:string)=>request<{filename:string;mimeType:string;sha256:string;base64:string}>(kitchenPath(kitchenId)+'/vouchers/'+encodeURIComponent(voucherId)+'/evidences/'+encodeURIComponent(evidenceId))
 export const receiveSupplyLot=(kitchenId:string,input:{lotCode:string;ingredientId:string;supplierId:string;quantity:number;unit?:string;expiryDate:string;storageLocation:string;note:string})=>request<SupplyLot>(kitchenPath(kitchenId)+'/receipts',{method:'POST',body:JSON.stringify(input)})
-export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;unit:string;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'SNACK';voucherNumber:string;inspection:StockInspection;evidences:StockEvidenceInput[]})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
+export type SupplyApprovedPlan={id:string;revisionId:string;revisionNo:number;schoolId:string;schoolName:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'DINNER'|'SNACK';approvedAt:string|null}
+export type SupplyIngredientRequirement={
+ ingredientId:string;name:string;unit:string;plannedQuantity:number;issueQuantity:number;stockAvailable:number;shortage:number;
+ dishes:Array<{dishVersionId:string;name:string;quantity:number}>;
+}
+export type SupplyApprovedRequirements={
+ revisionId:string;revisionNo:number;schoolId:string;schoolName:string;serviceDate:string;mealType:string;
+ ageGroups:Array<{name:string;plannedServings:number}>;items:SupplyIngredientRequirement[];warnings:string[];
+}
+export const getSupplyApprovedPlans=(kitchenId:string)=>request<SupplyApprovedPlan[]>(kitchenPath(kitchenId)+'/approved-plans')
+export const getSupplyIngredientRequirements=(kitchenId:string,revisionId:string)=>request<SupplyApprovedRequirements>(kitchenPath(kitchenId)+'/approved-plans/'+encodeURIComponent(revisionId)+'/requirements')
+export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;unit:string;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'SNACK';voucherNumber:string;inspection:StockInspection;evidences:StockEvidenceInput[];mealPlanRevisionId?:string;ingredientId?:string})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
 export const updateSupplySupplierStatus=(kitchenId:string,supplierId:string,status:'ACTIVE'|'INACTIVE')=>request<SupplySupplier>(kitchenPath(kitchenId)+'/suppliers/'+encodeURIComponent(supplierId)+'/status',{method:'PATCH',body:JSON.stringify({status})})
 
 export type SupplyFinance = {
