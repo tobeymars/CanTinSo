@@ -54,5 +54,7 @@ jobs:
         run: npx prisma migrate deploy
       - name: Import and verify Ministry of Health Appendix 7
         run: npm run prisma:seed:annex7
+      - name: Validate warehouse proof and inspection rules
+        run: npm run test:stock-vouchers
       - name: Build NestJS backend
         run: npm run build
