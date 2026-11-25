@@ -82,7 +82,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   void revision
   const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:serverQuery.data?.actors?.[item.actorId??'']??(item.actorRole==='SCHOOL_ADMIN'?'BGH':'Bếp'),photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
   const centralDelivery = serverMode && contextQuery.data?.kitchen?.type === 'CENTRAL'
-  const stages = serverMode && contextQuery.data?.kitchen ? (centralDelivery ? ['DISPATCHED','ARRIVED','PLATED','READY'] : ['PLATED','READY']) as JourneyStatus[] : stagesForSchool(school.mode, role)
+  const stages = serverMode && contextQuery.data?.kitchen ? (centralDelivery ? ['PLATED','READY','DISPATCHED','ARRIVED'] : ['PLATED','READY']) as JourneyStatus[] : stagesForSchool(school.mode, role)
   const dateKind=serverMode?supervisionDateKind(date):'today'
   const locked=dateKind==='future'
   const mealApproved=false // Trạng thái cũ không khóa sổ tác nghiệp của bếp.
@@ -91,7 +91,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
     const candidate=stages.find(stage=>!serverQuery.data?.stages[stage]?.confirmed);
     const row=candidate?serverQuery.data?.stages[candidate]:undefined;
     if(row && !row.revisionRequested)return null;
-    return candidate && (candidate==='DISPATCHED' ? role==='central_kitchen' : candidate==='ARRIVED' ? false : role==='school_kitchen') ? candidate : null;
+    return candidate && (candidate==='ARRIVED' ? false : centralDelivery ? role==='central_kitchen' : role==='school_kitchen') ? candidate : null;
   })() : getNextReportableStage(scope, school.mode, role)
   const pending = serverMode || locked || mealApproved ? [] : saved?.events.filter(event => !event.confirmed && !('revisionRequested' in event && event.revisionRequested) && stages.includes(event.status)) ?? []
   const hasProcessing = ['reported','confirmed'].includes(serverQuery.data?.checks.processing?.status ?? '') && (serverQuery.data?.checks.processing?.inspection as {isPass?:boolean}|undefined)?.isPass === true
@@ -109,7 +109,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   const canReopen = (status: JourneyStatus): boolean => serverMode && !locked &&
     status !== 'ARRIVED' && !!serverQuery.data?.stages[status] &&
     !serverQuery.data.stages[status].revisionRequested &&
-    (status==='DISPATCHED' ? role==='central_kitchen' : role==='school_kitchen');
+    (centralDelivery ? role==='central_kitchen' : role==='school_kitchen');
   const canUpdate = !!next || (isBoard && pending.length > 0) || canConfirmArrival || canResolveArrival ||
     stages.some(canReopen)
   const mealLabel = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
@@ -171,7 +171,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
       <div>
         <div className="section-kicker">CẬP NHẬT CÁC MỐC VẬN HÀNH</div>
         <h2>{serverMode && isBoard && centralDelivery ? 'Xác nhận tiếp nhận món ăn thành phẩm' : 'Trạng thái từ bếp đến phục vụ'} · {mealLabel}</h2>
-        <p className="muted">{serverMode && isBoard && centralDelivery ? 'Bếp trung tâm chế biến và xuất món đã hoàn thành. Nhà trường đối chiếu món, số suất và tình trạng thực nhận, sau đó lập phiếu xác nhận giao nhận thành phẩm; không tiếp nhận nguyên liệu.' : 'Bếp sản xuất ghi nhận xuất món; trường nhận món thành phẩm rồi ghi nhận ra món, phục vụ theo phân công. Hồ sơ và lịch sử được lưu theo trường.'}</p>
+        <p className="muted">{serverMode && isBoard && centralDelivery ? 'Bếp trung tâm ghi nhận Ra món, Sẵn sàng phục vụ và Xuất bếp trước khi vận chuyển. Nhà trường chỉ đối chiếu món, số suất, tình trạng thực nhận và xác nhận giao nhận thành phẩm.' : 'Bếp trực tiếp chế biến thực hiện Ra món và Sẵn sàng phục vụ trước khi xuất món thành phẩm. Nhà trường chỉ kiểm tra, xác nhận giao nhận khi món đến trường. Hồ sơ được lưu theo trường.'}</p>
       </div>
       {canUpdate && <div className="supervision-checklist-actions">
         {next && <button type="button" className="primary" onClick={() => edit({ action: 'report', stage: next })}><Pencil size={16}/>Cập nhật: {stageNames[next]}</button>}
@@ -356,12 +356,12 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
             </div>
           })()}
           {isServingReport(editing) && <>
-            <p className="supervision-edit-guidance">{editing.stage==='PLATED'?'Phiếu ra món ghi nhận việc chia suất tại trường, đối chiếu số lượng đã tiếp nhận và thực đơn được BGH duyệt. Đây chưa phải xác nhận sẵn sàng phục vụ.':'Chỉ ghi sẵn sàng phục vụ sau khi BGH xác nhận Ra món. Phải có ảnh thực tế của suất ăn chuẩn bị phục vụ.'}</p>
+            <p className="supervision-edit-guidance">{editing.stage==='PLATED'?'Bếp trực tiếp chế biến ghi nhận chia suất và đối chiếu từng món theo thực đơn được BGH duyệt. Với bếp trung tâm, việc ra món diễn ra trước khi xuất món đến trường.':'Chỉ ghi Sẵn sàng phục vụ sau khi bếp đã hoàn tất Ra món đạt. Với bếp trung tâm, đây là kiểm tra suất thành phẩm trước khi xuất bếp; phải có ảnh thực tế.'}</p>
             <fieldset className="arrival-section"><legend>A. Thông tin bữa ăn và người thực hiện</legend>
               <div className="arrival-grid"><div><small>Trường</small><strong>{school.name}</strong></div><div><small>Thực đơn đã duyệt</small><strong>{contextQuery.data?.menu?.servings.toLocaleString('vi-VN')??'Đang tải…'} suất</strong></div></div>
               {editing.stage==='PLATED' && contextQuery.data?.kitchen?.type==='CENTRAL' && <div className="arrival-grid">
                 <div><small>Bếp cung cấp</small><strong>{contextQuery.data.kitchen.name}</strong></div>
-                <div><small>BGH xác nhận tiếp nhận</small><strong>{serverQuery.data?.stages.ARRIVED?.arrival?.receivedServings?.toLocaleString('vi-VN')??'Chưa có'} suất · {serverQuery.data?.stages.ARRIVED?.arrival?.arrivalTime??'—'}</strong></div>
+                <div><small>Trình tự</small><strong>Ra món → Sẵn sàng phục vụ → Xuất bếp → Trường tiếp nhận</strong></div>
               </div>}
               <div className="arrival-grid">
                 {editing.stage==='PLATED' && <label>Bắt đầu chia suất *<input type="time" required value={portionStartAt} onChange={event=>setPortionStartAt(event.target.value)}/></label>}
@@ -391,10 +391,10 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
                 <label>Tình trạng món ăn khi chia suất *<select value={foodCondition} onChange={event=>setFoodCondition(event.target.value as 'PASS'|'ISSUE')}><option value="PASS">Không phát hiện bất thường</option><option value="ISSUE">Có dấu hiệu bất thường</option></select></label>
                 <label className="arrival-attestation"><input type="checkbox" required checked={handHygieneChecked} onChange={event=>setHandHygieneChecked(event.target.checked)}/><span>Tôi xác nhận nhân viên đã vệ sinh tay, sử dụng bảo hộ và dụng cụ chia suất sạch trước khi thao tác.</span></label>
               </>}
-              {editing.stage==='READY' && <label className="arrival-attestation"><input type="checkbox" required checked={servingAreaChecked} onChange={event=>setServingAreaChecked(event.target.checked)}/><span>Tôi đã kiểm tra khu vực, dụng cụ và các suất ăn trước khi phục vụ.</span></label>}
+              {editing.stage==='READY' && <label className="arrival-attestation"><input type="checkbox" required checked={servingAreaChecked} onChange={event=>setServingAreaChecked(event.target.checked)}/><span>Tôi đã kiểm tra khu vực, dụng cụ, suất thành phẩm trước khi giao đi hoặc phục vụ.</span></label>}
             </fieldset>
             <fieldset className="arrival-section"><legend>D. Sai lệch và xử lý</legend>
-              {hasServingIssues && <p className="arrival-warning" role="status">{editing.stage==='PLATED'?'Phiếu có sai lệch hoặc bất thường; BGH chưa thể duyệt mốc Ra món đến khi khắc phục và báo cáo lại.':'Có chênh lệch hoặc bất thường; không thể chuyển Sẵn sàng phục vụ.'}</p>}
+              {hasServingIssues && <p className="arrival-warning" role="status">{editing.stage==='PLATED'?'Phiếu có sai lệch hoặc bất thường; bếp phải xử lý, mở điều chỉnh và ghi nhận lại trước khi chuyển mốc tiếp theo.':'Có chênh lệch hoặc bất thường; không thể chuyển Sẵn sàng phục vụ.'}</p>}
               <label>{hasServingIssues?'Lý do và biện pháp xử lý *':'Ghi chú bổ sung (nếu có)'}<textarea rows={3} minLength={hasServingIssues?10:0} maxLength={1000} required={hasServingIssues} value={discrepancyNote} onChange={event=>setDiscrepancyNote(event.target.value)} placeholder="Ghi rõ thiếu hoặc thừa suất, món không đạt, biện pháp cách ly/bổ sung, người xử lý…"/></label>
             </fieldset>
           </>}
@@ -414,7 +414,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
           {error && <p className="error" role="alert">{error}</p>}
           <div className="supervision-edit-buttons"><button className="outline" type="button" onClick={() => setEditing(null)}>Hủy</button><button className="primary" disabled={saving || loadingPhoto || (isServingReport(editing) && (!plannedDishes.length || !occurredAt || !handlerName.trim() || actualServings==='' || !Number.isSafeInteger(Number(actualServings)) || (editing.stage==='READY' && (hasServingIssues || !servingAreaChecked)) ||
             (editing.stage==='PLATED' && (!portionStartAt || portionStartAt>occurredAt || !distributionArea.trim() || !handHygieneChecked ||
-              plannedDishes.some(dish=>dishPortions[dish.id]==='' || !Number.isSafeInteger(Number(dishPortions[dish.id]))))))) || (editing.action === 'report' && editing.stage === 'READY' && !photo) || (isArrivalReceipt(editing) && (!receiptChecked || !plannedDishes.length || !arrivalTime || !deliveryPerson.trim() || !Number.isSafeInteger(Number(receivedServings)) || Number(receivedServings) < 0 || (Number(receivedServings) === 0 && arrivalResult === 'ACCEPTED') || (hasArrivalIssues && arrivalResult==='ACCEPTED')))} type="submit">{saving ? 'Đang lưu phiếu…' : editing.action === 'report' ? (isServingReport(editing)?'Lưu phiếu · Chờ BGH xác nhận':'Lưu mốc · Chờ BGH xác nhận') : editing.action==='reopen'?'Mở điều chỉnh và lưu lịch sử':isArrivalReceipt(editing)?(arrivalResult==='ACCEPTED'?'Lưu phiếu và xác nhận Đến trường':'Lưu phiếu và tạm dừng phục vụ'):serverMode ? 'Xác nhận' : 'Xác nhận DEMO'}</button></div>
+              plannedDishes.some(dish=>dishPortions[dish.id]==='' || !Number.isSafeInteger(Number(dishPortions[dish.id]))))))) || (editing.action === 'report' && editing.stage === 'READY' && !photo) || (isArrivalReceipt(editing) && (!receiptChecked || !plannedDishes.length || !arrivalTime || !deliveryPerson.trim() || !Number.isSafeInteger(Number(receivedServings)) || Number(receivedServings) < 0 || (Number(receivedServings) === 0 && arrivalResult === 'ACCEPTED') || (hasArrivalIssues && arrivalResult==='ACCEPTED')))} type="submit">{saving ? 'Đang lưu phiếu…' : editing.action === 'report' ? (isServingReport(editing)?'Bếp lưu phiếu vận hành':'Bếp lưu mốc') : editing.action==='reopen'?'Mở điều chỉnh và lưu lịch sử':isArrivalReceipt(editing)?(arrivalResult==='ACCEPTED'?'Lưu phiếu và xác nhận Đến trường':'Lưu phiếu và tạm dừng phục vụ'):serverMode ? 'Xác nhận' : 'Xác nhận DEMO'}</button></div>
         </form>
       </section>
     </div>}
