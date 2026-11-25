@@ -11,7 +11,10 @@ import { StockVoucherService } from './stock-voucher.service';
 @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN','SCHOOL_ADMIN','UBND_ADMIN')
 export class SupplyController {
   constructor(private readonly service:SupplyService,private readonly vouchers:StockVoucherService){}
-  @Get(':kitchenId/vouchers') vouchersList(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.vouchers.list(user,kitchenId);}
+  @Post(':kitchenId/vouchers/:voucherId/returns')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  returnIssue(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('voucherId') voucherId:string,@Body() body:unknown){return this.service.returnIssue(user,kitchenId,voucherId,body);}
+    @Get(':kitchenId/vouchers') vouchersList(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.vouchers.list(user,kitchenId);}
   @Get(':kitchenId/vouchers/:voucherId/evidences/:evidenceId') voucherEvidence(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('voucherId') voucherId:string,@Param('evidenceId') evidenceId:string){return this.vouchers.evidence(user,kitchenId,voucherId,evidenceId);}
   @Get('kitchens') kitchens(@CurrentUser() user:AuthUser){return this.service.kitchens(user);}
   @Get(':kitchenId/schools') schools(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.schools(user,kitchenId);}
