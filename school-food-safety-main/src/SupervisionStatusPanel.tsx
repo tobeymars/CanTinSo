@@ -32,7 +32,7 @@ const labels: Record<CheckStatus, string> = {
 }
 const formatTimestamp = (value: string) => new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
 const actionLabels: Record<CheckAction | 'reopen', string> = {
-  report: 'Bếp báo cáo', confirm: 'BGH xác nhận', request_revision: 'BGH yêu cầu bổ sung', reopen:'BGH mở điều chỉnh',
+  report: 'Bếp ghi nhận', confirm: 'BGH xác nhận (quy trình cũ)', request_revision: 'Yêu cầu bổ sung (quy trình cũ)', reopen:'Mở điều chỉnh',
 }
 
 const formatDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString('vi-VN')
@@ -316,7 +316,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             </>}
             {serverMode && editing.action!=='report' && ['processing','before_serving','food_sample'].includes(editing.id) && <InspectionReadout inspection={serverQuery.data?.checks[editing.id]?.inspection}/>}
             {serverMode && dateKind==='past' && <label>Lý do thực hiện bổ sung cho ngày đã qua *<textarea required minLength={10} maxLength={1000} rows={3} value={lateReason} onChange={event=>setLateReason(event.target.value)} placeholder="Nêu nguyên nhân ghi nhận muộn hoặc điều chỉnh sau ngày phục vụ…"/></label>}
-            <label>Ghi chú / nội dung ghi nhận <span aria-hidden="true">*</span><textarea required minLength={5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Nhập thông tin đối chiếu hoặc nội dung cần bổ sung…" /></label>
+            <label>Ghi chú / nội dung ghi nhận <span aria-hidden="true">*</span><textarea required minLength={serverMode && editing.action==='reopen'?10:5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Nhập thông tin đối chiếu hoặc nội dung cần bổ sung…" /></label>
             {error && <p className="error" role="alert">{error}</p>}
             <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary" disabled={serverMode && editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id) && !inspectionDraft}>{editing.action === 'report' ? 'Lưu và gửi BGH xác nhận' : editing.action === 'confirm' ? (serverMode ? 'Xác nhận' : 'Xác nhận DEMO') : editing.action === 'reopen' ? 'Mở điều chỉnh và lưu lịch sử' : 'Gửi yêu cầu bổ sung'}</button></div>
           </form>
