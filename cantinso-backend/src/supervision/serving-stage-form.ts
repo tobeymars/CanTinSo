@@ -54,7 +54,7 @@ export function validateServingStageReport(body: any, stage: 'PLATED' | 'READY',
   if (stage==='PLATED') {
     const startAt=typeof body.portionStartAt==='string'?body.portionStartAt.trim():'';
     portionStartAt=startAt;
-    if (!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(startAt))
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(startAt))
       throw new BadRequestException('Cần ghi giờ bắt đầu chia suất theo HH:mm.');
     if (startAt>occurredAt)
       throw new BadRequestException('Giờ bắt đầu chia suất không được sau giờ hoàn tất ra món.');
