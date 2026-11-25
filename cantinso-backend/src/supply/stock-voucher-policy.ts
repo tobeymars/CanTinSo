@@ -5,8 +5,8 @@ export type StockEvidence = {
   category:string; filename:string;mimeType:string;size:number;sha256:string;data:Buffer;
 };
 const allowed = new Set(['application/pdf','image/jpeg','image/png','image/webp']);
-const categories = new Set(['DELIVERY_NOTE','LOT_PHOTO','INVOICE','QUALITY_CERTIFICATE','ISSUE_PHOTO','SCALE_PHOTO','OTHER']);
-export function validateStockEvidence(input:unknown,kind:'RECEIPT'|'ISSUE'):StockEvidence[]{
+const categories = new Set(['DELIVERY_NOTE','LOT_PHOTO','INVOICE','QUALITY_CERTIFICATE','ISSUE_PHOTO','SCALE_PHOTO','RETURN_PHOTO','OTHER']);
+export function validateStockEvidence(input:unknown,kind:'RECEIPT'|'ISSUE'|'RETURN'):StockEvidence[]{
   if(!Array.isArray(input)||input.length<2||input.length>8)
     throw new BadRequestException('Phiếu kho phải có từ 2 đến 8 tệp minh chứng.');
   const result:StockEvidence[]=[];
@@ -33,13 +33,13 @@ export function validateStockEvidence(input:unknown,kind:'RECEIPT'|'ISSUE'):Stoc
     result.push({category,filename:filename.trim(),mimeType,size:data.length,
       sha256:createHash('sha256').update(data).digest('hex'),data});
   }
-  for(const required of kind==='RECEIPT'?['DELIVERY_NOTE','LOT_PHOTO']:['ISSUE_PHOTO','SCALE_PHOTO']){
+  for(const required of kind==='RECEIPT'?['DELIVERY_NOTE','LOT_PHOTO']:kind==='ISSUE'?['ISSUE_PHOTO','SCALE_PHOTO']:['RETURN_PHOTO','SCALE_PHOTO']){
     if(!result.some(item=>item.category===required))
       throw new BadRequestException('Thiếu minh chứng bắt buộc: '+required);
   }
   if(kind==='RECEIPT'&&result.find(item=>item.category==='LOT_PHOTO')?.mimeType==='application/pdf')
     throw new BadRequestException('Ảnh lô hàng phải ở định dạng hình ảnh.');
-  if(kind==='ISSUE'&&result.some(item=>['ISSUE_PHOTO','SCALE_PHOTO'].includes(item.category)&&item.mimeType==='application/pdf'))
+  if(kind!=='RECEIPT'&&result.some(item=>[kind==='RETURN'?'RETURN_PHOTO':'ISSUE_PHOTO','SCALE_PHOTO'].includes(item.category)&&item.mimeType==='application/pdf'))
     throw new BadRequestException('Ảnh xuất kho và ảnh cân phải ở định dạng hình ảnh.');
   return result;
 }
@@ -48,7 +48,7 @@ const label=(v:unknown,name:string,max:number)=>{
  if(t.length<2||t.length>max)throw new BadRequestException('Thiếu hoặc sai '+name+'.');
  return t;
 };
-export function validateStockInspection(value:unknown,kind:'RECEIPT'|'ISSUE'){
+export function validateStockInspection(value:unknown,kind:'RECEIPT'|'ISSUE'|'RETURN'){
   if(!value||typeof value!=='object')throw new BadRequestException('Thiếu biên bản kiểm nhận/kiểm xuất.');
   const v=value as Record<string,unknown>;
   const inspector=label(v.inspector,'người kiểm tra',120);
@@ -57,7 +57,7 @@ export function validateStockInspection(value:unknown,kind:'RECEIPT'|'ISSUE'){
   const documentNumber=label(v.documentNumber,'mã chứng từ',120);
   const actualTime=typeof v.actualTime==='string'?v.actualTime.trim():'';
   if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(actualTime))throw new BadRequestException('Giờ kiểm nhận/kiểm xuất phải theo HH:mm.');
-  const checks=kind==='RECEIPT'?['documents','packaging','sensory','transport','quantity']:['packaging','quantity','weighing'];
+  const checks=kind==='RECEIPT'?['documents','packaging','sensory','transport','quantity']:kind==='ISSUE'?['packaging','quantity','weighing']:['packaging','quantity','weighing','transport'];
   for(const name of checks){
     if(v[name]!=='PASS')throw new BadRequestException('Chưa kiểm tra đạt: '+name+'. Hàng không đạt phải cách ly và lập biên bản riêng.');
   }
