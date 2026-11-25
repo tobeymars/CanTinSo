@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucide-react'
 import type { ViewRole } from './lib/store'
 import {
-  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,getStockVouchers,downloadStockVoucherEvidence,
+  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,getStockVouchers,downloadStockVoucherEvidence,returnSupplyIssue,
   issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,importSupplySuppliers,setSupplyMinimum,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot,StockEvidenceInput,StockVoucher } from './lib/supplyApi'
@@ -48,6 +48,13 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [issueInspection,setIssueInspection]=useState(emptyInspection)
   const [issueEvidences,setIssueEvidences]=useState<StockEvidenceInput[]>([])
   const [selectedVoucher,setSelectedVoucher]=useState<StockVoucher|null>(null)
+  const [returnVoucherNumber,setReturnVoucherNumber]=useState('')
+  const [returnQuantity,setReturnQuantity]=useState('')
+  const [returnReason,setReturnReason]=useState('')
+  const [returnSafe,setReturnSafe]=useState(false)
+  const [returnInspection,setReturnInspection]=useState(emptyInspection)
+  const [returnEvidences,setReturnEvidences]=useState<StockEvidenceInput[]>([])
+  const [returnOpen,setReturnOpen]=useState(false)
   const [issueLot,setIssueLot]=useState<SupplyLot|null>(null)
   const [section,setSection]=useState<'overview'|'stock'|'receipts'|'issues'|'transfers'|'lots'|'trace'>('overview')
   const [lotSearch,setLotSearch]=useState('')
@@ -63,7 +70,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setSelectedVoucher(null);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -123,6 +130,17 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       quantity:Number(issue.quantity),unit:issue.unit||issueLot.unit,note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType,
       voucherNumber:issue.voucherNumber,inspection:{...issueInspection,documentNumber:issue.voucherNumber},evidences:issueEvidences,
     });setIssueLot(null);setIssue(emptyIssue());setIssueInspection(emptyInspection());setIssueEvidences([])},'Đã ghi sổ phiếu xuất kho và lưu minh chứng. Tồn lô đã được trừ một lần.')
+  }
+  function submitReturn(e:FormEvent){
+    e.preventDefault()
+    if(!selectedVoucher?.id||!selectedVoucher.unit)return
+    void execute(async()=>{
+      await returnSupplyIssue(activeId,selectedVoucher.id,{voucherNumber:returnVoucherNumber,quantity:Number(returnQuantity),
+        unit:selectedVoucher.unit!,reason:returnReason,unusedAndSafe:returnSafe,
+        inspection:{...returnInspection,documentNumber:returnVoucherNumber},evidences:returnEvidences})
+      setSelectedVoucher(null);setReturnOpen(false);setReturnQuantity('');setReturnReason('');setReturnSafe(false)
+      setReturnInspection(emptyInspection());setReturnEvidences([])
+    },'Đã nhập hoàn nguyên liệu chưa sử dụng, ghi chứng từ và tăng tồn đúng một lần.')
   }
   const filteredSuppliers=(suppliers.data??[]).filter(item=>{const query=supplierSearch.toLocaleLowerCase('vi');return (item.code+' '+item.name+' '+(item.phone??'')).toLocaleLowerCase('vi').includes(query)&&(!supplierDebtOnly||(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0)>0)})
   const supplierPages=Math.max(1,Math.ceil(filteredSuppliers.length/10))
@@ -254,19 +272,33 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <h3>Phiếu kho đã ghi sổ · Truy xuất biên bản và tệp minh chứng</h3>
         <div className="supply-table-scroll"><table className="supply-table"><thead><tr><th>Mã phiếu</th><th>Nghiệp vụ</th><th>Thời điểm</th><th>Minh chứng</th><th>Thao tác</th></tr></thead><tbody>
           {(vouchers.data??[]).map(v=><tr key={v.id}>
-            <td><strong>{v.number}</strong></td><td>{v.kind==='RECEIPT'?'Nhập kho':'Xuất kho'}</td>
+            <td><strong>{v.number}</strong></td><td>{v.kind==='RECEIPT'?'Nhập kho':v.kind==='RETURN'?'Nhập hoàn':'Xuất kho'}</td>
             <td>{new Date(v.postedAt).toLocaleString('vi-VN')}</td><td>{v.evidences.length} tệp</td>
             <td><button type="button" className="outline" onClick={()=>setSelectedVoucher(v)}>Xem phiếu</button></td>
           </tr>)}
           {!vouchers.data?.length&&<tr><td colSpan={5}>Chưa có phiếu theo quy trình chứng từ mới.</td></tr>}
         </tbody></table></div>
         {selectedVoucher&&<section className="supply-panel stock-voucher-view" aria-label="Chi tiết phiếu kho">
-          <div className="supply-section-heading"><h3>{selectedVoucher.number} · {selectedVoucher.kind==='RECEIPT'?'Nhập kho':'Xuất kho'}</h3><button type="button" className="outline" onClick={()=>setSelectedVoucher(null)}>Đóng</button></div>
+          <div className="supply-section-heading"><h3>{selectedVoucher.number} · {selectedVoucher.kind==='RECEIPT'?'Nhập kho':selectedVoucher.kind==='RETURN'?'Nhập hoàn':'Xuất kho'}</h3><button type="button" className="outline" onClick={()=>setSelectedVoucher(null)}>Đóng</button></div>
           <p>Đã ghi sổ: {new Date(selectedVoucher.postedAt).toLocaleString('vi-VN')} · Người ghi sổ: {selectedVoucher.postedByName}</p>
           <p>Người kiểm tra: <strong>{selectedVoucher.inspection.inspector}</strong> · Người giao/nhận: {selectedVoucher.inspection.counterparty}</p>
           <p>Vị trí: {selectedVoucher.inspection.location} · Thời điểm: {selectedVoucher.inspection.actualTime} · Chứng từ: {selectedVoucher.inspection.documentNumber}</p>
           {selectedVoucher.receipt&&<p>Nhà cung cấp: {selectedVoucher.receipt.supplier.name} · {selectedVoucher.receipt.lines.map(line=>line.lot.lotCode+' / '+line.lot.ingredient.name).join(', ')}</p>}
-          {selectedVoucher.kind==='ISSUE'&&<p>Lô: {selectedVoucher.lotId} · Số lượng: {selectedVoucher.quantity} {selectedVoucher.unit}</p>}
+          {(selectedVoucher.kind==='ISSUE'||selectedVoucher.kind==='RETURN')&&<p>Lô: {selectedVoucher.lotId} · Số lượng: {selectedVoucher.quantity} {selectedVoucher.unit}</p>}
+          {selectedVoucher.kind==='ISSUE'&&canEdit&&<button type="button" className="outline" onClick={()=>{setReturnOpen(true);setReturnVoucherNumber('');setReturnQuantity('');setReturnReason('');setReturnSafe(false);setReturnInspection(emptyInspection());setReturnEvidences([])}}>Lập phiếu nhập hoàn nguyên liệu dư</button>}
+          {returnOpen&&selectedVoucher.kind==='ISSUE'&&<form className="stock-audit-return-form" onSubmit={submitReturn}>
+            <h3>Nhập hoàn từ phiếu {selectedVoucher.number}</h3>
+            <p className="muted">Chỉ hoàn nguyên liệu chưa sơ chế/chế biến, còn đủ điều kiện an toàn. Mỗi phiếu hoàn có chứng từ riêng; không sửa phiếu xuất gốc.</p>
+            <div className="supply-form-grid">
+              <label>Số phiếu nhập hoàn *<input required maxLength={60} value={returnVoucherNumber} onChange={e=>setReturnVoucherNumber(e.target.value)} placeholder="NH-2026-001"/></label>
+              <label>Khối lượng nhập hoàn ({selectedVoucher.unit}) *<input type="number" required min="0.001" step="any" max={selectedVoucher.quantity??undefined} value={returnQuantity} onChange={e=>setReturnQuantity(e.target.value)}/></label>
+            </div>
+            <label>Lý do nhập hoàn *<textarea required minLength={10} maxLength={500} value={returnReason} onChange={e=>setReturnReason(e.target.value)}/></label>
+            <label className="stock-return-confirm"><input type="checkbox" required checked={returnSafe} onChange={e=>setReturnSafe(e.target.checked)}/> Tôi xác nhận hàng chưa sử dụng, đủ điều kiện bảo quản và có thể nhập hoàn.</label>
+            <StockInspectionFields kind="RETURN" value={returnInspection} onChange={setReturnInspection}/>
+            <StockEvidenceFields kind="RETURN" value={returnEvidences} onChange={setReturnEvidences}/>
+            <div className="supply-form-actions"><button type="submit" className="primary" disabled={busy||!returnEvidences.some(x=>x.category==='RETURN_PHOTO')||!returnEvidences.some(x=>x.category==='SCALE_PHOTO')}>Ghi sổ nhập hoàn</button><button type="button" className="outline" onClick={()=>setReturnOpen(false)}>Hủy</button></div>
+          </form>}
           <p>Ghi chú: {selectedVoucher.inspection.remarks||'Không có'}</p>
           <div className="stock-voucher-evidences">{selectedVoucher.evidences.map(file=><button type="button" className="outline" key={file.id} onClick={()=>void (async()=>{
             try{
