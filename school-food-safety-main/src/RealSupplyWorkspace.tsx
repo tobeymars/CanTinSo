@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck, X } from 'lucide-react'
@@ -17,7 +18,7 @@ import RealSupplierDocuments from './RealSupplierDocuments'
 import RealWarehouseOverview from './RealWarehouseOverview'
 import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit, readableStockQuantity } from './lib/supervisionUnits'
 
-function ReceiptDialog({onClose,busy,children}:{onClose:()=>void;busy:boolean;children:React.ReactNode}){
+function ReceiptDialog({onClose,busy,children}:{onClose:()=>void;busy:boolean;children:ReactNode}){
   const dialogRef=useRef<HTMLDialogElement>(null)
   useEffect(()=>{
     const dialog=dialogRef.current
@@ -390,7 +391,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
               </div>
             </>:<p className="muted">Phiếu được lập trước khi triển khai bộ chứng từ điện tử. Hệ thống không tự tạo hoặc giả lập ảnh, biên bản cho dữ liệu cũ.</p>}
           </section>}
-        </>}
+        </>
       </section>}
       {section==='trace'&&<>
         <h3>Phiếu kho đã ghi sổ · Truy xuất biên bản và tệp minh chứng</h3>
