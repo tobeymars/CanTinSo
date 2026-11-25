@@ -112,7 +112,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   const dateKind=serverMode?supervisionDateKind(date):'today'
   const dateLocked=dateKind==='future'
   const approvedMeal=false // Phiên bản cũ có BGH duyệt; dữ liệu bếp không còn bị khóa bởi phê duyệt này.
-  const isSchoolReceiver = serverMode && role === 'school_kitchen' && !getStoredUser()?.kitchenId && contextQuery.data?.kitchen?.type === 'CENTRAL'
+  const isSchoolReceiver = serverMode && role === 'school_kitchen' && !getStoredUser()?.kitchenId
   const canReport = (serverMode ? (role === 'central_kitchen' || role === 'school_kitchen') && !isSchoolReceiver : canReportSupervision(role, school.mode)) && !dateLocked && !approvedMeal
   const canConfirm = !serverMode && canConfirmSupervision(role) && !dateLocked
   const confirmedCount = checks.filter(item => item.status === 'confirmed').length
@@ -177,8 +177,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
       <div className="card-header supervision-checklist-header">
         <div>
           <div className="section-kicker">KIỂM THỰC VÀ LƯU MẪU THEO BỮA</div>
-          <h2>Trạng thái giám sát · {mealLabel}</h2>
-          <p className="muted">Bếp tự ghi nhận và chịu trách nhiệm về hồ sơ kiểm thực, lưu mẫu theo trường · ngày · bữa. BGH theo dõi trong phạm vi trường quản lý; mọi chỉnh sửa có lịch sử.</p>
+          <h2>{serverMode && !canReport ? 'Hồ sơ kiểm thực của bếp cung cấp' : 'Trạng thái giám sát'} · {mealLabel}</h2>
+          <p className="muted">{serverMode && !canReport ? 'Nhà trường chỉ xem các hồ sơ nguyên liệu, chế biến và lưu mẫu do bếp sản xuất thực hiện; không tiếp nhận nguyên liệu sống. Việc nhận món ăn thành phẩm được xác nhận tại mốc Đến trường bên dưới.' : 'Bếp tự ghi nhận kiểm thực nguyên liệu, chế biến và lưu mẫu. Nhà trường tiếp nhận món ăn thành phẩm và xem được lịch sử hồ sơ liên quan.'}</p>
         </div>
         <div className="supervision-checklist-actions">
           <span className="supervision-check-count"><ShieldCheck size={16}/>{confirmedCount}/{checks.length} đã ghi nhận</span>
