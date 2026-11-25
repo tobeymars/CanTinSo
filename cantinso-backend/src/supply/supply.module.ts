@@ -6,5 +6,6 @@ import { SupplierDocumentsService } from './supplier-documents.service';
 import { SupplierDocumentsController } from './supplier-documents.controller';
 import { SupplyFinanceController } from './supply-finance.controller';
 import { StockVoucherService } from './stock-voucher.service';
-@Module({controllers:[SupplyController,SupplyFinanceController,SupplierDocumentsController],providers:[SupplyService,SupplyFinanceService,SupplierDocumentsService,StockVoucherService]})
+import { SupplyPlanService } from './supply-plan.service';
+@Module({controllers:[SupplyController,SupplyFinanceController,SupplierDocumentsController],providers:[SupplyService,SupplyFinanceService,SupplierDocumentsService,StockVoucherService,SupplyPlanService]})
 export class SupplyModule {}
