@@ -566,7 +566,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
             <div className="supply-form-actions"><button type="submit" className="primary" disabled={busy||!returnEvidences.some(x=>x.category==='RETURN_PHOTO')||!returnEvidences.some(x=>x.category==='SCALE_PHOTO')}>Ghi sổ nhập hoàn</button><button type="button" className="outline" onClick={()=>setReturnOpen(false)}>Hủy</button></div>
           </form>}
           <p>Ghi chú: {selectedVoucher.inspection.remarks||'Không có'}</p>
-          {selectedVoucher.inspection.approvedPlan&&<p className="supply-plan-link">Phiếu xuất gắn phiên bản thực đơn đã duyệt: <strong>{selectedVoucher.inspection.approvedPlan.revisionId}</strong> · Nguyên liệu: {selectedVoucher.inspection.approvedPlan.ingredientId} · {selectedVoucher.inspection.approvedPlan.dishVersionIds.length} phiên bản món liên quan. Dữ liệu truy xuất này được lưu cùng phiếu.</p>
+          {selectedVoucher.inspection.approvedPlan&&<p className="supply-plan-link">Phiếu xuất gắn phiên bản thực đơn đã duyệt: <strong>{selectedVoucher.inspection.approvedPlan.revisionId}</strong> · Nguyên liệu: {selectedVoucher.inspection.approvedPlan.ingredientId} · {selectedVoucher.inspection.approvedPlan.dishVersionIds.length} phiên bản món liên quan. Dữ liệu truy xuất này được lưu cùng phiếu.</p>}
           <div className="stock-voucher-evidences">{selectedVoucher.evidences.map(file=><button type="button" className="outline" key={file.id} onClick={()=>void (async()=>{
             try{
               const content=await downloadStockVoucherEvidence(activeId,selectedVoucher.id,file.id)
