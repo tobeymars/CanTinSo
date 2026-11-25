@@ -190,7 +190,7 @@ export class SupplyService {
       const changed=await tx.inventoryLot.updateMany({where:{id:lotId,kitchenId,status:'AVAILABLE',remainingQty:{gte:quantity}},data:{remainingQty:{decrement:quantity},...(current===quantity?{status:'DEPLETED' as const}:{})}});
       if(changed.count!==1) throw new ConflictException('Tồn kho đã thay đổi; vui lòng tải lại.');
       const voucher=await tx.stockVoucher.create({data:{
-        kitchenId,number:'XK-'+voucherNumber,kind:'ISSUE',lotId,schoolId,serviceDate:day,mealType,
+        kitchenId,number:voucherNumber,kind:'ISSUE',lotId,schoolId,serviceDate:day,mealType,
         quantity,unit:lot.unit,inspection,postedById:user.sub,
       }});
       await tx.stockVoucherEvidence.createMany({data:evidences.map(file=>({
