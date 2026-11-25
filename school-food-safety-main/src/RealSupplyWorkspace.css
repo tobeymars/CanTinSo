@@ -276,3 +276,29 @@
 .stock-voucher-evidences{display:grid;gap:7px}
 .stock-voucher-evidences button{text-align:left;justify-content:flex-start;white-space:normal;overflow-wrap:anywhere}
 @media(max-width:650px){.stock-audit-fieldset{padding:14px}.stock-audit-fieldset .supply-form-grid,.stock-audit-checks{grid-template-columns:1fr}}
+
+/* Receipt registry: keep creation separated from the default read-only listing. */
+.supply-receipts-workspace{display:grid;gap:16px;min-width:0}
+.supply-receipts-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:0}
+.supply-receipts-heading>div{flex:1;min-width:250px}
+.supply-receipts-heading h3{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.supply-receipts-heading button{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.supply-receipt-filterbar{display:flex;align-items:end;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.supply-receipt-filterbar label{flex:1;min-width:min(260px,100%)}
+.supply-receipt-filterbar input{width:100%;max-width:540px}
+.supply-receipt-list th,.supply-receipt-list td{vertical-align:middle}
+.supply-receipt-list td:first-child strong{white-space:nowrap}
+.supply-receipt-list td:last-child button{white-space:nowrap}
+.supply-receipt-status{font-weight:600;color:#16764c;font-size:12px}
+.supply-empty-receipts{text-align:center;padding:26px 15px!important;color:var(--muted,#5e6e82)}
+.supply-receipt-pagination{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.supply-receipt-editor,.supply-receipt-detail{border:1px solid var(--border,#d6e0eb);background:var(--surface,#fff);border-radius:14px;padding:20px;min-width:0}
+.supply-receipt-editor__heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px;flex-wrap:wrap}
+.supply-receipt-detail{display:grid;gap:16px}
+.supply-receipt-detail__facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.supply-receipt-detail__facts>div{padding:12px;background:var(--surface-alt,#f6f8fc);border-radius:9px;display:grid;gap:6px}
+.supply-receipt-detail__facts small{color:var(--muted,#53657b);font-size:11px}
+.supply-receipt-detail__facts strong{overflow-wrap:anywhere;font-size:13px}
+.supply-receipt-detail__proof{display:grid;gap:10px}
+@media(max-width:850px){.supply-receipt-detail__facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.supply-receipts-heading>div{min-width:0}.supply-receipts-heading button{width:100%}.supply-receipt-editor,.supply-receipt-detail{padding:13px}.supply-receipt-pagination{justify-content:center}}
