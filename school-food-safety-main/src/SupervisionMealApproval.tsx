@@ -52,7 +52,7 @@ export default function SupervisionMealApproval({ school, date, mealType, role }
   const localStatus = serverMode ? null : mealApprovalStatus(scope, school)
   const checks = serverQuery.data?.checks ?? {}
   const stages = serverQuery.data?.stages ?? {}
-  const requiredStages = school.mode === 'CENTRAL_KITCHEN' ? ['DISPATCHED','ARRIVED','PLATED','READY'] : ['PLATED','READY']
+  const requiredStages = school.mode === 'CENTRAL_KITCHEN' ? ['PLATED','READY','DISPATCHED','ARRIVED'] : ['PLATED','READY']
   const confirmedChecks = ['ingredient_receipt','processing','before_serving','food_sample'].filter(id=>checks[id]?.status==='confirmed').length
   const confirmedStages = requiredStages.filter(id=>stages[id]?.confirmed).length
   const pendingDetails = [...['ingredient_receipt','processing','before_serving','food_sample'].filter(id=>checks[id]?.status!=='confirmed'),...requiredStages.filter(id=>!stages[id]?.confirmed)]
