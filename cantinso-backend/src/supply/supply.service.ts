@@ -209,6 +209,72 @@ export class SupplyService {
       throw error;
     }
   }
+  async returnIssue(user:AuthUser,kitchenId:string,sourceVoucherId:string,input:any){
+    await this.permitted(user,kitchenId,true);
+    if(!uuid(sourceVoucherId))throw new BadRequestException('Phiếu xuất gốc không hợp lệ.');
+    const number=str(input?.voucherNumber,'Số phiếu nhập hoàn',60);
+    const reason=str(input?.reason,'Lý do nhập hoàn',500);
+    if(reason.length<10)throw new BadRequestException('Lý do nhập hoàn tối thiểu 10 ký tự.');
+    if(input?.unusedAndSafe!==true)
+      throw new BadRequestException('Chỉ nhập hoàn nguyên liệu chưa chế biến và còn đủ điều kiện bảo quản, sử dụng.');
+    const inspection=validateStockInspection(input?.inspection,'RETURN');
+    if(inspection.documentNumber!==number)
+      throw new BadRequestException('Số chứng từ nhập hoàn không khớp mã phiếu.');
+    const evidences=validateStockEvidence(input?.evidences,'RETURN');
+    try{return await this.prisma.$transaction(async tx=>{
+      const source=await tx.stockVoucher.findFirst({
+        where:{id:sourceVoucherId,kitchenId,kind:'ISSUE',status:'POSTED'},
+        select:{id:true,lotId:true,schoolId:true,serviceDate:true,mealType:true,quantity:true,unit:true},
+      });
+      if(!source || !source.lotId || !source.quantity || !source.unit)
+        throw new NotFoundException('Không thấy phiếu xuất gốc thuộc bếp.');
+      const lot=await tx.inventoryLot.findFirst({
+        where:{id:source.lotId,kitchenId},select:{id:true,remainingQty:true,quantity:true,status:true,expiryDate:true,unit:true},
+      });
+      if(!lot || !['AVAILABLE','DEPLETED'].includes(lot.status) ||
+        (lot.expiryDate && lot.expiryDate.getTime()<Date.now()-86400000))
+        throw new ConflictException('Lô đang cách ly/hết hạn hoặc không thể hoàn về tồn khả dụng.');
+      const entered=canonicalQuantity(input?.quantity,input?.unit,lot.unit);
+      const quantity=entered.quantity;
+      const previous=await tx.stockVoucher.aggregate({
+        where:{sourceVoucherId,kind:'RETURN',status:'POSTED'},_sum:{quantity:true},
+      });
+      const outstanding=Number(source.quantity)-Number(previous._sum.quantity??0);
+      if(quantity>outstanding+0.00000001)
+        throw new ConflictException('Lượng hoàn vượt phần nguyên liệu còn có thể hoàn của phiếu xuất.');
+      if(Number(lot.remainingQty)+quantity>Number(lot.quantity)+0.00000001)
+        throw new ConflictException('Nhập hoàn vượt số lượng gốc của lô.');
+      const voucher=await tx.stockVoucher.create({data:{
+        kitchenId,number,kind:'RETURN',sourceVoucherId,
+        lotId:lot.id,schoolId:source.schoolId,serviceDate:source.serviceDate,mealType:source.mealType,
+        quantity,unit:lot.unit,inspection:{...inspection,reason,unusedAndSafe:true},
+        postedById:user.sub,
+      }});
+      await tx.stockVoucherEvidence.createMany({data:evidences.map(file=>({
+        voucherId:voucher.id,category:file.category,filename:file.filename,
+        mimeType:file.mimeType,size:file.size,sha256:file.sha256,
+        data:Uint8Array.from(file.data),uploadedById:user.sub,
+      }))});
+      const changed=await tx.inventoryLot.updateMany({
+        where:{id:lot.id,kitchenId,status:lot.status,remainingQty:lot.remainingQty},
+        data:{remainingQty:{increment:quantity},status:'AVAILABLE'},
+      });
+      if(changed.count!==1)throw new ConflictException('Tồn lô thay đổi trong khi hoàn; vui lòng kiểm tra lại.');
+      await tx.traceEvent.create({data:{
+        lotId:lot.id,eventType:'RETURNED',actorId:user.sub,description:reason,
+        metadata:{kind:'RETURN',voucherId:voucher.id,sourceVoucherId,quantity,unit:lot.unit,
+          schoolId:source.schoolId,serviceDate:source.serviceDate?.toISOString().slice(0,10),mealType:source.mealType},
+      }});
+      return {voucherId:voucher.id,sourceVoucherId,lotId:lot.id,quantity,remainingQty:Number(lot.remainingQty)+quantity};
+    },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
+    }catch(error){
+      if(error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2002')
+        throw new ConflictException('Mã phiếu nhập hoàn đã tồn tại.');
+      if(error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2034')
+        throw new ConflictException('Tồn kho hoặc lượng hoàn vừa thay đổi. Vui lòng tải lại.');
+      throw error;
+    }
+  }
   async lotStatus(user:AuthUser,kitchenId:string,lotId:string,body:any){
     await this.permitted(user,kitchenId,true);
     if(!uuid(lotId))throw new BadRequestException('Mã lô không hợp lệ.');
