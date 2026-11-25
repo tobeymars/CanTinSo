@@ -58,6 +58,8 @@ jobs:
         run: npm run test:stock-vouchers
       - name: Validate serving-stage operations
         run: npm run test:supervision-serving
+      - name: Validate kitchen stage ownership
+        run: npm run test:supervision-stages
       - name: Validate approved meal-plan warehouse forecasts
         run: npm run test:stock-forecast
       - name: Build NestJS backend
