@@ -50,7 +50,7 @@ export type SupplyFinance = {
     lines:{id:string;quantity:number;enteredQuantity:number|null;enteredUnit:string|null;unitPrice:number;amount:number;lot:{id:string;lotCode:string;ingredient:{name:string;unit:string}}}[]}[]
   payments:{id:string;reference:string;amount:number;method:string;paidAt:string;note:string|null;reversedAt:string|null;reversalReason:string|null;receipt:{id:string;number:string};supplier:{id:string;name:string}}[]
 }
-export type SupplyPurchaseLine={ingredientId:string;lotCode:string;quantity:number;unit:string;unitPrice:number;expiryDate:string;storageLocation:string}
+export type SupplyPurchaseLine={ingredientId:string;lotCode:string;quantity:number;deliveredQuantity:number;rejectionReason:string;origin:string;producer:string;packagingStatus:'PASS'|'PENDING';sensoryStatus:'PASS'|'PENDING';unit:string;unitPrice:number;expiryDate:string;storageLocation:string}
 export const getSupplyFinance=(id:string)=>request<SupplyFinance>(kitchenPath(id)+'/finance')
 export const createSupplyPurchase=(id:string,input:{number:string;supplierId:string;invoiceNumber:string;reference:string;description:string;lines:SupplyPurchaseLine[];inspection:StockInspection;evidences:StockEvidenceInput[]})=>request<{id:string;number:string;total:number;lines:number}>(kitchenPath(id)+'/purchase-receipts',{method:'POST',body:JSON.stringify(input)})
 export const createSupplyPayment=(id:string,input:{receiptId:string;reference:string;amount:number;method:'BANK_TRANSFER'|'CASH'|'OTHER';paidAt:string;note:string})=>request<{id:string;reference:string;amount:number}>(kitchenPath(id)+'/payments',{method:'POST',body:JSON.stringify(input)})
