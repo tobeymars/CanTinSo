@@ -18,7 +18,7 @@ import RealSupplierDocuments from './RealSupplierDocuments'
 import RealWarehouseOverview from './RealWarehouseOverview'
 import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit, readableStockQuantity } from './lib/supervisionUnits'
 
-function ReceiptDialog({onClose,busy,children}:{onClose:()=>void;busy:boolean;children:ReactNode}){
+function SupplyDialog({onClose,busy,children,title='Tạo phiếu nhập kho',eyebrow='QUẢN LÝ KHO · NHẬP NGUYÊN LIỆU',description='Kiểm nhận hàng hóa, nguyên liệu và lưu ảnh, chứng từ theo từng phiếu.'}:{onClose:()=>void;busy:boolean;children:ReactNode;title?:string;eyebrow?:string;description?:string}){
   const dialogRef=useRef<HTMLDialogElement>(null)
   useEffect(()=>{
     const dialog=dialogRef.current
@@ -32,10 +32,10 @@ function ReceiptDialog({onClose,busy,children}:{onClose:()=>void;busy:boolean;ch
     }
     return ()=>{if(dialog.open && typeof dialog.close==='function')dialog.close()}
   },[])
-  return <dialog ref={dialogRef} className="supply-receipt-modal" aria-label="Tạo phiếu nhập kho"
+  return <dialog ref={dialogRef} className="supply-receipt-modal" aria-label={title}
     onCancel={event=>{event.preventDefault();if(!busy)onClose()}}>
     <header className="supply-receipt-modal__heading">
-      <div><small>QUẢN LÝ KHO · NHẬP NGUYÊN LIỆU</small><h2>Tạo phiếu nhập kho</h2><p>Kiểm nhận hàng hóa, nguyên liệu và lưu ảnh, chứng từ theo từng phiếu.</p></div>
+      <div><small>{eyebrow}</small><h2>{title}</h2><p>{description}</p></div>
       <button type="button" className="supply-receipt-modal__close" title="Đóng cửa sổ" aria-label="Đóng biểu mẫu nhập kho" disabled={busy} onClick={onClose}><X size={20}/></button>
     </header>
     <div className="supply-receipt-modal__content">{children}</div>
@@ -64,6 +64,9 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const movements=useQuery({queryKey:['supply-movements',activeId],queryFn:()=>getSupplyMovements(activeId),enabled:!!activeId&&mode==='warehouse'})
   const vouchers=useQuery({queryKey:['supply-vouchers',activeId],queryFn:()=>getStockVouchers(activeId),enabled:!!activeId&&mode==='warehouse'})
   const [vendor,setVendor]=useState(emptySupplier)
+  const [vendorDialogOpen,setVendorDialogOpen]=useState(false)
+  const [financeDialogOpen,setFinanceDialogOpen]=useState(false)
+  const [statusTarget,setStatusTarget]=useState<SupplySupplier|null>(null)
   const [editingVendor,setEditingVendor]=useState<string|null>(null)
   const [viewingSupplier,setViewingSupplier]=useState<string|null>(null)
   const [supplierSearch,setSupplierSearch]=useState('')
@@ -99,7 +102,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setVendorDialogOpen(false);setFinanceDialogOpen(false);setStatusTarget(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -146,11 +149,11 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   }
   function editVendor(item:SupplySupplier){
     setEditingVendor(item.id);setVendor({code:item.code,name:item.name,taxCode:item.taxCode??'',contactName:item.contactName??'',phone:item.phone??'',email:item.email??'',address:item.address??'',note:item.note??''})
-    window.scrollTo({top:0,behavior:'smooth'})
+    setVendorDialogOpen(true)
   }
   function submitVendor(e:FormEvent){
     e.preventDefault()
-    void execute(async()=>{await saveSupplySupplier(activeId,vendor,editingVendor??undefined);setEditingVendor(null);setVendor(emptySupplier())},'Đã lưu nhà cung cấp vào dữ liệu bếp.')
+    void execute(async()=>{await saveSupplySupplier(activeId,vendor,editingVendor??undefined);setEditingVendor(null);setVendor(emptySupplier());setVendorDialogOpen(false)},'Đã lưu nhà cung cấp vào dữ liệu bếp.')
   }
   function submitIssue(e:FormEvent){
     e.preventDefault()
@@ -223,42 +226,97 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     {error&&<p className="error" role="alert">{error}</p>}
     {notice&&<p role="status" className="supervision-status-message">{notice}</p>}
     {activeId&&mode==='suppliers'&&<>
-      {finance.data&&<RealSupplierFinance key={activeId} kitchenId={activeId} finance={finance.data} canEdit={canEdit} busy={busy} execute={execute}/>}
-      {canEdit&&<form className="supply-panel supply-vendor-form" onSubmit={submitVendor}>
-        <h3><Truck size={18}/>{editingVendor?'Sửa nhà cung cấp':'Thêm nhà cung cấp'}</h3>
-        <div className="supply-form-grid">
-          <label>Mã nhà cung cấp *<input required maxLength={50} value={vendor.code} onChange={e=>setVendor(v=>({...v,code:e.target.value}))}/></label>
-          <label>Tên nhà cung cấp *<input required maxLength={200} value={vendor.name} onChange={e=>setVendor(v=>({...v,name:e.target.value}))}/></label>
-          <label>Người liên hệ<input maxLength={150} value={vendor.contactName} onChange={e=>setVendor(v=>({...v,contactName:e.target.value}))}/></label>
-          <label>Số điện thoại<input maxLength={40} value={vendor.phone} onChange={e=>setVendor(v=>({...v,phone:e.target.value}))}/></label>
-          <label>Email<input type="email" value={vendor.email} onChange={e=>setVendor(v=>({...v,email:e.target.value}))}/></label>
-          <label>Mã số thuế<input value={vendor.taxCode} onChange={e=>setVendor(v=>({...v,taxCode:e.target.value}))}/></label>
-          <label>Địa chỉ<input value={vendor.address} onChange={e=>setVendor(v=>({...v,address:e.target.value}))}/></label>
-          <label>Ghi chú<input maxLength={500} value={vendor.note} onChange={e=>setVendor(v=>({...v,note:e.target.value}))}/></label>
+      <div className="supply-supplier-summary">
+        <div className="supply-section-heading supply-supplier-heading">
+          <div>
+            <h3><Truck size={19}/> Danh sách nhà cung cấp</h3>
+            <p className="muted">Quản lý thông tin liên hệ, hồ sơ pháp lý và lịch sử cung ứng trong phạm vi bếp.</p>
+          </div>
+          <div className="supply-supplier-actions">
+            {canEdit&&<button type="button" className="primary" onClick={()=>{setVendor(emptySupplier());setEditingVendor(null);setVendorDialogOpen(true)}}><Plus size={16}/> Thêm nhà cung cấp</button>}
+            {finance.data&&<button type="button" className="outline" onClick={()=>setFinanceDialogOpen(true)}><ClipboardList size={16}/> Công nợ & thanh toán</button>}
+            {canEdit&&<><input type="file" hidden ref={importRef} accept=".json,application/json" onChange={event=>{void importSupplierFile(event.target.files?.[0]);event.target.value=''}}/><button className="outline" type="button" onClick={()=>importRef.current?.click()}>Import JSON</button></>}
+            <button className="outline" type="button" onClick={exportSupplierList}>Xuất CSV</button>
+          </div>
         </div>
-        <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy}><Plus size={16}/>{editingVendor?'Lưu thay đổi':'Thêm nhà cung cấp'}</button>{editingVendor&&<button className="outline" type="button" onClick={()=>{setEditingVendor(null);setVendor(emptySupplier())}}>Hủy sửa</button>}</div>
-      </form>}
-      <div className="supply-section-heading">
-        <h3>Danh sách nhà cung cấp ({suppliers.data?.length??0})</h3>
-        <div style={{display:'flex',gap:8}}>
-          {canEdit&&<><input type="file" hidden ref={importRef} accept=".json,application/json" onChange={event=>{void importSupplierFile(event.target.files?.[0]);event.target.value=''}}/><button className="outline" type="button" onClick={()=>importRef.current?.click()}>Import JSON</button></>}
-          <button className="outline" type="button" onClick={exportSupplierList}>Xuất CSV</button>
+        <div className="management-toolbar supply-filterbar">
+          <label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>{setSupplierSearch(e.target.value);setSupplierPage(1)}}/></label>
+          {canEdit&&<label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>{setSupplierDebtOnly(e.target.checked);setSupplierPage(1)}}/> Còn công nợ</label>}
+          <span className="muted">{filteredSuppliers.length} nhà cung cấp</span>
+        </div>
+        {suppliers.data?.length===0&&<p className="muted">Chưa có nhà cung cấp. Chọn “Thêm nhà cung cấp” để bắt đầu.</p>}
+        <div className="supply-table-scroll"><table className="supply-table supply-table--suppliers">
+          <thead><tr><th>Mã</th><th>Tên nhà cung cấp</th><th>Liên hệ</th><th>Trạng thái</th><th>Còn phải trả</th><th>Chức năng</th></tr></thead>
+          <tbody>{visibleSuppliers.map(item=><tr key={item.id}>
+            <td><strong>{item.code}</strong></td>
+            <td>{item.name}</td>
+            <td>{item.contactName??'—'}<small style={{display:'block'}}>{item.phone??''}</small></td>
+            <td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td>
+            <td>{canEdit?(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0).toLocaleString('vi-VN')+' đ':'Chỉ bếp được xem'}</td>
+            <td><div className="supply-supplier-row-actions">
+              <button type="button" className="outline" onClick={()=>setViewingSupplier(item.id)}>Hồ sơ</button>
+              {canEdit&&<>
+                <button className="outline" type="button" onClick={()=>editVendor(item)}>Sửa</button>
+                <button className="outline" type="button" disabled={busy} onClick={()=>setStatusTarget(item)}>{item.status==='ACTIVE'?'Ngừng dùng':'Kích hoạt'}</button>
+              </>}
+            </div></td>
+          </tr>)}</tbody>
+        </table></div>
+        <div className="management-pagination supply-supplier-pagination">
+          <span>Hiển thị {visibleSuppliers.length}/{filteredSuppliers.length} · Trang {Math.min(supplierPage,supplierPages)}/{supplierPages}</span>
+          <button type="button" className="outline" disabled={supplierPage<=1} onClick={()=>setSupplierPage(page=>Math.max(1,page-1))}>Trước</button>
+          <button type="button" className="outline" disabled={supplierPage>=supplierPages} onClick={()=>setSupplierPage(page=>Math.min(supplierPages,page+1))}>Sau</button>
         </div>
       </div>
-      <div className="management-toolbar supply-filterbar"><label>Tìm nhà cung cấp<input placeholder="Tên, mã, điện thoại" value={supplierSearch} onChange={e=>{setSupplierSearch(e.target.value);setSupplierPage(1)}}/></label>{canEdit&&<label className="management-check"><input type="checkbox" checked={supplierDebtOnly} onChange={e=>{setSupplierDebtOnly(e.target.checked);setSupplierPage(1)}}/>Còn công nợ</label>}</div>
-      {suppliers.data?.length===0&&<p className="muted">Chưa có nhà cung cấp. Bếp cần tạo trước khi nhập lô nguyên liệu.</p>}
-      <div className="supply-table-scroll"><table className="supply-table supply-table--suppliers"><thead><tr><th>Mã</th><th>Tên</th><th>Liên hệ</th><th>Trạng thái</th><th>Còn phải trả</th><th>Chức năng</th></tr></thead><tbody>
-        {visibleSuppliers.map(item=><tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{item.contactName??''}<small style={{display:'block'}}>{item.phone??''}</small></td><td>{item.status==='ACTIVE'?'Đang hoạt động':'Ngừng hoạt động'}</td><td>{canEdit?(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0).toLocaleString('vi-VN')+' đ':'Chỉ bếp được xem'}</td><td><div style={{display:'flex',gap:6}}><button type="button" className="outline" onClick={()=>setViewingSupplier(current=>current===item.id?null:item.id)}>Hồ sơ</button>{canEdit&&<div style={{display:'flex',gap:6}}>
-          <button className="outline" type="button" onClick={()=>editVendor(item)}>Sửa</button>
-          <button className="outline" type="button" disabled={busy} onClick={()=>void execute(()=>updateSupplySupplierStatus(activeId,item.id,item.status==='ACTIVE'?'INACTIVE':'ACTIVE'),item.status==='ACTIVE'?'Đã ngừng sử dụng nhà cung cấp.':'Đã kích hoạt nhà cung cấp.')}>{item.status==='ACTIVE'?'Ngừng dùng':'Kích hoạt'}</button>
-        </div>}</div></td></tr>)}
-      </tbody></table></div>
-      <div className="management-pagination" style={{display:'flex',gap:10,justifyContent:'flex-end',alignItems:'center'}}>
-        <span>Hiển thị {visibleSuppliers.length} / {filteredSuppliers.length} nhà cung cấp · Trang {Math.min(supplierPage,supplierPages)}/{supplierPages}</span>
-        <button type="button" className="outline" disabled={supplierPage<=1} onClick={()=>setSupplierPage(page=>Math.max(1,page-1))}>Trước</button>
-        <button type="button" className="outline" disabled={supplierPage>=supplierPages} onClick={()=>setSupplierPage(page=>Math.min(supplierPages,page+1))}>Sau</button>
-      </div>
-      {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<RealSupplierDocuments key={viewingSupplier} kitchenId={activeId} supplierId={viewingSupplier} supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''} receipts={(finance.data?.receipts??[]).map(item=>({id:item.id,number:item.number,supplierId:item.supplier.id}))} canEdit={canEdit} busy={busy} execute={execute}/>}
+      {vendorDialogOpen&&canEdit&&<SupplyDialog title={editingVendor?'Sửa thông tin nhà cung cấp':'Thêm nhà cung cấp'} eyebrow="DANH MỤC NHÀ CUNG CẤP"
+        description="Thông tin được lưu cho bếp đang quản lý. Giấy tờ pháp lý được đính kèm trong Hồ sơ nhà cung cấp."
+        busy={busy} onClose={()=>{setVendorDialogOpen(false);setEditingVendor(null);setVendor(emptySupplier())}}>
+        <form className="supply-panel supply-vendor-form" onSubmit={submitVendor}>
+          <div className="supply-form-grid">
+            <label>Mã nhà cung cấp *<input required maxLength={50} value={vendor.code} onChange={e=>setVendor(v=>({...v,code:e.target.value}))}/></label>
+            <label>Tên nhà cung cấp *<input required maxLength={200} value={vendor.name} onChange={e=>setVendor(v=>({...v,name:e.target.value}))}/></label>
+            <label>Người liên hệ<input maxLength={150} value={vendor.contactName} onChange={e=>setVendor(v=>({...v,contactName:e.target.value}))}/></label>
+            <label>Số điện thoại<input maxLength={40} value={vendor.phone} onChange={e=>setVendor(v=>({...v,phone:e.target.value}))}/></label>
+            <label>Email<input type="email" value={vendor.email} onChange={e=>setVendor(v=>({...v,email:e.target.value}))}/></label>
+            <label>Mã số thuế<input maxLength={30} value={vendor.taxCode} onChange={e=>setVendor(v=>({...v,taxCode:e.target.value}))}/></label>
+            <label>Địa chỉ<input maxLength={300} value={vendor.address} onChange={e=>setVendor(v=>({...v,address:e.target.value}))}/></label>
+            <label>Ghi chú<textarea rows={3} maxLength={500} value={vendor.note} onChange={e=>setVendor(v=>({...v,note:e.target.value}))}/></label>
+          </div>
+          <div className="supply-form-actions">
+            <button className="primary" type="submit" disabled={busy}><Plus size={16}/>{editingVendor?'Lưu thay đổi':'Thêm nhà cung cấp'}</button>
+            <button className="outline" type="button" disabled={busy} onClick={()=>{setVendorDialogOpen(false);setEditingVendor(null);setVendor(emptySupplier())}}>Hủy</button>
+          </div>
+        </form>
+      </SupplyDialog>}
+      {viewingSupplier&&suppliers.data?.some(item=>item.id===viewingSupplier)&&<SupplyDialog
+        title={'Hồ sơ · '+(suppliers.data.find(item=>item.id===viewingSupplier)?.name??'Nhà cung cấp')}
+        eyebrow="HỒ SƠ PHÁP LÝ & CHỨNG TỪ" description="Xem giấy tờ đã lưu, thời hạn và chứng từ liên quan. Việc lưu trữ chứng từ không xóa hồ sơ gốc."
+        busy={busy} onClose={()=>setViewingSupplier(null)}>
+        <RealSupplierDocuments key={viewingSupplier} kitchenId={activeId} supplierId={viewingSupplier}
+          supplierName={suppliers.data.find(item=>item.id===viewingSupplier)?.name??''}
+          receipts={(finance.data?.receipts??[]).map(item=>({id:item.id,number:item.number,supplierId:item.supplier.id}))}
+          canEdit={canEdit} busy={busy} execute={execute}/>
+      </SupplyDialog>}
+      {financeDialogOpen&&finance.data&&<SupplyDialog title="Công nợ & thanh toán" eyebrow="ĐỐI SOÁT NHÀ CUNG CẤP"
+        description="Xem phiếu nhập, số dư và các chứng từ thanh toán đã ghi nhận của bếp."
+        busy={busy} onClose={()=>setFinanceDialogOpen(false)}>
+        <RealSupplierFinance key={activeId} kitchenId={activeId} finance={finance.data} canEdit={canEdit} busy={busy} execute={execute}/>
+      </SupplyDialog>}
+      {statusTarget&&canEdit&&<SupplyDialog title={statusTarget.status==='ACTIVE'?'Ngừng sử dụng nhà cung cấp':'Kích hoạt nhà cung cấp'}
+        eyebrow="QUẢN LÝ TRẠNG THÁI" description="Xác nhận thay đổi trạng thái nhà cung cấp trong danh mục bếp."
+        busy={busy} onClose={()=>setStatusTarget(null)}>
+        <div className="supply-supplier-status-dialog">
+          <p><strong>{statusTarget.name}</strong> · {statusTarget.code}</p>
+          <p>{statusTarget.status==='ACTIVE'?'Ngừng cho phép chọn nhà cung cấp này trong các giao dịch mới. Chứng từ và lịch sử đã lưu được giữ nguyên.':'Cho phép tiếp tục sử dụng nhà cung cấp này trong các giao dịch mới.'}</p>
+          <div className="supply-form-actions">
+            <button type="button" className="primary" disabled={busy} onClick={()=>void execute(async()=>{
+              await updateSupplySupplierStatus(activeId,statusTarget.id,statusTarget.status==='ACTIVE'?'INACTIVE':'ACTIVE')
+              setStatusTarget(null)
+            },statusTarget.status==='ACTIVE'?'Đã ngừng sử dụng nhà cung cấp.':'Đã kích hoạt nhà cung cấp.')}>Xác nhận</button>
+            <button type="button" className="outline" disabled={busy} onClick={()=>setStatusTarget(null)}>Hủy</button>
+          </div>
+        </div>
+      </SupplyDialog>}
     </>}
     {activeId&&mode==='warehouse'&&<>
       <nav className="supply-tabs" aria-label="Quản lý kho">
@@ -323,9 +381,9 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
             <Plus size={16}/> Tạo phiếu nhập
           </button>}
         </div>
-        {receiptFormOpen&&canEdit&&<ReceiptDialog busy={busy} onClose={()=>setReceiptFormOpen(false)}>
+        {receiptFormOpen&&canEdit&&<SupplyDialog busy={busy} onClose={()=>setReceiptFormOpen(false)}>
           <RealPurchaseReceipt key={activeId} kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>{setReceiptFormOpen(false);setReceiptViewId(null);setReceiptPage(1)}}/>
-        </ReceiptDialog>}
+        </SupplyDialog>}
         <>
           <div className="management-toolbar supply-filterbar supply-receipt-filterbar">
             <label>Tìm kiếm phiếu nhập
