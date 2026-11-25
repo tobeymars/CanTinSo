@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck, X } from 'lucide-react'
 import type { ViewRole } from './lib/store'
 import {
-  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,getStockVouchers,downloadStockVoucherEvidence,returnSupplyIssue,
+  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,getStockVouchers,downloadStockVoucherEvidence,returnSupplyIssue,getSupplyApprovedPlans,getSupplyIngredientRequirements,
   issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,importSupplySuppliers,setSupplyMinimum,
 } from './lib/supplyApi'
 import type { SupplySupplier,SupplyLot,StockEvidenceInput,StockVoucher } from './lib/supplyApi'
@@ -63,6 +63,12 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const lots=useQuery({queryKey:['supply-lots',activeId],queryFn:()=>getSupplyLots(activeId),enabled:!!activeId&&mode==='warehouse'})
   const movements=useQuery({queryKey:['supply-movements',activeId],queryFn:()=>getSupplyMovements(activeId),enabled:!!activeId&&mode==='warehouse'})
   const vouchers=useQuery({queryKey:['supply-vouchers',activeId],queryFn:()=>getStockVouchers(activeId),enabled:!!activeId&&mode==='warehouse'})
+  const approvedPlans=useQuery({queryKey:['supply-approved-plans',activeId],queryFn:()=>getSupplyApprovedPlans(activeId),enabled:!!activeId&&mode==='warehouse'&&canEdit})
+  const [selectedPlanRevisionId,setSelectedPlanRevisionId]=useState('')
+  const planRevisionId=approvedPlans.data?.some(p=>p.revisionId===selectedPlanRevisionId)?selectedPlanRevisionId:approvedPlans.data?.[0]?.revisionId??''
+  const requirements=useQuery({queryKey:['supply-plan-requirements',activeId,planRevisionId],
+    queryFn:()=>getSupplyIngredientRequirements(activeId,planRevisionId),
+    enabled:!!activeId&&!!planRevisionId&&mode==='warehouse'&&canEdit})
   const [vendor,setVendor]=useState(emptySupplier)
   const [vendorDialogOpen,setVendorDialogOpen]=useState(false)
   const [financeDialogOpen,setFinanceDialogOpen]=useState(false)
@@ -85,6 +91,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [returnEvidences,setReturnEvidences]=useState<StockEvidenceInput[]>([])
   const [returnOpen,setReturnOpen]=useState(false)
   const [issueLot,setIssueLot]=useState<SupplyLot|null>(null)
+  const [issuePlanLink,setIssuePlanLink]=useState<{revisionId:string;ingredientId:string}|null>(null)
   const [section,setSection]=useState<'overview'|'stock'|'receipts'|'issues'|'transfers'|'lots'|'trace'>('overview')
   const [receiptFormOpen,setReceiptFormOpen]=useState(false)
   const [receiptSearch,setReceiptSearch]=useState('')
@@ -103,7 +110,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setVendorDialogOpen(false);setFinanceDialogOpen(false);setStatusTarget(null);setImportDraft(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setIssuePlanLink(null);setSelectedPlanRevisionId('');setViewingSupplier(null);setVendorDialogOpen(false);setFinanceDialogOpen(false);setStatusTarget(null);setImportDraft(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -111,6 +118,8 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       qc.invalidateQueries({queryKey:['supply-lots',activeId]}),
       qc.invalidateQueries({queryKey:['supply-minimums',activeId]}),
       qc.invalidateQueries({queryKey:['supply-movements',activeId]}),
+      qc.invalidateQueries({queryKey:['supply-plan-requirements',activeId]}),
+      qc.invalidateQueries({queryKey:['supply-approved-plans',activeId]}),
       qc.invalidateQueries({queryKey:['supply-vouchers',activeId]}),
       qc.invalidateQueries({queryKey:['supervision-context']}),
     ])
@@ -161,7 +170,8 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{
       quantity:Number(issue.quantity),unit:issue.unit||issueLot.unit,note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType,
       voucherNumber:issue.voucherNumber,inspection:{...issueInspection,documentNumber:issue.voucherNumber},evidences:issueEvidences,
-    });setIssueLot(null);setIssue(emptyIssue());setIssueInspection(emptyInspection());setIssueEvidences([])},'Đã ghi sổ phiếu xuất kho và lưu minh chứng. Tồn lô đã được trừ một lần.')
+      ...(issuePlanLink?{mealPlanRevisionId:issuePlanLink.revisionId,ingredientId:issuePlanLink.ingredientId}:{}),
+    });setIssueLot(null);setIssuePlanLink(null);setIssue(emptyIssue());setIssueInspection(emptyInspection());setIssueEvidences([])},'Đã ghi sổ phiếu xuất kho và lưu minh chứng. Tồn lô đã được trừ một lần.')
   }
   function submitReturn(e:FormEvent){
     e.preventDefault()
@@ -177,6 +187,24 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const filteredSuppliers=(suppliers.data??[]).filter(item=>{const query=supplierSearch.toLocaleLowerCase('vi');return (item.code+' '+item.name+' '+(item.phone??'')).toLocaleLowerCase('vi').includes(query)&&(!supplierDebtOnly||(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0)>0)})
   const supplierPages=Math.max(1,Math.ceil(filteredSuppliers.length/10))
   const visibleSuppliers=filteredSuppliers.slice((Math.min(supplierPage,supplierPages)-1)*10,Math.min(supplierPage,supplierPages)*10)
+  function chooseSuggestedIssue(ingredientId:string,quantity:number){
+    if(!requirements.data)return
+    const eligible=(lots.data??[]).filter(l=>l.ingredientId===ingredientId&&l.status==='AVAILABLE'&&l.remainingQty>0
+      &&!expired(l.expiryDate)&&(!l.expiryDate||l.expiryDate.slice(0,10)>=requirements.data!.serviceDate))
+      .sort((a,b)=>(a.expiryDate??'9999').localeCompare(b.expiryDate??'9999'))
+    const lot=eligible[0]
+    if(!lot){setError('Không có lô khả dụng cho nguyên liệu này. Hãy kiểm tra tồn kho hoặc nhập bổ sung.');return}
+    const suggested=Math.max(0,Math.round(quantity*1000)/1000)
+    const actual=Math.min(suggested,lot.remainingQty)
+    setIssueLot(lot)
+    setIssuePlanLink({revisionId:requirements.data.revisionId,ingredientId})
+    setIssue({...emptyIssue(),schoolId:requirements.data.schoolId,
+      serviceDate:requirements.data.serviceDate,mealType:requirements.data.mealType as 'BREAKFAST'|'LUNCH'|'SNACK',
+      quantity:actual>0?String(actual):'',unit:lot.unit,
+      note:'Xuất nguyên liệu chế biến theo thực đơn đã duyệt · phiên bản '+requirements.data.revisionNo})
+    setIssueInspection(emptyInspection());setIssueEvidences([])
+    setError('')
+  }
   const matchedLots=(lots.data??[]).filter(lot=>(lot.lotCode+' '+lot.ingredient.name+' '+lot.supplier.name).toLocaleLowerCase('vi').includes(lotSearch.toLocaleLowerCase('vi')))
   // A historical finance receipt may predate the new evidence-backed voucher model.
   // Keep it visible without mislabelling it as a fully documented receipt.
@@ -353,13 +381,53 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         }}>{receiptUnitOptions(ingredients.data?.find(item=>item.id===thresholdIngredient)?.unit??'').map(unit=><option key={unit} value={unit}>{unit}</option>)}</select></label>
         <button className="primary" type="submit" disabled={busy}>Lưu định mức</button>
       </form>}
+      {section==='issues'&&canEdit&&<section className="supply-panel supply-production-plan">
+        <div className="supply-section-heading">
+          <div><h3><ClipboardList size={18}/> Dự trù nguyên liệu từ thực đơn đã duyệt</h3>
+            <p className="muted">Hệ thống tự tổng hợp định lượng từ công thức theo trường, ngày, bữa và nhóm tuổi. Dự trù chưa trừ tồn kho.</p></div>
+          <button type="button" className="outline" onClick={()=>{void approvedPlans.refetch();void requirements.refetch()}}>Làm mới dự trù</button>
+        </div>
+        <label className="supply-plan-selector">Thực đơn đã được BGH duyệt
+          <select value={planRevisionId} onChange={e=>{setSelectedPlanRevisionId(e.target.value);setIssueLot(null);setIssuePlanLink(null)}}>
+            {!approvedPlans.data?.length&&<option value="">Chưa có thực đơn được duyệt</option>}
+            {approvedPlans.data?.map(p=><option key={p.revisionId} value={p.revisionId}>
+              {p.schoolName} · {p.serviceDate} · {p.mealType} · phiên bản {p.revisionNo}
+            </option>)}
+          </select>
+        </label>
+        {approvedPlans.isLoading&&<p className="muted">Đang tải thực đơn đã duyệt…</p>}
+        {approvedPlans.isError&&<p className="error">Không tải được danh sách thực đơn: {approvedPlans.error.message}</p>}
+        {requirements.isLoading&&planRevisionId&&<p className="muted">Đang tính nguyên liệu theo công thức…</p>}
+        {requirements.isError&&<p className="error">Không tính được dự trù: {requirements.error.message}</p>}
+        {requirements.data&&<>
+          <p className="muted">Nhóm tuổi: {requirements.data.ageGroups.map(a=>a.name+' ('+a.plannedServings+' suất)').join(', ')||'Chưa có số suất'} · Dữ liệu từ phiên bản {requirements.data.revisionNo}</p>
+          <div className="supply-table-scroll"><table className="supply-table">
+            <thead><tr><th>Nguyên liệu</th><th>Dự trù</th><th>Đã xuất ròng</th><th>Tồn khả dụng</th><th>Còn cần</th><th>Thao tác</th></tr></thead>
+            <tbody>{requirements.data.items.map(item=>{
+              const pending=Math.max(0,Math.round((item.plannedQuantity-item.issueQuantity)*1000)/1000)
+              const eligible=(lots.data??[]).some(l=>l.ingredientId===item.ingredientId&&l.status==='AVAILABLE'&&l.remainingQty>0&&!expired(l.expiryDate)
+                &&(!l.expiryDate||l.expiryDate.slice(0,10)>=requirements.data!.serviceDate))
+              return <tr key={item.ingredientId}>
+                <td><strong>{item.name}</strong><small style={{display:'block'}}>{item.dishes.map(d=>d.name+' ('+fmt(d.quantity)+' '+item.unit+')').join(', ')}</small></td>
+                <td>{fmt(item.plannedQuantity)} {item.unit}</td><td>{fmt(item.issueQuantity)} {item.unit}</td>
+                <td>{fmt(item.stockAvailable)} {item.unit}</td><td>{fmt(pending)} {item.unit}
+                  {item.shortage>0&&<small className="supply-plan-shortage">Thiếu {fmt(item.shortage)} {item.unit}</small>}</td>
+                <td><button type="button" className="outline" disabled={!eligible||pending<=0}
+                  onClick={()=>chooseSuggestedIssue(item.ingredientId,pending)}>Chọn lô để xuất</button></td>
+              </tr>
+            })}</tbody>
+          </table></div>
+          {!requirements.data.items.length&&<p className="muted">Không có nguyên liệu có thể dự trù; kiểm tra lại định lượng công thức và nhóm tuổi.</p>}
+          {requirements.data.warnings.map((warning,index)=><p className="supply-plan-warning" key={index}>{warning}</p>)}
+        </>}
+      </section>}
       {(section==='stock'||section==='lots'||section==='issues')&&<>
         <h3><Boxes size={19}/>{section==='issues'?'Chọn lô để xuất kho':'Tồn kho theo lô'} ({matchedLots.length})</h3>
         <label>Tìm mã lô / nguyên liệu / nhà cung cấp <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Nhập từ khóa để lọc…"/></label>
         {lots.data?.length===0&&<p className="muted">Bếp chưa có lô nguyên liệu thật. Hãy tạo nhà cung cấp và nhập kho.</p>}
         <div className="supply-table-scroll"><table className="supply-table supply-table--lots"><thead><tr><th>Lô</th><th>Nguyên liệu</th><th>Nhà cung cấp</th><th>Tồn</th><th>Hạn dùng</th><th>Trạng thái</th><th></th></tr></thead><tbody>
         {matchedLots.map(lot=><tr key={lot.id}><td><strong>{lot.lotCode}</strong><small style={{display:'block'}}>{lot.storageLocation||'Chưa cập nhật vị trí'}</small></td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td><strong>{readableStockQuantity(lot.remainingQty,lot.unit)}</strong>{readableStockQuantity(lot.remainingQty,lot.unit)!==fmt(lot.remainingQty)+' '+lot.unit&&<small style={{display:'block'}}>Số liệu kho: {fmt(lot.remainingQty)} {lot.unit}</small>}</td><td>{date(lot.expiryDate)}</td><td>{expired(lot.expiryDate)?'Hết hạn':lot.status==='AVAILABLE'?'Có thể xuất':lot.status==='DEPLETED'?'Đã hết':'Cách ly / tạm ngưng'}</td><td><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-          {canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssueLot(lot);setIssue({...emptyIssue(),unit:preferredReceiptUnit(lot.unit,lot.remainingQty)})}}>Xuất lô</button>}
+          {canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssuePlanLink(null);setIssueLot(lot);setIssue({...emptyIssue(),unit:preferredReceiptUnit(lot.unit,lot.remainingQty)})}}>Xuất lô</button>}
           {canEdit&&lot.status!=='DEPLETED'&&<button type="button" className="outline" onClick={()=>{setMoveLot(lot);setNewLocation(lot.storageLocation??'');setMoveReason('');setSection('transfers')}}>Chuyển vị trí</button>}
           {canEdit&&(lot.status==='AVAILABLE'||lot.status==='QUARANTINED')&&<button type="button" className="outline" onClick={()=>{setStatusLot(lot);setStatusReason('')}}>{lot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'}</button>}
         </div></td></tr>)}
@@ -367,6 +435,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         {issueLot&&canEdit&&<form className="supply-panel supply-issue-form" onSubmit={submitIssue}>
           <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({readableStockQuantity(issueLot.remainingQty,issueLot.unit)} còn lại)</h3>
           <p className="muted">Chỉ ghi trừ tồn khi có đủ chứng từ và kiểm xuất đạt. Mã phiếu không được trùng trong kho.</p>
+          {issuePlanLink&&<p className="supply-plan-link"><strong>Liên kết thực đơn đã duyệt:</strong> {requirements.data?.schoolName} · {requirements.data?.serviceDate} · {requirements.data?.mealType} · phiên bản {requirements.data?.revisionNo}. Khối lượng thực xuất phải được cân lại; không tự trừ theo dự trù.</p>
           <label>Mã phiếu xuất *<input required maxLength={60} value={issue.voucherNumber} onChange={e=>setIssue(v=>({...v,voucherNumber:e.target.value}))} placeholder="XK-2026-001"/></label>
           <div style={{display:'grid',gridTemplateColumns:'minmax(160px,1fr) minmax(95px,140px)',gap:10}}>
             <label>Số lượng xuất *<input type="number" required min="0.000001" step="any" max={convertReceiptQuantity(issueLot.remainingQty,issueLot.unit,issue.unit||issueLot.unit)??undefined} value={issue.quantity} onChange={e=>setIssue(v=>({...v,quantity:e.target.value}))}/></label>
@@ -382,7 +451,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <label>Lý do / chứng từ xuất *<input required maxLength={500} value={issue.note} onChange={e=>setIssue(v=>({...v,note:e.target.value}))}/></label>
           <StockInspectionFields kind="ISSUE" value={issueInspection} onChange={setIssueInspection}/>
           <StockEvidenceFields kind="ISSUE" value={issueEvidences} onChange={setIssueEvidences}/>
-          <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy||!issueEvidences.some(x=>x.category==='ISSUE_PHOTO')||!issueEvidences.some(x=>x.category==='SCALE_PHOTO')}>Xác nhận xuất kho</button><button className="outline" type="button" onClick={()=>setIssueLot(null)}>Hủy</button></div>
+          <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy||!issueEvidences.some(x=>x.category==='ISSUE_PHOTO')||!issueEvidences.some(x=>x.category==='SCALE_PHOTO')}>Xác nhận xuất kho</button><button className="outline" type="button" onClick={()=>{setIssueLot(null);setIssuePlanLink(null)}}>Hủy</button></div>
         </form>}
       </>}
       {section==='receipts'&&<section className="supply-receipts-workspace">
