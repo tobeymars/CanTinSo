@@ -382,3 +382,20 @@
  .supply-receipt-modal__content .supply-vendor-form .supply-form-grid{grid-template-columns:1fr}
  .supply-receipt-modal__content .supply-finance-kpis{grid-template-columns:1fr}
 }
+
+/* Approved meal plan demand: read-only until operator confirms an actual stock issue. */
+.supply-production-plan{display:grid;gap:15px;padding:18px;border:1px solid var(--supply-line,#d6e0eb);border-radius:14px;background:var(--surface,#fff)}
+.supply-production-plan>.supply-section-heading{align-items:flex-start}
+.supply-production-plan>.supply-section-heading>div{display:grid;gap:6px}
+.supply-production-plan>.supply-section-heading h3{display:flex;align-items:center;gap:9px;margin:0}
+.supply-production-plan .supply-table{font-size:12px}
+.supply-production-plan .supply-table td{vertical-align:middle}
+.supply-production-plan .supply-table td:first-child{min-width:175px}
+.supply-production-plan .supply-table td:first-child small{max-width:310px;line-height:1.5;color:var(--muted,#64748b)}
+.supply-production-plan .supply-table button{white-space:nowrap}
+.supply-plan-selector{display:grid;gap:7px;max-width:620px}
+.supply-plan-selector select{width:100%;min-width:0}
+.supply-plan-warning{padding:10px 12px;border:1px solid #ead7ae;background:#fff9e9;color:#705018;border-radius:9px;font-size:12px;line-height:1.55}
+.supply-plan-shortage{display:block;color:#a32f2f;font-weight:700;font-size:11px}
+.supply-plan-link{background:#eef6ff;border:1px solid #cfe1f8;padding:11px 13px;border-radius:9px;color:#23456a;font-size:12px;line-height:1.6}
+@media(max-width:700px){.supply-production-plan{padding:13px}.supply-production-plan>.supply-section-heading>button{width:100%}}
