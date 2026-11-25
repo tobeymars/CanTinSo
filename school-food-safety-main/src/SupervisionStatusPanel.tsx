@@ -101,7 +101,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   // Recalculate after writes in this tab and cross-tab storage changes.
   void revision
   const statusLabel = (status: CheckStatus) => serverMode ? status === 'confirmed' ? 'Bếp đã ghi nhận' : status === 'reported' ? 'Có vấn đề cần xử lý' : status === 'revision_requested' ? 'Đang điều chỉnh' : 'Chưa cập nhật' : labels[status]
-  const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []).map((event: any) => ({ id: String(event.id), action: event.action === 'request_revision' ? 'request_revision' : event.action, actorLabel: event.actorRole === 'SCHOOL_ADMIN' ? 'Ban Giám hiệu' : 'Bếp', recordedAt: event.at, note: [event.note, event.lateReason ? 'Lý do ghi muộn: '+event.lateReason : ''].filter(Boolean).join(' · '), evidenceRef: event.evidenceRef ?? '', ingredientReceipts: Array.isArray(event.ingredientReceipts) ? event.ingredientReceipts : [] })) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
+  const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []).map((event: any) => ({ id: String(event.id), action: event.action === 'request_revision' ? 'request_revision' : event.action, actorLabel: serverQuery.data?.actors?.[event.actorId] ?? (event.actorRole === 'SCHOOL_ADMIN' ? 'Ban Giám hiệu' : 'Bếp'), recordedAt: event.at, note: [event.note, event.lateReason ? 'Lý do ghi muộn: '+event.lateReason : ''].filter(Boolean).join(' · '), evidenceRef: event.evidenceRef ?? '', ingredientReceipts: Array.isArray(event.ingredientReceipts) ? event.ingredientReceipts : [], inspection:event.inspection })) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
   const demoIngredientCatalog = useMemo(() => supervisionIngredientCatalog(school.id), [school.id])
   const ingredientCatalog = serverMode ? (contextQuery.data?.lots ?? []).map(lot=>({
     itemId:lot.itemId, ingredientName:lot.ingredientName,lotCode:lot.lotCode,
@@ -209,7 +209,15 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
               {def.id === 'ingredient_receipt' && Array.isArray(reportedIngredients) && reportedIngredients.length > 0 && (canReport || canConfirm || serverMode) && <div className="supervision-ingredient-summary"><strong>{reportedIngredients.length} nguyên liệu đã ghi nhận</strong><span>{reportedIngredients.map(line => `${line.ingredientName}: ${(line.displayQuantity ?? line.quantity).toLocaleString('vi-VN')} ${line.displayUnit ?? line.unit}`).join(' · ')}</span></div>}
               {serverMode && ['processing','before_serving','food_sample'].includes(def.id) && Boolean(serverQuery.data?.checks[def.id]?.inspection) && <details className="sif-report-details"><summary>Xem nội dung kiểm thực đã báo cáo</summary><InspectionReadout inspection={serverQuery.data?.checks[def.id]?.inspection}/></details>}
               {latest && (canReport || canConfirm || serverMode) && <small>{latest.actorLabel} · {formatTimestamp(latest.recordedAt)} · {latest.evidenceRef ? `Tham chiếu: ${latest.evidenceRef}` : 'Không có tham chiếu'}</small>}
-              {showHistory && (canReport || canConfirm || serverMode) && item.history.length > 0 && <ol className="supervision-status-history">{item.history.map(entry => <li key={entry.id}><strong>{actionLabels[entry.action]}</strong> · {formatTimestamp(entry.recordedAt)} · {entry.note}</li>)}</ol>}
+              {showHistory && (canReport || canConfirm || serverMode) && item.history.length > 0 && <ol className="supervision-status-history">{item.history.map(entry => <li key={entry.id}>
+                  <strong>{actionLabels[entry.action]}</strong> · {entry.actorLabel} · {formatTimestamp(entry.recordedAt)} · {entry.note}
+                  {serverMode && entry.action==='report' && (entry.inspection || entry.ingredientReceipts?.length) && <details className="sif-report-details">
+                    <summary>Xem dữ liệu của phiên bản này</summary>
+                    {entry.inspection && <InspectionReadout inspection={entry.inspection}/>}
+                    {!!entry.ingredientReceipts?.length && <IngredientReceiptDetails lines={entry.ingredientReceipts}/>}
+                    {entry.evidenceRef && <small>Tham chiếu hồ sơ: {entry.evidenceRef}</small>}
+                  </details>}
+                </li>)}</ol>}
             </div>
             <div className="supervision-check-controls">
               <span className={`supervision-check-pill ${item.status}`}>{item.status === 'confirmed' ? <CheckCircle2 size={13}/> : <Clock3 size={13}/>} {statusLabel(item.status)}</span>
