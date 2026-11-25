@@ -118,7 +118,7 @@ export class SupplyFinanceService {
           description:code(body?.description,'Diễn giải',500,false)||null,total,createdById:user.sub,
         }});
         const voucher=await tx.stockVoucher.create({data:{
-          kitchenId,number:'NK-'+number,kind:'RECEIPT',receiptId:receipt.id,
+          kitchenId,number,kind:'RECEIPT',receiptId:receipt.id,
           inspection:{...inspection,lineInspections:lines.map(line=>({
             ingredientId:line.ingredientId,lotCode:line.lotCode,origin:line.origin,producer:line.producer,
             deliveredQuantity:line.deliveredQuantity,acceptedQuantity:line.quantity,rejectedQuantity:line.rejectedQuantity,
