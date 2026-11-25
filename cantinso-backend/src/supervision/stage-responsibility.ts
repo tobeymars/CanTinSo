@@ -7,7 +7,7 @@
 export type KitchenKind = 'CENTRAL' | 'SCHOOL';
 export type JourneyStage = 'PLATED' | 'READY' | 'DISPATCHED' | 'ARRIVED';
 export const stageOrderFor = (kind: KitchenKind): JourneyStage[] =>
-  kind === 'CENTRAL' ? ['PLATED', 'READY', 'DISPATCHED', 'ARRIVED'] : ['PLATED', 'READY'];
+  kind === 'CENTRAL' ? ['DISPATCHED', 'ARRIVED', 'PLATED', 'READY'] : ['PLATED', 'READY'];
 
 export function canKitchenRecordStage(
   role: string, actorKitchenId: string | null | undefined,
