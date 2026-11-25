@@ -260,3 +260,19 @@
 .supply-workspace .supply-table td .primary{
  max-width:100%;white-space:normal!important;text-overflow:clip!important;
 }
+
+/* Evidence-backed posted warehouse vouchers and line-by-line receiving checks. */
+.stock-audit-fieldset{display:grid;gap:14px;border:1px solid var(--border,#d8e1ec);border-radius:12px;padding:18px 20px;margin:14px 0;min-width:0}
+.stock-audit-fieldset legend{font-weight:800;font-size:14px;padding:0 8px}
+.stock-audit-fieldset .supply-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.stock-audit-fieldset label{min-width:0;display:grid;gap:6px;font-size:12px;font-weight:700}
+.stock-audit-fieldset input:not([type="checkbox"]),.stock-audit-fieldset textarea{width:100%;min-width:0;max-width:100%;padding:9px;border:1px solid var(--border,#cfd8e3);border-radius:9px;font:inherit}
+.stock-audit-fieldset input[type="file"]{font-size:12px}
+.stock-audit-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.stock-audit-checks label{display:flex;align-items:flex-start;gap:9px;padding:11px;background:var(--surface-alt,#f7faff);border:1px solid var(--border,#dce5f0);border-radius:9px;line-height:1.45}
+.stock-audit-checks input{margin-top:2px;accent-color:var(--primary,#2767b2)}
+.stock-voucher-view{margin:15px 0;padding:18px;border:1px solid var(--border,#d9e3ed);border-radius:12px;display:grid;gap:10px}
+.stock-voucher-view p{font-size:13px;line-height:1.6}
+.stock-voucher-evidences{display:grid;gap:7px}
+.stock-voucher-evidences button{text-align:left;justify-content:flex-start;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:650px){.stock-audit-fieldset{padding:14px}.stock-audit-fieldset .supply-form-grid,.stock-audit-checks{grid-template-columns:1fr}}
