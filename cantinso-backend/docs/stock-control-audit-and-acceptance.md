@@ -60,7 +60,7 @@
 - Kiểm thử tích hợp thật PostgreSQL, concurrency, phân quyền nhiều bếp/trường, chứng từ và ứng dụng chạy trên máy vận hành.
 
 ## 6. Cấu trúc dữ liệu mới
-- StockVoucher (posted): bếp, số phiếu, kind RECEIPT/ISSUE, inspection snapshot, người ghi sổ, thời điểm, liên kết phiếu mua hoặc lô xuất.
+- StockVoucher (posted): bếp, số phiếu, kind RECEIPT/ISSUE/RETURN, inspection snapshot, người ghi sổ, thời điểm, liên kết phiếu mua, lô xuất hoặc phiếu xuất gốc để nhập hoàn.
 - StockVoucherEvidence: loại chứng từ, tên, mime, dung lượng, SHA-256, dữ liệu gốc, người/timestamp. Không thay thế/sửa.
 - Phiếu nhập còn lưu dữ liệu mua hàng và công nợ ở PurchaseReceipt. TraceEvent vẫn là nhật ký biến động lô và gắn voucherId qua metadata.
 - Migration `20261125090000_stock_vouchers_evidence` additive: không sửa các giao dịch cũ; chúng sẽ không tự có chứng từ theo chuẩn mới.
