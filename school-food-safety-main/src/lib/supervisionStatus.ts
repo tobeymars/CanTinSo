@@ -21,6 +21,7 @@ export type StatusHistory = {
   note: string
   evidenceRef: string
   ingredientReceipts?: IngredientReceiptLine[]
+  inspection?:unknown
 }
 export type IngredientReceiptLine = SupervisionIngredientOption & { quantity: number; displayQuantity?: number; displayUnit?: string; documentsStatus?:'pass'|'fail'; sensoryStatus?:'pass'|'fail'; storageCondition?:string; handling?:string }
 export type SupervisionEvidenceOption = { value: string; label: string; description: string; tag: string }
