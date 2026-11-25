@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { createSupplyPurchase } from './lib/supplyApi'
+import type { StockEvidenceInput } from './lib/supplyApi'
+import { StockEvidenceFields,StockInspectionFields,emptyInspection } from './StockVoucherEvidenceFields'
 import type { SupplyIngredient,SupplySupplier } from './lib/supplyApi'
 import { convertReceiptQuantity, receiptUnitOptions, formatReceiptQuantity, preferredReceiptUnit } from './lib/supervisionUnits'
 
@@ -17,6 +19,8 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
   const [invoiceNumber,setInvoiceNumber]=useState('')
   const [reference,setReference]=useState('')
   const [description,setDescription]=useState('')
+  const [inspection,setInspection]=useState(emptyInspection)
+  const [evidences,setEvidences]=useState<StockEvidenceInput[]>([])
   const [lines,setLines]=useState<Line[]>([blank(1)])
   const [nextId,setNextId]=useState(2)
   const sum=lines.reduce((total,line)=>total+Math.round((Number(line.quantity)||0)*(Number(line.unitPrice)||0)),0)
@@ -31,10 +35,11 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
         if(normalized===null||normalized<=0||Math.abs(normalized*1000-Math.round(normalized*1000))>0.0000001)throw new Error('Số lượng sau quy đổi phải có tối đa 3 chữ số thập phân theo đơn vị kho.')
       }
       await createSupplyPurchase(kitchenId,{number,supplierId,invoiceNumber,reference,description,
+        inspection:{...inspection,documentNumber:invoiceNumber||reference||number},evidences,
         lines:lines.map(line=>({ingredientId:line.ingredientId,lotCode:line.lotCode,quantity:Number(line.quantity),unit:line.unit,
           unitPrice:Number(line.unitPrice),expiryDate:line.expiryDate,storageLocation:line.storageLocation}))})
-      setNumber('');setSupplierId('');setInvoiceNumber('');setReference('');setDescription('');setLines([blank(1)]);setNextId(2);onSaved()
-    },'Đã lưu phiếu nhập nhiều dòng và ghi nhận công nợ theo đơn giá thực tế.')
+      setNumber('');setSupplierId('');setInvoiceNumber('');setReference('');setDescription('');setLines([blank(1)]);setNextId(2);setInspection(emptyInspection());setEvidences([]);onSaved()
+    },'Đã ghi sổ nhập kho kèm biên bản kiểm nhận, ảnh và chứng từ.')
   }
   if(!canEdit)return <p className="muted">Bạn chỉ có quyền xem phiếu nhập, không được tạo chứng từ.</p>
   return <form className="supply-purchase-form" onSubmit={submit}>
@@ -99,9 +104,11 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
         </section>
       })}
     </div>
+    <StockInspectionFields kind="RECEIPT" value={inspection} onChange={setInspection}/>
+    <StockEvidenceFields kind="RECEIPT" value={evidences} onChange={setEvidences}/>
     <div className="supply-form-footer">
       <strong>Tổng tiền hàng: {cash(sum)}</strong>
-      <button type="submit" className="primary" disabled={busy||!ingredients.length||!suppliers.some(item=>item.status==='ACTIVE')}>Xác nhận phiếu nhập</button>
+      <button type="submit" className="primary" disabled={busy||!ingredients.length||!suppliers.some(item=>item.status==='ACTIVE')||!evidences.some(x=>x.category==='DELIVERY_NOTE')||!evidences.some(x=>x.category==='LOT_PHOTO')}>Xác nhận phiếu nhập</button>
     </div>
   </form>
 }
