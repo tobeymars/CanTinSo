@@ -234,11 +234,11 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
         {(canReport || canConfirm || serverMode) && <button type="button" className="text-button" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Ẩn lịch sử cập nhật' : 'Xem lịch sử cập nhật'}</button>}
       </div>
       {editing && selected && <div className="supervision-edit-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setEditing(null) }}>
-        <section role="dialog" aria-modal="true" aria-labelledby="supervision-edit-title" className="supervision-edit-dialog">
-          <div className="dialog-head"><h2 id="supervision-edit-title">{editing.action === 'report' ? 'Bếp ghi nhận kiểm thực' : editing.action === 'confirm' ? 'Xác nhận trạng thái' : editing.action === 'reopen' ? 'Bếp mở điều chỉnh kiểm thực' : 'Yêu cầu bổ sung'}</h2><button type="button" className="icon-button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
+        <section role="dialog" aria-modal="true" aria-labelledby="supervision-edit-title" className={editing.id==='ingredient_receipt'&&editing.action==='report'?'supervision-edit-dialog supervision-intake-modal':'supervision-edit-dialog'}>
+          <div className="dialog-head"><div className="supervision-edit-heading">{editing.id==='ingredient_receipt'&&editing.action==='report'&&<small>KIỂM THỰC BA BƯỚC · BƯỚC 1</small>}<h2 id="supervision-edit-title">{editing.action === 'report' ? (editing.id==='ingredient_receipt'?'Tiếp nhận nguyên liệu':'Bếp ghi nhận kiểm thực') : editing.action === 'confirm' ? 'Xác nhận trạng thái' : editing.action === 'reopen' ? 'Bếp mở điều chỉnh kiểm thực' : 'Yêu cầu bổ sung'}</h2>{editing.id==='ingredient_receipt'&&editing.action==='report'&&<p>Đối chiếu lô nguyên liệu, số lượng thực nhận, chứng từ và cảm quan.</p>}</div><button type="button" className="icon-button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
           <p className="supervision-edit-context">{school.name} · {date} · {mealLabel} · <strong>{selected.label}</strong></p>
           <form onSubmit={submit} className="supervision-edit-form">
-            {editing.action === 'report' && <label>Mã sổ / mã mẫu / tham chiếu hồ sơ <span aria-hidden="true">*</span>
+            {editing.action === 'report' && <label className="supervision-reference-field">Mã sổ / mã mẫu / tham chiếu hồ sơ <span aria-hidden="true">*</span>
               {serverMode ? <input required maxLength={180} value={evidenceRef} onChange={event => setEvidenceRef(event.target.value)} placeholder="Nhập mã hồ sơ thực tế đã đối chiếu" /> : <Select label="Tham chiếu hồ sơ" required searchable value={evidenceRef} options={evidenceOptions} placeholder={evidenceOptions.length ? 'Tìm và chọn hồ sơ' : 'Chưa có hồ sơ phù hợp'} searchPlaceholder="Tìm theo mã, loại hồ sơ hoặc nguyên liệu…" onValueChange={setEvidenceRef}/>}
               {!serverMode && evidenceOptions.length === 0 && <small className="supervision-reference-empty">Chưa có hồ sơ thuộc đúng trường, ngày và bữa để liên kết.</small>}
             </label>}
@@ -246,7 +246,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             {editing.id === 'ingredient_receipt' && editing.action === 'report' && <fieldset className="supervision-ingredient-fieldset">
               <legend>Nguyên liệu đã tiếp nhận <span aria-hidden="true">*</span></legend>
               <p>{serverMode ? "Chọn lô đã xuất từ kho bếp cho đúng trường, ngày và bữa. Mỗi lô chỉ được chọn một lần." : "Thêm từng dòng, tìm và chọn trong toàn bộ danh mục kho của trường. Mỗi nguyên liệu chỉ được chọn một lần."}</p>
-              {ingredientCatalog.length === 0 ? <div className="supervision-ingredient-empty">{serverMode ? 'Chưa có lô được xuất từ kho bếp cho đúng trường, ngày và bữa này. Hãy vào Quản lý kho → Xuất kho trước.' : 'Chưa có nguyên liệu trong danh mục kho của trường. Cần cập nhật kho trước khi lập bước kiểm thực này.'}</div> : <div className="supervision-ingredient-options">
+              <div className="supervision-intake-overview"><span><strong>{ingredientRows.filter(row=>row.itemId).length}</strong> nguyên liệu đã chọn</span><span><strong>{ingredientCatalog.length}</strong> lô để đối chiếu</span></div>
+               {ingredientCatalog.length === 0 ? <div className="supervision-ingredient-empty">{serverMode ? 'Chưa có lô được xuất từ kho bếp cho đúng trường, ngày và bữa này. Hãy vào Quản lý kho → Xuất kho trước.' : 'Chưa có nguyên liệu trong danh mục kho của trường. Cần cập nhật kho trước khi lập bước kiểm thực này.'}</div> : <div className="supervision-ingredient-options">
                 {ingredientRows.map((row, index) => {
                   const usedIds = new Set(ingredientRows.filter(item => item.id !== row.id).map(item => item.itemId).filter(Boolean))
                   const options = ingredientCatalog.map(item => ({ value: item.itemId, label: item.ingredientName, description: `${item.lotCode} · ${item.supplierName} · ${item.supplierContact}`, tag: item.unit, disabled: usedIds.has(item.itemId) }))
@@ -254,7 +255,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                   const expiredAtService = selectedIngredient ? selectedIngredient.expiresAt < date : false
                   return <article key={row.id} className={selectedIngredient ? 'selected' : ''}>
                     <div className="supervision-ingredient-row-head">
-                      <strong>Dòng {index + 1}</strong>
+                      <strong>Nguyên liệu {index + 1}</strong>
                       <button type="button" aria-label={`Xóa dòng nguyên liệu ${index + 1}`} disabled={ingredientRows.length === 1} onClick={() => setIngredientRows(current => current.filter(item => item.id !== row.id))}><X size={16}/>Xóa</button>
                     </div>
                     <div className="supervision-ingredient-picker">
@@ -274,7 +275,8 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                         <div><dt>Người cấp / liên hệ</dt><dd>{selectedIngredient.supplierContact}</dd></div>
                         <div><dt>Hạn sử dụng</dt><dd>{formatDate(selectedIngredient.expiresAt)} <em className={expiredAtService ? 'expired' : ''}>{expiredAtService ? 'Quá hạn tại ngày bữa ăn' : 'Còn hạn tại ngày bữa ăn'}</em></dd></div>
                       </dl>
-                      <div className="supervision-ingredient-quantity" style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(105px,135px)',gap:12,alignItems:'end'}}>
+                      <div className="supervision-intake-subtitle"><strong>B. Số lượng thực nhận</strong><small>Cân hoặc kiểm đếm thực tế, không trừ kho lần hai.</small></div>
+                       <div className="supervision-ingredient-quantity">
                         <label>Số lượng thực nhận <input required type="number" inputMode="decimal" min="0.000001" step="any" max={serverMode ? (convertReceiptQuantity(contextQuery.data?.lots.find(lot => lot.itemId === selectedIngredient.itemId)?.quantityAvailable ?? 0, selectedIngredient.unit, row.unit || selectedIngredient.unit) ?? undefined) : undefined} aria-label={`Số lượng ${selectedIngredient.ingredientName}`} value={row.quantity} onChange={event => setIngredientRows(current => current.map(item => item.id === row.id ? { ...item, quantity: event.target.value } : item))}/></label>
                         <label>Đơn vị
                           <select aria-label={`Đơn vị thực nhận ${selectedIngredient.ingredientName}`} value={row.unit || selectedIngredient.unit} onChange={event=>{
@@ -291,12 +293,13 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                         </label>
                       </div>
                       {serverMode && <div className="sif-intake-checks">
+                         <div className="supervision-intake-subtitle sif-intake-checks__wide"><strong>C. Đánh giá chất lượng & an toàn</strong><small>Đánh giá độc lập từng lô trước khi đưa vào chế biến.</small></div>
                         <label>Điều kiện bảo quản / nhãn lô *<input required maxLength={500} value={row.storageCondition} onChange={e=>setIngredientRows(current=>current.map(item=>item.id===row.id?{...item,storageCondition:e.target.value}:item))} placeholder="Nhiệt độ / bao bì / bảo quản thực tế…"/></label>
                         {(['documentsStatus','sensoryStatus'] as const).map(key=><fieldset key={key} className="sif-choice"><legend>{key==='documentsStatus'?'Chứng từ, nguồn gốc':'Cảm quan nguyên liệu'} *</legend><div>
                           {([{value:'pass',label:'Đạt'},{value:'fail',label:'Không đạt'}] as const).map(option=><label key={option.value}><input required type="radio" name={row.id+'-'+key} value={option.value} checked={row[key]===option.value} onChange={()=>setIngredientRows(current=>current.map(item=>item.id===row.id?{...item,[key]:option.value}:item))}/>{option.label}</label>)}
                         </div></fieldset>)}
                         <label className="sif-intake-checks__wide">Xử lý / ghi chú (ghi “Không có” nếu đạt) *<textarea required rows={2} maxLength={1000} value={row.handling} onChange={e=>setIngredientRows(current=>current.map(item=>item.id===row.id?{...item,handling:e.target.value}:item))}/></label>
-                        {(row.documentsStatus==='fail'||row.sensoryStatus==='fail')&&<p role="status" className="sif-warning sif-intake-checks__wide">Có chỉ tiêu Không đạt: BGH không thể xác nhận mục này là đạt nếu chưa xử lý, kiểm tra và báo cáo lại.</p>}
+                        {(row.documentsStatus==='fail'||row.sensoryStatus==='fail')&&<p role="status" className="sif-warning sif-intake-checks__wide">Có chỉ tiêu Không đạt: bếp phải xử lý và ghi nhận lại, không thể coi hồ sơ là hoàn tất đạt.</p>}
                       </div>}
                       {serverMode && <small className="muted">Đã cấp cho bữa này: {(()=>{
                           const base=contextQuery.data?.lots.find(lot=>lot.itemId===selectedIngredient.itemId)?.quantityAvailable??0
@@ -326,7 +329,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             {serverMode && dateKind==='past' && <label>Lý do thực hiện bổ sung cho ngày đã qua *<textarea required minLength={10} maxLength={1000} rows={3} value={lateReason} onChange={event=>setLateReason(event.target.value)} placeholder="Nêu nguyên nhân ghi nhận muộn hoặc điều chỉnh sau ngày phục vụ…"/></label>}
             <label>Ghi chú / nội dung ghi nhận <span aria-hidden="true">*</span><textarea required minLength={serverMode && editing.action==='reopen'?10:5} maxLength={1000} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Nhập thông tin đối chiếu hoặc nội dung cần bổ sung…" /></label>
             {error && <p className="error" role="alert">{error}</p>}
-            <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary" disabled={serverMode && editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id) && !inspectionDraft}>{editing.action === 'report' ? 'Lưu và gửi BGH xác nhận' : editing.action === 'confirm' ? (serverMode ? 'Xác nhận' : 'Xác nhận DEMO') : editing.action === 'reopen' ? 'Mở điều chỉnh và lưu lịch sử' : 'Gửi yêu cầu bổ sung'}</button></div>
+            <div className="supervision-edit-buttons"><button type="button" className="outline" onClick={() => setEditing(null)}>Hủy</button><button type="submit" className="primary" disabled={serverMode && editing.action==='report' && ['processing','before_serving','food_sample'].includes(editing.id) && !inspectionDraft}>{editing.action === 'report' ? 'Lưu phiếu kiểm thực' : editing.action === 'confirm' ? (serverMode ? 'Xác nhận' : 'Xác nhận DEMO') : editing.action === 'reopen' ? 'Mở điều chỉnh và lưu lịch sử' : 'Gửi yêu cầu bổ sung'}</button></div>
           </form>
         </section>
       </div>}
