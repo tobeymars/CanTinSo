@@ -25,17 +25,19 @@ export const getSupplyIngredients=(id:string)=>request<SupplyIngredient[]>(kitch
 export const getSupplyLots=(id:string)=>request<SupplyLot[]>(kitchenPath(id)+'/lots')
 export const getSupplyMovements=(id:string)=>request<SupplyMovement[]>(kitchenPath(id)+'/movements')
 export const saveSupplySupplier=(kitchenId:string,input:{code:string;name:string;taxCode:string;contactName:string;phone:string;email:string;address:string;note:string},id?:string)=>request<SupplySupplier>(kitchenPath(kitchenId)+'/suppliers'+(id?'/'+encodeURIComponent(id):''),{method:id?'PATCH':'POST',body:JSON.stringify(input)})
-export type StockEvidenceInput={category:'DELIVERY_NOTE'|'LOT_PHOTO'|'INVOICE'|'QUALITY_CERTIFICATE'|'ISSUE_PHOTO'|'SCALE_PHOTO'|'OTHER';filename:string;mimeType:string;base64:string}
+export type StockEvidenceInput={category:'DELIVERY_NOTE'|'LOT_PHOTO'|'INVOICE'|'QUALITY_CERTIFICATE'|'ISSUE_PHOTO'|'SCALE_PHOTO'|'RETURN_PHOTO'|'OTHER';filename:string;mimeType:string;base64:string}
 export type StockInspection={
  inspector:string;counterparty:string;location:string;documentNumber:string;actualTime:string;temperatureC:string;
  documents:'PASS'|'PENDING';packaging:'PASS'|'PENDING';sensory:'PASS'|'PENDING';transport:'PASS'|'PENDING';quantity:'PASS'|'PENDING';weighing:'PASS'|'PENDING';remarks:string;
 }
 export type StockVoucher={
- id:string;kind:'RECEIPT'|'ISSUE';status:string;number:string;postedAt:string;postedById:string;postedByName:string;inspection:StockInspection;schoolId:string|null;lotId:string|null;
+ id:string;kind:'RECEIPT'|'ISSUE'|'RETURN';status:string;number:string;postedAt:string;postedById:string;postedByName:string;inspection:StockInspection;schoolId:string|null;lotId:string|null;
  quantity:number|null;unit:string|null;
  receipt?:{number:string;supplier:{name:string};lines:Array<{lot:{lotCode:string;ingredient:{name:string;unit:string}};quantity:string}>}|null;
  evidences:Array<{id:string;category:string;filename:string;mimeType:string;size:number;sha256:string;createdAt:string}>;
 }
+export const returnSupplyIssue=(kitchenId:string,sourceVoucherId:string,input:{voucherNumber:string;quantity:number;unit:string;reason:string;unusedAndSafe:boolean;inspection:StockInspection;evidences:StockEvidenceInput[]})=>
+ request<{voucherId:string;sourceVoucherId:string;lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/vouchers/'+encodeURIComponent(sourceVoucherId)+'/returns',{method:'POST',body:JSON.stringify(input)})
 export const getStockVouchers=(kitchenId:string)=>request<StockVoucher[]>(kitchenPath(kitchenId)+'/vouchers')
 export const downloadStockVoucherEvidence=(kitchenId:string,voucherId:string,evidenceId:string)=>request<{filename:string;mimeType:string;sha256:string;base64:string}>(kitchenPath(kitchenId)+'/vouchers/'+encodeURIComponent(voucherId)+'/evidences/'+encodeURIComponent(evidenceId))
 export const receiveSupplyLot=(kitchenId:string,input:{lotCode:string;ingredientId:string;supplierId:string;quantity:number;unit?:string;expiryDate:string;storageLocation:string;note:string})=>request<SupplyLot>(kitchenPath(kitchenId)+'/receipts',{method:'POST',body:JSON.stringify(input)})
