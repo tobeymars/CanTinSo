@@ -31,7 +31,7 @@ export type StockInspection={
  documents:'PASS'|'PENDING';packaging:'PASS'|'PENDING';sensory:'PASS'|'PENDING';transport:'PASS'|'PENDING';quantity:'PASS'|'PENDING';weighing:'PASS'|'PENDING';remarks:string;
 }
 export type StockVoucher={
- id:string;kind:'RECEIPT'|'ISSUE';status:string;number:string;postedAt:string;postedById:string;inspection:StockInspection;schoolId:string|null;lotId:string|null;
+ id:string;kind:'RECEIPT'|'ISSUE';status:string;number:string;postedAt:string;postedById:string;postedByName:string;inspection:StockInspection;schoolId:string|null;lotId:string|null;
  quantity:number|null;unit:string|null;
  receipt?:{number:string;supplier:{name:string};lines:Array<{lot:{lotCode:string;ingredient:{name:string;unit:string}};quantity:string}>}|null;
  evidences:Array<{id:string;category:string;filename:string;mimeType:string;size:number;sha256:string;createdAt:string}>;
