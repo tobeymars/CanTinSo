@@ -33,7 +33,7 @@ export type StockInspection={
 export type StockVoucher={
  id:string;kind:'RECEIPT'|'ISSUE'|'RETURN';status:string;number:string;postedAt:string;postedById:string;postedByName:string;inspection:StockInspection;schoolId:string|null;lotId:string|null;
  quantity:number|null;unit:string|null;
- receipt?:{number:string;supplier:{name:string};lines:Array<{lot:{lotCode:string;ingredient:{name:string;unit:string}};quantity:string}>}|null;
+ receipt?:{id:string;number:string;supplier:{name:string};lines:Array<{lot:{lotCode:string;ingredient:{name:string;unit:string}};quantity:string}>}|null;
  evidences:Array<{id:string;category:string;filename:string;mimeType:string;size:number;sha256:string;createdAt:string}>;
 }
 export const returnSupplyIssue=(kitchenId:string,sourceVoucherId:string,input:{voucherNumber:string;quantity:number;unit:string;reason:string;unusedAndSafe:boolean;inspection:StockInspection;evidences:StockEvidenceInput[]})=>
