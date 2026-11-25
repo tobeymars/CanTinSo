@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucide-react'
+import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck, X } from 'lucide-react'
 import type { ViewRole } from './lib/store'
 import {
   getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,getStockVouchers,downloadStockVoucherEvidence,returnSupplyIssue,
@@ -16,6 +16,30 @@ import RealPurchaseReceipt from './RealPurchaseReceipt'
 import RealSupplierDocuments from './RealSupplierDocuments'
 import RealWarehouseOverview from './RealWarehouseOverview'
 import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit, readableStockQuantity } from './lib/supervisionUnits'
+
+function ReceiptDialog({onClose,busy,children}:{onClose:()=>void;busy:boolean;children:React.ReactNode}){
+  const dialogRef=useRef<HTMLDialogElement>(null)
+  useEffect(()=>{
+    const dialog=dialogRef.current
+    if(!dialog)return
+    if(typeof dialog.showModal==='function'){
+      try{if(!dialog.open)dialog.showModal()}
+      catch{dialog.setAttribute('open','');dialog.classList.add('supply-receipt-modal-fallback')}
+    }else{
+      dialog.setAttribute('open','')
+      dialog.classList.add('supply-receipt-modal-fallback')
+    }
+    return ()=>{if(dialog.open && typeof dialog.close==='function')dialog.close()}
+  },[])
+  return <dialog ref={dialogRef} className="supply-receipt-modal" aria-label="Tạo phiếu nhập kho"
+    onCancel={event=>{event.preventDefault();if(!busy)onClose()}}>
+    <header className="supply-receipt-modal__heading">
+      <div><small>QUẢN LÝ KHO · NHẬP NGUYÊN LIỆU</small><h2>Tạo phiếu nhập kho</h2><p>Kiểm nhận hàng hóa, nguyên liệu và lưu ảnh, chứng từ theo từng phiếu.</p></div>
+      <button type="button" className="supply-receipt-modal__close" title="Đóng cửa sổ" aria-label="Đóng biểu mẫu nhập kho" disabled={busy} onClick={onClose}><X size={20}/></button>
+    </header>
+    <div className="supply-receipt-modal__content">{children}</div>
+  </dialog>
+}
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:'',note:''})
 const emptyIssue=()=>({voucherNumber:'',quantity:'',unit:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
@@ -294,18 +318,14 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
             <h3><PackagePlus size={19}/> Quản lý phiếu nhập kho</h3>
             <p className="muted">Xem phiếu đã ghi nhận và kiểm tra chứng từ theo từng lô. Tạo phiếu mới bằng chức năng riêng, không chỉnh sửa số liệu đã ghi sổ.</p>
           </div>
-          {canEdit&&<button type="button" className={receiptFormOpen?'outline':'primary'} onClick={()=>{setReceiptFormOpen(open=>!open);setReceiptViewId(null)}}>
-            {receiptFormOpen?'Đóng biểu mẫu':<><Plus size={16}/> Tạo phiếu nhập</>}
+          {canEdit&&<button type="button" className="primary" onClick={()=>{setReceiptFormOpen(true);setReceiptViewId(null)}}>
+            <Plus size={16}/> Tạo phiếu nhập
           </button>}
         </div>
-        {receiptFormOpen&&canEdit&&<section className="supply-receipt-editor" aria-label="Tạo phiếu nhập kho">
-          <div className="supply-receipt-editor__heading">
-            <strong>Phiếu nhập nguyên liệu mới</strong>
-            <button type="button" className="outline" onClick={()=>setReceiptFormOpen(false)}>Quay về danh sách</button>
-          </div>
+        {receiptFormOpen&&canEdit&&<ReceiptDialog busy={busy} onClose={()=>setReceiptFormOpen(false)}>
           <RealPurchaseReceipt key={activeId} kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>{setReceiptFormOpen(false);setReceiptViewId(null);setReceiptPage(1)}}/>
-        </section>}
-        {!receiptFormOpen&&<>
+        </ReceiptDialog>}
+        <>
           <div className="management-toolbar supply-filterbar supply-receipt-filterbar">
             <label>Tìm kiếm phiếu nhập
               <input value={receiptSearch} onChange={e=>{setReceiptSearch(e.target.value);setReceiptPage(1)}} placeholder="Mã phiếu, nhà cung cấp, ngày nhập…"/>
