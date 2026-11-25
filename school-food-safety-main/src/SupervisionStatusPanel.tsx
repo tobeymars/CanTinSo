@@ -211,10 +211,10 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
               {latest && (canReport || canConfirm || serverMode) && <small>{latest.actorLabel} · {formatTimestamp(latest.recordedAt)} · {latest.evidenceRef ? `Tham chiếu: ${latest.evidenceRef}` : 'Không có tham chiếu'}</small>}
               {showHistory && (canReport || canConfirm || serverMode) && item.history.length > 0 && <ol className="supervision-status-history">{item.history.map(entry => <li key={entry.id}>
                   <strong>{actionLabels[entry.action]}</strong> · {entry.actorLabel} · {formatTimestamp(entry.recordedAt)} · {entry.note}
-                  {serverMode && entry.action==='report' && (entry.inspection || entry.ingredientReceipts?.length) && <details className="sif-report-details">
+                  {serverMode && entry.action==='report' && (Boolean(entry.inspection) || !!entry.ingredientReceipts?.length) && <details className="sif-report-details">
                     <summary>Xem dữ liệu của phiên bản này</summary>
-                    {entry.inspection && <InspectionReadout inspection={entry.inspection}/>}
-                    {!!entry.ingredientReceipts?.length && <IngredientReceiptDetails lines={entry.ingredientReceipts}/>}
+                    {Boolean(entry.inspection) && <InspectionReadout inspection={entry.inspection}/> }
+                    {!!entry.ingredientReceipts?.length && <IngredientReceiptDetails lines={entry.ingredientReceipts} serviceDate={date}/>}
                     {entry.evidenceRef && <small>Tham chiếu hồ sơ: {entry.evidenceRef}</small>}
                   </details>}
                 </li>)}</ol>}
