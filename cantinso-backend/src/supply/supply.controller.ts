@@ -5,12 +5,19 @@ import { Roles } from '../common/roles.decorator';
 import { AuthUser, CurrentUser } from '../common/current-user.decorator';
 import { SupplyService } from './supply.service';
 import { StockVoucherService } from './stock-voucher.service';
+import { SupplyPlanService } from './supply-plan.service';
 
 @Controller('supply')
 @UseGuards(JwtAuthGuard,RolesGuard)
 @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN','SCHOOL_ADMIN','UBND_ADMIN')
 export class SupplyController {
-  constructor(private readonly service:SupplyService,private readonly vouchers:StockVoucherService){}
+  constructor(private readonly service:SupplyService,private readonly vouchers:StockVoucherService,private readonly plans:SupplyPlanService){}
+  @Get(':kitchenId/approved-plans')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  approvedPlans(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.plans.list(user,kitchenId);}
+  @Get(':kitchenId/approved-plans/:revisionId/requirements')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  planRequirements(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('revisionId') revisionId:string){return this.plans.detail(user,kitchenId,revisionId);}
   @Post(':kitchenId/vouchers/:voucherId/returns')
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
   returnIssue(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('voucherId') voucherId:string,@Body() body:unknown){return this.service.returnIssue(user,kitchenId,voucherId,body);}
