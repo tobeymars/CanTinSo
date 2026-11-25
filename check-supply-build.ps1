@@ -34,6 +34,8 @@ Check 'Arrival receipt tests'
 Write-Host '[9/12] Serving stage validation tests'
 npm run test:supervision-serving
 Check 'Serving stage tests'
+npm run test:supervision-stages
+Check 'Stage responsibility tests'
 Write-Host '[10/12] Backend build'
 npm run build
 Check 'Backend build'
