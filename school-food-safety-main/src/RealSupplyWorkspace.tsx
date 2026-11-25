@@ -67,6 +67,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [vendorDialogOpen,setVendorDialogOpen]=useState(false)
   const [financeDialogOpen,setFinanceDialogOpen]=useState(false)
   const [statusTarget,setStatusTarget]=useState<SupplySupplier|null>(null)
+  const [importDraft,setImportDraft]=useState<unknown[]|null>(null)
   const [editingVendor,setEditingVendor]=useState<string|null>(null)
   const [viewingSupplier,setViewingSupplier]=useState<string|null>(null)
   const [supplierSearch,setSupplierSearch]=useState('')
@@ -102,7 +103,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setVendorDialogOpen(false);setFinanceDialogOpen(false);setStatusTarget(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setVendorDialogOpen(false);setFinanceDialogOpen(false);setStatusTarget(null);setImportDraft(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -143,8 +144,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       const parsed:unknown=JSON.parse(await file.text())
       const list=Array.isArray(parsed)?parsed:parsed&&typeof parsed==='object'&&'suppliers' in parsed?(parsed as {suppliers:unknown}).suppliers:null;
       if(!Array.isArray(list)||!list.length||list.length>100)throw Error('Chỉ nhận JSON mảng từ 1 đến 100 nhà cung cấp.');
-      if(!window.confirm('Nhập '+list.length+' nhà cung cấp vào kho bếp? Chỉ nhập danh tính/liên hệ/ghi chú. Công nợ, giao dịch DEMO và tệp đính kèm KHÔNG được nhập.'))return
-      await execute(()=>importSupplySuppliers(activeId,list),'Đã nhập danh sách nhà cung cấp thật; không nhập công nợ DEMO.')
+      setImportDraft(list)
     }catch(error){setError(error instanceof Error?error.message:'Tệp JSON không hợp lệ.')}
   }
   function editVendor(item:SupplySupplier){
@@ -301,6 +301,20 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         description="Xem phiếu nhập, số dư và các chứng từ thanh toán đã ghi nhận của bếp."
         busy={busy} onClose={()=>setFinanceDialogOpen(false)}>
         <RealSupplierFinance key={activeId} kitchenId={activeId} finance={finance.data} canEdit={canEdit} busy={busy} execute={execute}/>
+      </SupplyDialog>}
+      {importDraft&&canEdit&&<SupplyDialog title="Xác nhận nhập danh sách" eyebrow="IMPORT NHÀ CUNG CẤP"
+        description="Kiểm tra số lượng bản ghi trước khi đưa dữ liệu vào danh mục bếp." busy={busy} onClose={()=>setImportDraft(null)}>
+        <div className="supply-supplier-status-dialog">
+          <p><strong>{importDraft.length} nhà cung cấp</strong> được đọc từ tệp JSON.</p>
+          <p>Hệ thống chỉ nhập danh tính, liên hệ và ghi chú. Không nhập giao dịch demo, công nợ hoặc tệp minh chứng.</p>
+          <div className="supply-form-actions">
+            <button className="primary" type="button" disabled={busy} onClick={()=>void execute(async()=>{
+              await importSupplySuppliers(activeId,importDraft)
+              setImportDraft(null)
+            },'Đã nhập danh sách nhà cung cấp thật, không bao gồm công nợ DEMO.')}>Xác nhận import</button>
+            <button className="outline" type="button" disabled={busy} onClick={()=>setImportDraft(null)}>Hủy</button>
+          </div>
+        </div>
       </SupplyDialog>}
       {statusTarget&&canEdit&&<SupplyDialog title={statusTarget.status==='ACTIVE'?'Ngừng sử dụng nhà cung cấp':'Kích hoạt nhà cung cấp'}
         eyebrow="QUẢN LÝ TRẠNG THÁI" description="Xác nhận thay đổi trạng thái nhà cung cấp trong danh mục bếp."
