@@ -80,7 +80,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
     }
   }, [])
   void revision
-  const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:item.actorRole==='SCHOOL_ADMIN'?'BGH':'Bếp',photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
+  const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:serverQuery.data?.actors?.[item.actorId??'']??(item.actorRole==='SCHOOL_ADMIN'?'BGH':'Bếp'),photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
   const centralDelivery = serverMode && contextQuery.data?.kitchen?.type === 'CENTRAL'
   const stages = serverMode && contextQuery.data?.kitchen ? (centralDelivery ? ['DISPATCHED','ARRIVED','PLATED','READY'] : ['PLATED','READY']) as JourneyStatus[] : stagesForSchool(school.mode, role)
   const dateKind=serverMode?supervisionDateKind(date):'today'
@@ -200,7 +200,17 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
             {serverMode && serverQuery.data?.stages[status]?.reopenReason && <small>Lý do điều chỉnh: {serverQuery.data.stages[status].reopenReason}</small>}
             {serverMode && (serverQuery.data?.stages[status]?.history?.length??0)>0 && <details className="supervision-stage-revisions">
               <summary>Xem lịch sử điều chỉnh ({serverQuery.data?.stages[status]?.history?.length})</summary>
-              <ol>{serverQuery.data?.stages[status]?.history?.map((entry,i)=><li key={i}>{entry.at?new Date(entry.at).toLocaleString('vi-VN'):''} · {entry.action==='reopen'?'Mở điều chỉnh':'Phiên bản ghi nhận trước đó'} · {entry.note}{entry.lateReason?' · Lý do ghi muộn: '+entry.lateReason:''}</li>)}</ol>
+              <ol>{serverQuery.data?.stages[status]?.history?.map((entry,i)=><li key={i}>
+                <strong>{entry.action==='reopen'?'Mở điều chỉnh':'Phiên bản ghi nhận trước đó'}</strong> ·
+                {entry.actorId ? ' '+(serverQuery.data?.actors?.[entry.actorId]??'Tài khoản thực hiện')+' ·' : ''}
+                {entry.at?new Date(entry.at).toLocaleString('vi-VN'):''} · {entry.note}
+                {entry.lateReason?' · Lý do ghi muộn: '+entry.lateReason:''}
+                {entry.serving&&<details className="sif-report-details"><summary>Chi tiết phiên bản ra món / phục vụ</summary>
+                  <p>Người thực hiện: {entry.serving.handlerName} · {entry.serving.occurredAt} · {entry.serving.actualServings.toLocaleString('vi-VN')} suất</p>
+                  <ul>{entry.serving.dishChecks.map(d=><li key={d.dishId}>{d.name}: {d.portions??'—'} suất · {d.status==='PASS'?'Không bất thường':'Có bất thường'}</li>)}</ul>
+                </details>}
+                {entry.arrival&&<p>Tiếp nhận: {entry.arrival.receivedServings} suất · Kết quả: {entry.arrival.result??'Theo hồ sơ cũ'}</p>}
+              </li>)}</ol>
             </details>}</div>
           <div className="supervision-check-controls"><span className={`supervision-check-pill ${event?.confirmed ? 'confirmed' : event ? 'reported' : 'not_reported'}`}>{status==='ARRIVED' && serverMode && event?.confirmed && serverQuery.data?.stages.ARRIVED?.arrival?.result !== undefined && serverQuery.data?.stages.ARRIVED?.arrival?.result !== 'ACCEPTED' ? 'Tạm dừng phục vụ' : event?.confirmed ? (status==='ARRIVED'?'Đã xác nhận tiếp nhận':'Bếp đã ghi nhận') : needsRevision ? 'Đang điều chỉnh' : event ? (serverMode?'Cần bếp xử lý':'Chờ xác nhận') : 'Chưa cập nhật'}</span>{next === status && <button className="outline" type="button" onClick={() => edit({action:'report',stage:status})}>Cập nhật</button>}{status === 'ARRIVED' && canConfirmArrival && <button className="primary" type="button" onClick={() => edit({action:'arrival_confirm',stage:'ARRIVED'})}>Xác nhận Đến trường</button>}{status === 'ARRIVED' && canResolveArrival && <button className="primary" type="button" onClick={()=>edit({action:'arrival_resolve',stage:'ARRIVED'})}>Kiểm tra lại</button>}{isBoard && event && !event.confirmed && !needsRevision && !locked && !mealApproved && <button className="primary" type="button" onClick={() => edit({action:'confirm',stage:status})}>Xác nhận</button>}{canReopen(status) && <button type="button" className="outline" onClick={()=>edit({action:'reopen',stage:status})}>Mở điều chỉnh</button>}</div>
         </div>
