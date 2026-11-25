@@ -179,9 +179,27 @@ export class SupplyService {
       select:{id:true},
     }));
     if(!assigned)throw new ForbiddenException('Trường không thuộc bếp phục vụ tại ngày được chọn.');
+    let issuedForPlan:{revisionId:string;dishVersionIds:string[];ingredientId:string}|null=null;
+    if(input?.mealPlanRevisionId!==undefined && input?.mealPlanRevisionId!==''){
+      if(!uuid(input.mealPlanRevisionId))throw new BadRequestException('Mã phiên bản thực đơn không hợp lệ.');
+      const revision=await this.prisma.mealPlanRevision.findFirst({
+        where:{id:input.mealPlanRevisionId,status:'APPROVED',
+          mealPlan:{kitchenId,schoolId,serviceDate:day,mealType}},
+        select:{id:true,items:{where:{isDefault:true},select:{
+          dishVersionId:true,dishVersion:{select:{ingredients:{select:{ingredientId:true}}}},
+        }}},
+      });
+      if(!revision)throw new ForbiddenException('Phiếu xuất phải gắn với đúng phiên bản thực đơn đã duyệt của trường, ngày và bữa.');
+      const selected=revision.items.filter(item=>item.dishVersion.ingredients.some(line=>line.ingredientId===input.ingredientId));
+      if(!uuid(input.ingredientId)||!selected.length)
+        throw new BadRequestException('Nguyên liệu không nằm trong các món mặc định của thực đơn đã duyệt.');
+      issuedForPlan={revisionId:revision.id,ingredientId:input.ingredientId,dishVersionIds:selected.map(item=>item.dishVersionId)};
+    }
     try{return await this.prisma.$transaction(async tx=>{
-      const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},select:{id:true,remainingQty:true,status:true,expiryDate:true,unit:true}});
+      const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},select:{id:true,ingredientId:true,remainingQty:true,status:true,expiryDate:true,unit:true}});
       if(!lot) throw new NotFoundException('Không tìm thấy lô thuộc bếp.');
+      if(issuedForPlan && lot.ingredientId!==issuedForPlan.ingredientId)
+        throw new BadRequestException('Lô xuất không trùng nguyên liệu dự trù trong thực đơn đã duyệt.');
       if(lot.status!=='AVAILABLE' || (lot.expiryDate && lot.expiryDate.getTime()<Date.now()-86400000) || (lot.expiryDate && lot.expiryDate.getTime()<day.getTime())) throw new ConflictException('Lô đã hết hạn tại ngày sử dụng hoặc không đủ điều kiện xuất.');
       const entered=canonicalQuantity(input?.quantity,input?.unit,lot.unit);
       const quantity=entered.quantity;
@@ -191,7 +209,7 @@ export class SupplyService {
       if(changed.count!==1) throw new ConflictException('Tồn kho đã thay đổi; vui lòng tải lại.');
       const voucher=await tx.stockVoucher.create({data:{
         kitchenId,number:voucherNumber,kind:'ISSUE',lotId,schoolId,serviceDate:day,mealType,
-        quantity,unit:lot.unit,inspection,postedById:user.sub,
+        quantity,unit:lot.unit,inspection:{...inspection,...(issuedForPlan?{approvedPlan:issuedForPlan}: {})},postedById:user.sub,
       }});
       await tx.stockVoucherEvidence.createMany({data:evidences.map(file=>({
         voucherId:voucher.id,category:file.category,filename:file.filename,mimeType:file.mimeType,
@@ -200,6 +218,7 @@ export class SupplyService {
       await tx.traceEvent.create({data:{lotId,eventType:'ISSUED',actorId:user.sub,description:reason,metadata:{
         kind:'ISSUE',voucherId:voucher.id,voucherNumber,quantity,unit:lot.unit,
         enteredQuantity:entered.enteredQuantity,enteredUnit:entered.enteredUnit,schoolId,serviceDate,mealType,
+        ...(issuedForPlan?{approvedPlan:issuedForPlan}:{}),
       }}});
       return {lotId,quantity,remainingQty:current-quantity,voucherId:voucher.id};
     });
