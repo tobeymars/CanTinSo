@@ -63,6 +63,7 @@ enum MealType {
 }
 
 enum TraceEventType {
+  RETURNED
   ISSUED
   RECEIVED
   INSPECTED
@@ -888,6 +889,9 @@ model StockVoucher {
   receiptId String? @map("receipt_id") @db.Uuid
   receipt PurchaseReceipt? @relation(fields:[receiptId],references:[id],onDelete:Restrict)
   lotId String? @map("lot_id") @db.Uuid
+  sourceVoucherId String? @map("source_voucher_id") @db.Uuid
+  sourceVoucher StockVoucher? @relation("StockVoucherReturns",fields:[sourceVoucherId],references:[id],onDelete:Restrict)
+  returns StockVoucher[] @relation("StockVoucherReturns")
   schoolId String? @map("school_id") @db.Uuid
   serviceDate DateTime? @map("service_date") @db.Date
   mealType String? @map("meal_type")
@@ -901,6 +905,7 @@ model StockVoucher {
   @@index([kitchenId,postedAt])
   @@index([receiptId])
   @@index([lotId])
+  @@index([sourceVoucherId])
   @@map("stock_vouchers")
 }
 
