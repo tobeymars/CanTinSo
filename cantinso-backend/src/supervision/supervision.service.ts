@@ -344,15 +344,16 @@ export class SupervisionService {
         if (!canKitchenRecordStage(user.role,user.kitchenId,s.kitchenId,
           kitchenKind==='CENTRAL'?'CENTRAL':'SCHOOL',itemId))
           throw new ForbiddenException('Chỉ bếp trực tiếp chế biến được ghi nhận Ra món, Sẵn sàng phục vụ và Xuất bếp.');
-        if (itemId === 'DISPATCHED' && (!journey.PLATED?.confirmed || !journey.READY?.confirmed ||
-          journey.PLATED?.revisionRequested || journey.READY?.revisionRequested))
-          throw new ConflictException('Bếp phải hoàn tất Ra món và Sẵn sàng phục vụ trước khi xuất món thành phẩm đến trường.');
         if (itemId === 'DISPATCHED') verifySamplesBeforeDispatch(
           checks.food_sample, checks.processing, new Date(entry.at),
         );
-        // The producing-kitchen authorization above applies to every reportable stage.
-        // For a central kitchen, portioning and readiness happen BEFORE dispatch to school.
-        // A school only confirms delivery of finished meals after DISPATCHED.
+        // For centrally delivered meals the school confirms arrival first;
+        // the producing kitchen then records portioning and readiness.
+        // School users never get producer permissions from schoolId alone.
+        if (kitchenKind === 'CENTRAL' && ['PLATED','READY'].includes(itemId) &&
+          (!journey.ARRIVED?.confirmed || !arrivalAllowsService(journey.ARRIVED.arrival) ||
+            journey.ARRIVED.revisionRequested))
+          throw new ConflictException('BGH phải xác nhận món đến trường đạt trước khi bếp ghi Ra món hoặc Sẵn sàng phục vụ.');
         let servingReport;
         if (itemId==='PLATED' || itemId==='READY') {
           const plan=await tx.mealPlan.findUnique({
@@ -364,8 +365,15 @@ export class SupervisionService {
           servingReport=validateServingStageReport(body,itemId,
             revision?.items.map(row=>({id:row.id,name:row.dishVersion.dish.name}))??[],
             revision?.ageGroups.reduce((total,row)=>total+row.plannedServings,0)??0,date);
-          // Quantities are checked against the APPROVED meal plan by validateServingStageReport.
-          // Do not compare against a school handover that has not happened yet.
+          // Validate against the approved plan AND the actual accepted handover.
+          if (itemId==='PLATED' && kitchenKind==='CENTRAL') {
+            const accepted=journey.ARRIVED.arrival;
+            if(servingReport.actualServings>accepted.receivedServings)
+              throw new BadRequestException('Số suất ra món không thể vượt số suất trường đã tiếp nhận.');
+            if(servingReport.portionStartAt && accepted.arrivalTime &&
+              servingReport.portionStartAt<accepted.arrivalTime)
+              throw new BadRequestException('Giờ bắt đầu ra món không được trước giờ món ăn đến trường.');
+          }
           if(itemId==='READY') {
             if(!journey.PLATED?.confirmed || journey.PLATED?.revisionRequested)
               throw new ConflictException('Bếp phải ghi nhận Ra món đạt và hoàn tất điều chỉnh trước khi Sẵn sàng phục vụ.');
