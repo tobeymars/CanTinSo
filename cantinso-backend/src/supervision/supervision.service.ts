@@ -113,7 +113,15 @@ export class SupervisionService {
     if (!['check_report','check_confirm','check_revision','check_reopen','stage_report','stage_confirm','stage_arrival_confirm','stage_arrival_resolve','stage_reopen','meal_confirm','sample_dispose','sample_hold'].includes(action)) throw new BadRequestException('Thao tác không hợp lệ.');
     if (action.startsWith('check_') && !checkIds.includes(itemId)) throw new BadRequestException('Mục kiểm thực không hợp lệ.');
     if (action.startsWith('stage_') && !stages.includes(itemId)) throw new BadRequestException('Mốc vận hành không hợp lệ.');
-    if ((action.endsWith('_confirm') || action === 'check_revision' || action === 'check_reopen' || action === 'stage_reopen' || action === 'stage_arrival_resolve') && user.role !== 'SCHOOL_ADMIN') throw new ForbiddenException('Chỉ BGH được xác nhận.');
+    // Kiểm thực, xuất bếp, ra món và phục vụ là trách nhiệm của bếp thực hiện.
+    // BGH xem hồ sơ trường của mình, không phê duyệt hồ sơ tác nghiệp của bếp.
+    if (['check_confirm','check_revision','stage_confirm','meal_confirm'].includes(action))
+      throw new ForbiddenException('BGH không duyệt nghiệp vụ vận hành của bếp. Bếp tự ghi nhận; hồ sơ và lịch sử được lưu để BGH giám sát.');
+    if (['stage_arrival_confirm','stage_arrival_resolve'].includes(action) && user.role !== 'SCHOOL_ADMIN')
+      throw new ForbiddenException('Chỉ BGH trường được xác nhận tiếp nhận tại trường.');
+    if (['check_reopen','stage_reopen'].includes(action) &&
+      !['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role))
+      throw new ForbiddenException('Chỉ đơn vị đã ghi nhận được mở điều chỉnh nghiệp vụ của mình.');
     if ((action === 'check_report' || action === 'stage_report') && !['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role)) throw new ForbiddenException('Chỉ bếp được báo cáo.');
     if (action === 'check_report' && user.role === 'SCHOOL_KITCHEN' && user.kitchenId !== s.kitchenId)
       throw new ForbiddenException('Nhân viên tiếp nhận tại trường chỉ được xem kiểm thực của bếp trung tâm.');
@@ -126,10 +134,8 @@ export class SupervisionService {
       const checks = asObject(current.checks), journey = asObject(current.stages), approvals = asArray(current.approvals);
       const eventId = randomUUID();
       const entry = {id:eventId,actorId:user.sub,actorRole:user.role,at:new Date().toISOString(),note,...(lateReason?{lateReason}:{})};
-      const latestApproval=approvals.at(-1);
-      const approved=!!latestApproval && latestApproval.snapshot===canonical({checks,journey});
-      if (approved && action!=='check_reopen' && action!=='stage_reopen' && !sampleLifecycle)
-        throw new ConflictException('Bữa đã được BGH xác nhận tổng thể. BGH cần mở điều chỉnh mục cụ thể trước khi cập nhật.');
+      // Hồ sơ xác nhận tổng thể từ phiên bản cũ vẫn được giữ trong lịch sử.
+      // Không khóa nghiệp vụ bếp dựa trên lần phê duyệt BGH trước đây.
       if(sampleLifecycle){
         const inspection=checks['food_sample']?.inspection;
         if(!inspection || !Array.isArray(inspection.dishes) || inspection.dishes.length===0)throw new ConflictException('Chưa có hồ sơ lấy mẫu đã ghi nhận.');
@@ -277,10 +283,19 @@ export class SupervisionService {
           ? body.ingredientReceipts.every((line:any)=>line.documentsStatus==='pass' && line.sensoryStatus==='pass')
           : undefined;
         const evidence={evidenceRef:body.evidenceRef.trim(),ingredientReceipts:body.ingredientReceipts??[],...(inspection?{inspection}:{}),...(ingredientPass!==undefined?{ingredientPass}:{})};
-        checks[itemId] = {status:'reported',...evidence,history:[...(checks[itemId]?.history??[]),{...entry,action:'report',status:'reported',...evidence}]};
+        if (checks[itemId] && checks[itemId].status !== 'revision_requested')
+          throw new ConflictException('Hồ sơ đã được lưu. Hãy mở điều chỉnh và ghi lý do trước khi cập nhật.');
+        const hasIssue=ingredientPass===false || inspection?.isPass===false;
+        const status=hasIssue?'reported':'confirmed';
+        checks[itemId] = {status,recordedAt:entry.at,recordedBy:user.sub,recordedByRole:user.role,
+          needsAttention:hasIssue,...evidence,
+          history:[...(checks[itemId]?.history??[]),{...entry,action:'report',status,...evidence,needsAttention:hasIssue}]};
       } else if (action === 'check_reopen') {
-        if (checks[itemId]?.status!=='confirmed')
-          throw new ConflictException('Chỉ được mở điều chỉnh mục kiểm thực đã xác nhận.');
+        if (user.kitchenId !== s.kitchenId)
+          throw new ForbiddenException('Chỉ nhân viên của bếp phụ trách được sửa kiểm thực.');
+        if (!['confirmed','reported'].includes(checks[itemId]?.status))
+          throw new ConflictException('Chỉ được mở điều chỉnh hồ sơ kiểm thực đã lưu.');
+        if (note.length<10) throw new BadRequestException('Cần ghi lý do điều chỉnh tối thiểu 10 ký tự.');
         checks[itemId]={...checks[itemId],status:'revision_requested',history:[...(checks[itemId].history??[]),{...entry,action:'reopen',status:'revision_requested'}]};
       } else if (action === 'check_confirm' || action === 'check_revision') {
         if (checks[itemId]?.status !== 'reported') throw new ConflictException('Mục chưa chờ xác nhận.');
@@ -296,7 +311,7 @@ export class SupervisionService {
         checks[itemId] = {...checks[itemId],status,history:[...checks[itemId].history,{...entry,action:action==='check_confirm'?'confirm':'request_revision',status}]};
       } else if (action === 'stage_report') {
         const previousStage=journey[itemId];
-        if (previousStage && !previousStage.revisionRequested) throw new ConflictException('Mốc đã báo cáo.');
+        if (previousStage && !previousStage.revisionRequested) throw new ConflictException('Mốc đã lưu. Hãy mở điều chỉnh và nêu lý do trước khi báo cáo lại.');
         const required = s.kitchenId && (await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}}))?.type === 'CENTRAL' ? stages : ['PLATED','READY'];
         if (!required.includes(itemId) || (!previousStage && required.find(x=>!journey[x])!==itemId)) throw new ConflictException('Cần báo cáo mốc theo thứ tự.');
         if (itemId === 'ARRIVED') throw new ForbiddenException('Mốc Đến trường do BGH lập phiếu và xác nhận, không do nhân viên bếp báo cáo.');
@@ -338,7 +353,11 @@ export class SupervisionService {
           }
         }
         if (itemId === 'READY' && (typeof body.photo !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(body.photo) || body.photo.length>1100000)) throw new BadRequestException('Cần ảnh thực tế hợp lệ tối đa 750 KB.');
-        journey[itemId] = {...entry,status:itemId,time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),confirmed:false,photos:itemId==='READY'?[body.photo]:[],...(servingReport?{serving:servingReport}:{}),
+        const needsAttention=itemId==='PLATED' && servingReport?.hasIssue===true;
+        journey[itemId] = {...entry,status:itemId,time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),
+          confirmed:!needsAttention,confirmedAt:!needsAttention?entry.at:undefined,confirmedBy:!needsAttention?user.sub:undefined,
+          confirmedByRole:!needsAttention?user.role:undefined,needsAttention,
+          photos:itemId==='READY'?[body.photo]:[],...(servingReport?{serving:servingReport}:{}),
           history:[...(previousStage?.history??[]),...(previousStage?[{...previousStage,history:undefined}]:[])]};
       } else if (action === 'stage_arrival_confirm' || action === 'stage_arrival_resolve') {
         // BGH directly records and confirms the handover at its own school.
@@ -375,7 +394,14 @@ export class SupervisionService {
           note,photos:arrival.photo?[arrival.photo]:[],arrival,
           history:previous?[...(previous.history??[]),{...previous,history:undefined}]:[]};
       } else if (action === 'stage_reopen') {
-        if (!journey[itemId]?.confirmed) throw new ConflictException('Chỉ được mở điều chỉnh mốc đã xác nhận.');
+        if (itemId==='ARRIVED') throw new ForbiddenException('Phiếu tiếp nhận do BGH phụ trách, sử dụng chức năng Kiểm tra lại phiếu giao nhận.');
+        if (itemId==='DISPATCHED' ? (user.role!=='CENTRAL_KITCHEN' || user.kitchenId!==s.kitchenId)
+          : (user.role!=='SCHOOL_KITCHEN' ||
+            (user.kitchenId!==s.kitchenId && user.schoolId!==s.schoolId)))
+          throw new ForbiddenException('Chỉ đơn vị thực hiện mốc được mở điều chỉnh.');
+        if (!journey[itemId] || journey[itemId].revisionRequested)
+          throw new ConflictException('Mốc chưa có hồ sơ hoặc đang chờ cập nhật sau điều chỉnh.');
+        if (note.length<10) throw new BadRequestException('Cần ghi lý do điều chỉnh tối thiểu 10 ký tự.');
         journey[itemId] = {...journey[itemId],confirmed:false,revisionRequested:true,
           reopenedAt:entry.at,reopenedBy:user.sub,reopenReason:note,
           history:[...(journey[itemId].history??[]),{...entry,action:'reopen'}]};
