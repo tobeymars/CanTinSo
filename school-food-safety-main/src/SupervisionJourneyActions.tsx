@@ -102,7 +102,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   const dispatchReady = hasProcessing && hasSample
   const shouldExplainDispatch=serverMode && role==='central_kitchen' && !saved?.events.some(event=>event.status==='DISPATCHED')
   const isBoard = role === 'school_board'
-  const canConfirmArrival = serverMode && isBoard && centralDelivery && !locked && !mealApproved && !!serverQuery.data?.stages.DISPATCHED && !serverQuery.data?.stages.DISPATCHED?.revisionRequested && !serverQuery.data?.stages.ARRIVED
+  const canConfirmArrival = serverMode && isBoard && centralDelivery && !locked && !mealApproved && !!serverQuery.data?.stages.DISPATCHED?.confirmed && !serverQuery.data?.stages.DISPATCHED?.revisionRequested && !serverQuery.data?.stages.ARRIVED
   const arrivalRecord=serverQuery.data?.stages.ARRIVED
   const canResolveArrival=serverMode && isBoard && centralDelivery && !locked && !mealApproved &&
     !!arrivalRecord?.confirmed && !!arrivalRecord.arrival?.result && arrivalRecord.arrival.result !== 'ACCEPTED'
