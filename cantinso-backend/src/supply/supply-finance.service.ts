@@ -87,10 +87,23 @@ export class SupplyFinanceService {
       const ingredient=ingredients.find(item=>item.id===line.ingredientId)!;
       const lotCode=code(line?.lotCode,'Mã lô',100);
       const entered=canonicalQuantity(line?.quantity,line?.unit,ingredient.unit);
+      const delivered=canonicalQuantity(line?.deliveredQuantity,line?.unit,ingredient.unit);
+      if(delivered.quantity<entered.quantity)
+        throw new BadRequestException('Số lượng hàng giao phải không nhỏ hơn số lượng được chấp nhận vào kho.');
+      const origin=code(line?.origin,'Nguồn gốc/xuất xứ lô',160);
+      const producer=code(line?.producer,'Đơn vị sản xuất/đóng gói',160);
+      const rejectedQuantity=Math.round((delivered.quantity-entered.quantity)*1000)/1000;
+      const rejectionReason=code(line?.rejectionReason,'Lý do không nhận đủ',500,false);
+      if(rejectedQuantity>0 && rejectionReason.length<10)
+        throw new BadRequestException('Chênh lệch hàng giao và thực nhập cần ghi lý do từ 10 ký tự.');
+      if(line?.packagingStatus!=='PASS'||line?.sensoryStatus!=='PASS')
+        throw new BadRequestException('Nguyên liệu chấp nhận nhập kho phải đạt bao gói và cảm quan tại từng dòng lô.');
       const unitPrice=unitPriceMoney(line?.unitPrice);
       const amount=Number(new Prisma.Decimal(entered.enteredQuantity).mul(unitPrice).toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP));
       if(!Number.isSafeInteger(amount)||amount>1000000000000)throw new BadRequestException('Thành tiền vượt giới hạn.');
-      return {ingredientId:line.ingredientId as string,lotCode,quantity:entered.quantity,enteredQuantity:entered.enteredQuantity,enteredUnit:entered.enteredUnit,unitPrice,amount,expiryDate:parseDate(line?.expiryDate),storageLocation:code(line?.storageLocation,'Vị trí lưu',120,false)||null};
+      return {ingredientId:line.ingredientId as string,lotCode,quantity:entered.quantity,enteredQuantity:entered.enteredQuantity,enteredUnit:entered.enteredUnit,
+        deliveredQuantity:delivered.quantity,rejectedQuantity,rejectionReason,origin,producer,
+        packagingStatus:'PASS',sensoryStatus:'PASS',unitPrice,amount,expiryDate:parseDate(line?.expiryDate),storageLocation:code(line?.storageLocation,'Vị trí lưu',120,false)||null};
     });
     if(new Set(lines.map(line=>line.lotCode)).size!==lines.length)throw new BadRequestException('Không được nhập trùng mã lô trong phiếu.');
     const today=new Date();today.setUTCHours(0,0,0,0);
@@ -106,7 +119,11 @@ export class SupplyFinanceService {
         }});
         const voucher=await tx.stockVoucher.create({data:{
           kitchenId,number:'NK-'+number,kind:'RECEIPT',receiptId:receipt.id,
-          inspection,postedById:user.sub,
+          inspection:{...inspection,lineInspections:lines.map(line=>({
+            ingredientId:line.ingredientId,lotCode:line.lotCode,origin:line.origin,producer:line.producer,
+            deliveredQuantity:line.deliveredQuantity,acceptedQuantity:line.quantity,rejectedQuantity:line.rejectedQuantity,
+            rejectionReason:line.rejectionReason,packagingStatus:line.packagingStatus,sensoryStatus:line.sensoryStatus,
+          }))},postedById:user.sub,
         }});
         await tx.stockVoucherEvidence.createMany({data:evidences.map(file=>({
           voucherId:voucher.id,category:file.category,filename:file.filename,mimeType:file.mimeType,
