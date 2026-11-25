@@ -168,7 +168,7 @@ export class SupplyService {
     const schoolId=input?.schoolId;
     const serviceDate=input?.serviceDate;
     const mealType=input?.mealType;
-    if(!uuid(schoolId) || typeof serviceDate!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(serviceDate) || !['BREAKFAST','LUNCH','SNACK'].includes(mealType))
+    if(!uuid(schoolId) || typeof serviceDate!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(serviceDate) || !['BREAKFAST','LUNCH','DINNER','SNACK'].includes(mealType))
       throw new BadRequestException('Cần xác định trường, ngày và bữa sử dụng lô.');
     const day=new Date(serviceDate+'T00:00:00.000Z');
     const dayEnd=new Date(serviceDate+'T23:59:59.999Z');
