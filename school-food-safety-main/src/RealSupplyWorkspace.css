@@ -302,3 +302,52 @@
 .supply-receipt-detail__proof{display:grid;gap:10px}
 @media(max-width:850px){.supply-receipt-detail__facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.supply-receipts-heading>div{min-width:0}.supply-receipts-heading button{width:100%}.supply-receipt-editor,.supply-receipt-detail{padding:13px}.supply-receipt-pagination{justify-content:center}}
+
+/* The same large, centered dialog pattern used by the Kitchen Legal Records workspace. */
+.supply-receipt-modal{
+  width:min(880px,calc(100vw - 32px));max-width:calc(100vw - 32px);
+  max-height:min(92dvh,980px);margin:auto;padding:0;
+  border:1px solid #dbe2ed;border-radius:18px;background:var(--surface,#fff);
+  color:var(--text,#152437);box-shadow:0 24px 85px #091b3152;
+  overflow-y:auto;overscroll-behavior:contain;
+}
+.supply-receipt-modal::backdrop{background:#091b31a8;backdrop-filter:blur(3px)}
+.supply-receipt-modal-fallback{
+  position:fixed;inset:4vh 0;z-index:10000;
+  box-shadow:0 0 0 100vmax #091b31a8,0 24px 85px #091b3152;
+}
+.supply-receipt-modal__heading{
+  position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;
+  align-items:flex-start;gap:16px;padding:23px 27px 18px;
+  background:var(--surface,#fff);border-bottom:1px solid var(--border,#e0e6ef);
+}
+.supply-receipt-modal__heading small{
+  font-size:10px;letter-spacing:1px;font-weight:800;color:#3c5e92;
+}
+.supply-receipt-modal__heading h2{font-size:20px;line-height:1.4;margin:7px 0 5px}
+.supply-receipt-modal__heading p{font-size:12px;color:var(--muted,#617085);line-height:1.5;margin:0}
+.supply-receipt-modal__close{
+  display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;
+  padding:0;border:0;border-radius:9px;background:transparent;color:var(--muted,#617085);cursor:pointer;
+}
+.supply-receipt-modal__close:hover{background:var(--surface-alt,#f0f4f8)}
+.supply-receipt-modal__close:disabled{opacity:.5;cursor:not-allowed}
+.supply-receipt-modal__content{padding:21px 27px 25px;min-width:0}
+.supply-receipt-modal__content .supply-purchase-form{min-width:0}
+.supply-receipt-modal__content .supply-purchase-form>h3{margin:0;font-size:16px}
+.supply-receipt-modal__content .supply-form-footer{
+  position:sticky;bottom:0;z-index:2;background:var(--surface,#fff);
+  border:1px solid var(--border,#dbe2ed);
+  box-shadow:0 -5px 15px #091b3110;
+}
+.supply-receipt-modal__content .supply-form-grid,
+.supply-receipt-modal__content .supply-receipt-line,
+.supply-receipt-modal__content .stock-audit-fieldset{min-width:0}
+@media(max-width:650px){
+  .supply-receipt-modal{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:96dvh;border-radius:13px}
+  .supply-receipt-modal__heading{padding:17px 16px 14px}
+  .supply-receipt-modal__heading h2{font-size:18px}
+  .supply-receipt-modal__content{padding:15px 13px 18px}
+  .supply-receipt-modal__content .supply-form-footer{justify-content:stretch}
+  .supply-receipt-modal__content .supply-form-footer button{width:100%}
+}
