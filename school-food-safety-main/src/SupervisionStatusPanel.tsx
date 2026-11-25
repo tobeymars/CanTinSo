@@ -259,6 +259,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
                       <button type="button" aria-label={`Xóa dòng nguyên liệu ${index + 1}`} disabled={ingredientRows.length === 1} onClick={() => setIngredientRows(current => current.filter(item => item.id !== row.id))}><X size={16}/>Xóa</button>
                     </div>
                     <div className="supervision-ingredient-picker">
+                       <div className="supervision-intake-subtitle"><strong>A. Chọn nguyên liệu và lô</strong><small>Thông tin lô và nhà cung cấp sẽ hiển thị tự động sau khi chọn.</small></div>
                       <label>Nguyên liệu <span aria-hidden="true">*</span>
                         <Select label={`Nguyên liệu dòng ${index + 1}`} required searchable value={row.itemId} placeholder="Tìm và chọn từ kho" searchPlaceholder="Tên, mã lô, nhà cung cấp…" options={options} onValueChange={itemId => setIngredientRows(current => current.map(item => {
                           if(item.id!==row.id)return item
