@@ -4,10 +4,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck } from 'lucide-react'
 import type { ViewRole } from './lib/store'
 import {
-  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,
+  getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,getStockVouchers,downloadStockVoucherEvidence,
   issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,importSupplySuppliers,setSupplyMinimum,
 } from './lib/supplyApi'
-import type { SupplySupplier,SupplyLot } from './lib/supplyApi'
+import type { SupplySupplier,SupplyLot,StockEvidenceInput,StockVoucher } from './lib/supplyApi'
+import { StockInspectionFields,StockEvidenceFields,emptyInspection } from './StockVoucherEvidenceFields'
 import './WarehouseManagement.css'
 import './RealSupplyWorkspace.css'
 import RealSupplierFinance from './RealSupplierFinance'
@@ -17,7 +18,7 @@ import RealWarehouseOverview from './RealWarehouseOverview'
 import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit, readableStockQuantity } from './lib/supervisionUnits'
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:'',note:''})
-const emptyIssue=()=>({quantity:'',unit:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
+const emptyIssue=()=>({voucherNumber:'',quantity:'',unit:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'SNACK'})
 const fmt=(value:number)=>value.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const date=(value?:string|null)=>value?new Date(value).toLocaleDateString('vi-VN'):'Chưa có'
 const expired=(value?:string|null)=>!!value&&value.slice(0,10)<new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
@@ -36,6 +37,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const ingredients=useQuery({queryKey:['supply-ingredients',activeId],queryFn:()=>getSupplyIngredients(activeId),enabled:!!activeId&&mode==='warehouse'})
   const lots=useQuery({queryKey:['supply-lots',activeId],queryFn:()=>getSupplyLots(activeId),enabled:!!activeId&&mode==='warehouse'})
   const movements=useQuery({queryKey:['supply-movements',activeId],queryFn:()=>getSupplyMovements(activeId),enabled:!!activeId&&mode==='warehouse'})
+  const vouchers=useQuery({queryKey:['supply-vouchers',activeId],queryFn:()=>getStockVouchers(activeId),enabled:!!activeId&&mode==='warehouse'})
   const [vendor,setVendor]=useState(emptySupplier)
   const [editingVendor,setEditingVendor]=useState<string|null>(null)
   const [viewingSupplier,setViewingSupplier]=useState<string|null>(null)
@@ -43,6 +45,9 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [supplierDebtOnly,setSupplierDebtOnly]=useState(false)
   const [supplierPage,setSupplierPage]=useState(1)
   const [issue,setIssue]=useState(emptyIssue)
+  const [issueInspection,setIssueInspection]=useState(emptyInspection)
+  const [issueEvidences,setIssueEvidences]=useState<StockEvidenceInput[]>([])
+  const [selectedVoucher,setSelectedVoucher]=useState<StockVoucher|null>(null)
   const [issueLot,setIssueLot]=useState<SupplyLot|null>(null)
   const [section,setSection]=useState<'overview'|'stock'|'receipts'|'issues'|'transfers'|'lots'|'trace'>('overview')
   const [lotSearch,setLotSearch]=useState('')
@@ -58,7 +63,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setSelectedVoucher(null);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -66,6 +71,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       qc.invalidateQueries({queryKey:['supply-lots',activeId]}),
       qc.invalidateQueries({queryKey:['supply-minimums',activeId]}),
       qc.invalidateQueries({queryKey:['supply-movements',activeId]}),
+      qc.invalidateQueries({queryKey:['supply-vouchers',activeId]}),
       qc.invalidateQueries({queryKey:['supervision-context']}),
     ])
   }
@@ -113,7 +119,10 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   function submitIssue(e:FormEvent){
     e.preventDefault()
     if(!issueLot)return
-    void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{quantity:Number(issue.quantity),unit:issue.unit||issueLot.unit,note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType});setIssueLot(null);setIssue(emptyIssue())},'Đã xuất kho và cập nhật tồn lô.')
+    void execute(async()=>{await issueSupplyLot(activeId,issueLot.id,{
+      quantity:Number(issue.quantity),unit:issue.unit||issueLot.unit,note:issue.note,schoolId:issue.schoolId,serviceDate:issue.serviceDate,mealType:issue.mealType,
+      voucherNumber:issue.voucherNumber,inspection:{...issueInspection,documentNumber:issue.voucherNumber},evidences:issueEvidences,
+    });setIssueLot(null);setIssue(emptyIssue());setIssueInspection(emptyInspection());setIssueEvidences([])},'Đã ghi sổ phiếu xuất kho và lưu minh chứng. Tồn lô đã được trừ một lần.')
   }
   const filteredSuppliers=(suppliers.data??[]).filter(item=>{const query=supplierSearch.toLocaleLowerCase('vi');return (item.code+' '+item.name+' '+(item.phone??'')).toLocaleLowerCase('vi').includes(query)&&(!supplierDebtOnly||(finance.data?.suppliers.find(row=>row.id===item.id)?.debt??0)>0)})
   const supplierPages=Math.max(1,Math.ceil(filteredSuppliers.length/10))
@@ -218,6 +227,8 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         </tbody></table></div>
         {issueLot&&canEdit&&<form className="supply-panel supply-issue-form" onSubmit={submitIssue}>
           <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({readableStockQuantity(issueLot.remainingQty,issueLot.unit)} còn lại)</h3>
+          <p className="muted">Chỉ ghi trừ tồn khi có đủ chứng từ và kiểm xuất đạt. Mã phiếu không được trùng trong kho.</p>
+          <label>Mã phiếu xuất *<input required maxLength={60} value={issue.voucherNumber} onChange={e=>setIssue(v=>({...v,voucherNumber:e.target.value}))} placeholder="XK-2026-001"/></label>
           <div style={{display:'grid',gridTemplateColumns:'minmax(160px,1fr) minmax(95px,140px)',gap:10}}>
             <label>Số lượng xuất *<input type="number" required min="0.000001" step="any" max={convertReceiptQuantity(issueLot.remainingQty,issueLot.unit,issue.unit||issueLot.unit)??undefined} value={issue.quantity} onChange={e=>setIssue(v=>({...v,quantity:e.target.value}))}/></label>
             <label>Đơn vị<select value={issue.unit||issueLot.unit} onChange={e=>setIssue(v=>{
@@ -230,7 +241,9 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <label>Ngày sử dụng *<input type="date" required value={issue.serviceDate} onChange={e=>setIssue(v=>({...v,serviceDate:e.target.value}))}/></label>
           <label>Bữa sử dụng *<select value={issue.mealType} onChange={e=>setIssue(v=>({...v,mealType:e.target.value as typeof issue.mealType}))}><option value="BREAKFAST">Bữa sáng</option><option value="LUNCH">Bữa trưa</option><option value="SNACK">Bữa xế</option></select></label>
           <label>Lý do / chứng từ xuất *<input required maxLength={500} value={issue.note} onChange={e=>setIssue(v=>({...v,note:e.target.value}))}/></label>
-          <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy}>Xác nhận xuất kho</button><button className="outline" type="button" onClick={()=>setIssueLot(null)}>Hủy</button></div>
+          <StockInspectionFields kind="ISSUE" value={issueInspection} onChange={setIssueInspection}/>
+          <StockEvidenceFields kind="ISSUE" value={issueEvidences} onChange={setIssueEvidences}/>
+          <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy||!issueEvidences.some(x=>x.category==='ISSUE_PHOTO')||!issueEvidences.some(x=>x.category==='SCALE_PHOTO')}>Xác nhận xuất kho</button><button className="outline" type="button" onClick={()=>setIssueLot(null)}>Hủy</button></div>
         </form>}
       </>}
       {section==='receipts'&&<>
@@ -238,6 +251,34 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <RealPurchaseReceipt key={activeId} kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>setSection('stock')}/>
       </>}
       {section==='trace'&&<>
+        <h3>Phiếu kho đã ghi sổ · Truy xuất biên bản và tệp minh chứng</h3>
+        <div className="supply-table-scroll"><table className="supply-table"><thead><tr><th>Mã phiếu</th><th>Nghiệp vụ</th><th>Thời điểm</th><th>Minh chứng</th><th>Thao tác</th></tr></thead><tbody>
+          {(vouchers.data??[]).map(v=><tr key={v.id}>
+            <td><strong>{v.number}</strong></td><td>{v.kind==='RECEIPT'?'Nhập kho':'Xuất kho'}</td>
+            <td>{new Date(v.postedAt).toLocaleString('vi-VN')}</td><td>{v.evidences.length} tệp</td>
+            <td><button type="button" className="outline" onClick={()=>setSelectedVoucher(v)}>Xem phiếu</button></td>
+          </tr>)}
+          {!vouchers.data?.length&&<tr><td colSpan={5}>Chưa có phiếu theo quy trình chứng từ mới.</td></tr>}
+        </tbody></table></div>
+        {selectedVoucher&&<section className="supply-panel stock-voucher-view" aria-label="Chi tiết phiếu kho">
+          <div className="supply-section-heading"><h3>{selectedVoucher.number} · {selectedVoucher.kind==='RECEIPT'?'Nhập kho':'Xuất kho'}</h3><button type="button" className="outline" onClick={()=>setSelectedVoucher(null)}>Đóng</button></div>
+          <p>Đã ghi sổ: {new Date(selectedVoucher.postedAt).toLocaleString('vi-VN')} · Người ghi sổ ID: {selectedVoucher.postedById}</p>
+          <p>Người kiểm tra: <strong>{selectedVoucher.inspection.inspector}</strong> · Người giao/nhận: {selectedVoucher.inspection.counterparty}</p>
+          <p>Vị trí: {selectedVoucher.inspection.location} · Thời điểm: {selectedVoucher.inspection.actualTime} · Chứng từ: {selectedVoucher.inspection.documentNumber}</p>
+          {selectedVoucher.receipt&&<p>Nhà cung cấp: {selectedVoucher.receipt.supplier.name} · {selectedVoucher.receipt.lines.map(line=>line.lot.lotCode+' / '+line.lot.ingredient.name).join(', ')}</p>}
+          {selectedVoucher.kind==='ISSUE'&&<p>Lô: {selectedVoucher.lotId} · Số lượng: {selectedVoucher.quantity} {selectedVoucher.unit}</p>}
+          <p>Ghi chú: {selectedVoucher.inspection.remarks||'Không có'}</p>
+          <div className="stock-voucher-evidences">{selectedVoucher.evidences.map(file=><button type="button" className="outline" key={file.id} onClick={()=>void (async()=>{
+            try{
+              const content=await downloadStockVoucherEvidence(activeId,selectedVoucher.id,file.id)
+              const bytes=Uint8Array.from(atob(content.base64),c=>c.charCodeAt(0))
+              const url=URL.createObjectURL(new Blob([bytes],{type:content.mimeType}))
+              const link=document.createElement('a');link.href=url;link.download=content.filename;link.click()
+              setTimeout(()=>URL.revokeObjectURL(url),3000)
+            }catch(e){setError(e instanceof Error?e.message:'Không thể xem minh chứng.')}
+          })()}>{file.category}: {file.filename} · SHA-256 {file.sha256.slice(0,12)}…</button>)}</div>
+        </section>}
+
         <h3>Truy xuất nguồn gốc và nhật ký nhập / xuất</h3>
         <label>Tìm mã lô hoặc nguyên liệu <input value={movementSearch} onChange={e=>setMovementSearch(e.target.value)} placeholder="Mã lô / nguyên liệu / diễn giải"/></label>
         {movements.data?.length===0&&<p className="muted">Chưa có nhật ký.</p>}
