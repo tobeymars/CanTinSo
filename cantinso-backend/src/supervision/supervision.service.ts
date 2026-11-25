@@ -143,8 +143,12 @@ export class SupervisionService {
       !['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role))
       throw new ForbiddenException('Chỉ đơn vị đã ghi nhận được mở điều chỉnh nghiệp vụ của mình.');
     if ((action === 'check_report' || action === 'stage_report') && !['CENTRAL_KITCHEN','SCHOOL_KITCHEN'].includes(user.role)) throw new ForbiddenException('Chỉ bếp được báo cáo.');
-    if (action === 'check_report' && user.role === 'SCHOOL_KITCHEN' && user.kitchenId !== s.kitchenId)
-      throw new ForbiddenException('Nhân viên tiếp nhận tại trường chỉ được xem kiểm thực của bếp trung tâm.');
+    // A centrally supplied school receives FINISHED MEALS, not raw ingredients.
+    // Food-safety checks belong to the producing kitchen only.
+    if (action === 'check_report' && user.kitchenId !== s.kitchenId)
+      throw new ForbiddenException('Kiểm thực nguyên liệu, chế biến và lưu mẫu thuộc bếp trực tiếp sản xuất. Nhà trường chỉ tiếp nhận món ăn thành phẩm.');
+    if (action === 'stage_report' && itemId === 'DISPATCHED' && user.kitchenId !== s.kitchenId)
+      throw new ForbiddenException('Chỉ bếp chế biến được ghi nhận xuất món thành phẩm khỏi bếp.');
     const sampleLifecycle=['sample_dispose','sample_hold'].includes(action);
     const lateReason = sampleLifecycle ? '' : validateSupervisionWriteDate(date,body);
     try {
@@ -339,7 +343,9 @@ export class SupervisionService {
         if (itemId === 'DISPATCHED') verifySamplesBeforeDispatch(
           checks.food_sample, checks.processing, new Date(entry.at),
         );
-        if (itemId !== 'DISPATCHED' && user.role !== 'SCHOOL_KITCHEN') throw new ForbiddenException('Chỉ bếp tại trường được báo cáo mốc này.');
+        if (itemId !== 'DISPATCHED' && (user.role !== 'SCHOOL_KITCHEN' ||
+          (user.kitchenId !== s.kitchenId && user.schoolId !== s.schoolId)))
+          throw new ForbiddenException('Chỉ nhân viên bếp tại trường hoặc nhân viên phục vụ đúng trường được ghi nhận ra món, phục vụ.');
         if (required[0]==='DISPATCHED' && ['PLATED','READY'].includes(itemId) &&
           (!journey.ARRIVED?.confirmed || !arrivalAllowsService(journey.ARRIVED.arrival)))
           throw new ConflictException('BGH chưa chấp nhận phiếu giao nhận. Không được chuyển sang ra món hoặc phục vụ.');
@@ -380,8 +386,8 @@ export class SupervisionService {
           photos:itemId==='READY'?[body.photo]:[],...(servingReport?{serving:servingReport}:{}),
           history:[...(previousStage?.history??[]),...(previousStage?[{...previousStage,history:undefined}]:[])]};
       } else if (action === 'stage_arrival_confirm' || action === 'stage_arrival_resolve') {
-        // BGH directly records and confirms the handover at its own school.
-        // This is a receipt of delivery, not a food-safety certification.
+        // School administration confirms FINISHED DISHES delivered from the central kitchen.
+        // This is NOT a raw-ingredient receipt or a food-safety certificate.
         if (itemId !== 'ARRIVED') throw new BadRequestException('Chỉ hỗ trợ xác nhận mốc Đến trường.');
         const kitchen = await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}});
         if (kitchen?.type !== 'CENTRAL') throw new ConflictException('Bếp tại trường không có mốc Đến trường.');
