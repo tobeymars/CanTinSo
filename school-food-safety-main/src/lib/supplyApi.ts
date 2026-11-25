@@ -25,8 +25,21 @@ export const getSupplyIngredients=(id:string)=>request<SupplyIngredient[]>(kitch
 export const getSupplyLots=(id:string)=>request<SupplyLot[]>(kitchenPath(id)+'/lots')
 export const getSupplyMovements=(id:string)=>request<SupplyMovement[]>(kitchenPath(id)+'/movements')
 export const saveSupplySupplier=(kitchenId:string,input:{code:string;name:string;taxCode:string;contactName:string;phone:string;email:string;address:string;note:string},id?:string)=>request<SupplySupplier>(kitchenPath(kitchenId)+'/suppliers'+(id?'/'+encodeURIComponent(id):''),{method:id?'PATCH':'POST',body:JSON.stringify(input)})
+export type StockEvidenceInput={category:'DELIVERY_NOTE'|'LOT_PHOTO'|'INVOICE'|'QUALITY_CERTIFICATE'|'ISSUE_PHOTO'|'SCALE_PHOTO'|'OTHER';filename:string;mimeType:string;base64:string}
+export type StockInspection={
+ inspector:string;counterparty:string;location:string;documentNumber:string;actualTime:string;temperatureC:string;
+ documents:'PASS'|'PENDING';packaging:'PASS'|'PENDING';sensory:'PASS'|'PENDING';transport:'PASS'|'PENDING';quantity:'PASS'|'PENDING';weighing:'PASS'|'PENDING';remarks:string;
+}
+export type StockVoucher={
+ id:string;kind:'RECEIPT'|'ISSUE';status:string;number:string;postedAt:string;postedById:string;inspection:StockInspection;schoolId:string|null;lotId:string|null;
+ quantity:number|null;unit:string|null;
+ receipt?:{number:string;supplier:{name:string};lines:Array<{lot:{lotCode:string;ingredient:{name:string;unit:string}};quantity:string}>}|null;
+ evidences:Array<{id:string;category:string;filename:string;mimeType:string;size:number;sha256:string;createdAt:string}>;
+}
+export const getStockVouchers=(kitchenId:string)=>request<StockVoucher[]>(kitchenPath(kitchenId)+'/vouchers')
+export const downloadStockVoucherEvidence=(kitchenId:string,voucherId:string,evidenceId:string)=>request<{filename:string;mimeType:string;sha256:string;base64:string}>(kitchenPath(kitchenId)+'/vouchers/'+encodeURIComponent(voucherId)+'/evidences/'+encodeURIComponent(evidenceId))
 export const receiveSupplyLot=(kitchenId:string,input:{lotCode:string;ingredientId:string;supplierId:string;quantity:number;unit?:string;expiryDate:string;storageLocation:string;note:string})=>request<SupplyLot>(kitchenPath(kitchenId)+'/receipts',{method:'POST',body:JSON.stringify(input)})
-export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;unit:string;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'SNACK'})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
+export const issueSupplyLot=(kitchenId:string,lotId:string,input:{quantity:number;unit:string;note:string;schoolId:string;serviceDate:string;mealType:'BREAKFAST'|'LUNCH'|'SNACK';voucherNumber:string;inspection:StockInspection;evidences:StockEvidenceInput[]})=>request<{lotId:string;quantity:number;remainingQty:number}>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/issues',{method:'POST',body:JSON.stringify(input)})
 export const updateSupplySupplierStatus=(kitchenId:string,supplierId:string,status:'ACTIVE'|'INACTIVE')=>request<SupplySupplier>(kitchenPath(kitchenId)+'/suppliers/'+encodeURIComponent(supplierId)+'/status',{method:'PATCH',body:JSON.stringify({status})})
 
 export type SupplyFinance = {
@@ -39,7 +52,7 @@ export type SupplyFinance = {
 }
 export type SupplyPurchaseLine={ingredientId:string;lotCode:string;quantity:number;unit:string;unitPrice:number;expiryDate:string;storageLocation:string}
 export const getSupplyFinance=(id:string)=>request<SupplyFinance>(kitchenPath(id)+'/finance')
-export const createSupplyPurchase=(id:string,input:{number:string;supplierId:string;invoiceNumber:string;reference:string;description:string;lines:SupplyPurchaseLine[]})=>request<{id:string;number:string;total:number;lines:number}>(kitchenPath(id)+'/purchase-receipts',{method:'POST',body:JSON.stringify(input)})
+export const createSupplyPurchase=(id:string,input:{number:string;supplierId:string;invoiceNumber:string;reference:string;description:string;lines:SupplyPurchaseLine[];inspection:StockInspection;evidences:StockEvidenceInput[]})=>request<{id:string;number:string;total:number;lines:number}>(kitchenPath(id)+'/purchase-receipts',{method:'POST',body:JSON.stringify(input)})
 export const createSupplyPayment=(id:string,input:{receiptId:string;reference:string;amount:number;method:'BANK_TRANSFER'|'CASH'|'OTHER';paidAt:string;note:string})=>request<{id:string;reference:string;amount:number}>(kitchenPath(id)+'/payments',{method:'POST',body:JSON.stringify(input)})
 
 export type SupplierDocument = {id:string;category:string;receiptId:string|null;filename:string;mimeType:string;size:number;documentNumber:string|null;issuer:string|null;issuedAt:string|null;expiresAt:string|null;createdAt:string}
