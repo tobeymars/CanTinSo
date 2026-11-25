@@ -858,3 +858,18 @@ form .feedback-photo-picker.disabled{cursor:not-allowed;opacity:.6}
  .supervision-intake-modal .supervision-edit-buttons{margin:0 -13px;padding:12px 13px}
  .supervision-intake-modal .supervision-edit-buttons button{flex:1}
 }
+
+/* Intake radio controls must override the generic full-width modal input rule. */
+.supervision-intake-modal .sif-intake-checks .sif-choice{display:block;min-width:0;padding:13px}
+.supervision-intake-modal .sif-intake-checks .sif-choice>div{display:flex;align-items:center;gap:10px 22px;flex-wrap:wrap;margin-top:6px}
+.supervision-intake-modal .sif-intake-checks .sif-choice label{display:inline-flex;align-items:center;gap:8px;flex:none;min-width:0;font-size:13px;font-weight:600;cursor:pointer}
+.supervision-intake-modal .sif-intake-checks .sif-choice input[type="radio"]{
+  appearance:auto;display:block;flex:0 0 18px;width:18px;height:18px;min-width:18px;
+  margin:0;padding:0;border:0;border-radius:50%;accent-color:var(--primary);
+}
+.supervision-intake-modal .sif-intake-checks input:not([type="radio"]),
+.supervision-intake-modal .sif-intake-checks textarea,
+.supervision-intake-modal .supervision-ingredient-quantity select{
+  min-width:0;max-width:100%;box-sizing:border-box;
+}
+.supervision-intake-modal .sif-intake-checks .sif-choice legend{max-width:100%;line-height:1.5;white-space:normal}
