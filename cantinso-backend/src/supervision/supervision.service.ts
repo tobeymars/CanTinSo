@@ -102,7 +102,27 @@ export class SupervisionService {
     const checks=asObject(record?.checks), stages=asObject(record?.stages), approvals=asArray(record?.approvals);
     const snapshot=canonical({checks,journey:stages});
     const latest=approvals.at(-1);
-    return {checks,stages,approvals,approvalCurrent:!!latest && latest.snapshot===snapshot,events:record?.events??[]};
+    // Resolve the people shown in immutable audit history without exposing user secrets.
+    const actorIds=new Set<string>();
+    const addActor=(id:unknown)=>{
+      if(typeof id==='string' && /^[0-9a-f-]{36}$/i.test(id))actorIds.add(id);
+    };
+    for(const event of record?.events??[])addActor(event.actorId);
+    for(const item of Object.values(checks)){
+      addActor(item?.recordedBy);
+      for(const line of asArray(item?.history))addActor(line?.actorId);
+    }
+    for(const item of Object.values(stages)){
+      addActor(item?.actorId);
+      addActor(item?.confirmedBy);
+      for(const line of asArray(item?.history))addActor(line?.actorId);
+    }
+    const people=actorIds.size?await this.prisma.user.findMany({
+      where:{id:{in:[...actorIds]}},select:{id:true,fullName:true},
+    }):[];
+    const actors=Object.fromEntries(people.map(person=>[person.id,person.fullName]));
+    return {checks,stages,approvals,approvalCurrent:!!latest && latest.snapshot===snapshot,
+      actors,events:record?.events??[]};
   }
   async act(user: AuthUser, schoolId: string, date: string, mealType: string, body: any) {
     const s = await this.scope(user,schoolId,date,mealType);
