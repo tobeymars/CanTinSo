@@ -156,31 +156,6 @@ export class SupplyService {
     await this.permitted(user,kitchenId,true);
     throw new BadRequestException('Hãy dùng Phiếu nhập nhiều dòng có kiểm nhận, hình ảnh và chứng từ. Không được nhập lô trực tiếp.');
   }
-  private legacyReceiptNeverUsed(user:AuthUser,kitchenId:string,input:any) {
-    void user;void kitchenId;void input;
-    return null;
-  }
-  async deprecatedReceipt(user:AuthUser,kitchenId:string,input:any) {
-    await this.permitted(user,kitchenId,true);
-    const lotCode=str(input?.lotCode,'Mã lô',100);
-    if (!uuid(input?.ingredientId) || !uuid(input?.supplierId)) throw new BadRequestException('Phải chọn nguyên liệu và nhà cung cấp thực tế.');
-    const [ingredient,supplier]=await Promise.all([
-      this.prisma.ingredient.findUnique({where:{id:input.ingredientId}}),
-      this.prisma.supplier.findFirst({where:{id:input.supplierId,kitchenId,status:'ACTIVE'}}),
-    ]);
-    if(!ingredient || !supplier) throw new BadRequestException('Nguyên liệu hoặc nhà cung cấp không hợp lệ.');
-    const entered=canonicalQuantity(input?.quantity,input?.unit,ingredient.unit);
-    const quantity=entered.quantity;
-    const expiryDate=dateValue(input?.expiryDate);
-    if (expiryDate && expiryDate.getTime()<Date.now()-86400000) throw new BadRequestException('Không nhập lô đã hết hạn.');
-    try {
-      return await this.prisma.$transaction(async tx=>{
-        const lot=await tx.inventoryLot.create({data:{kitchenId,lotCode,ingredientId:ingredient.id,supplierId:supplier.id,quantity,remainingQty:quantity,unit:ingredient.unit,expiryDate,storageLocation:str(input?.storageLocation,'Vị trí lưu kho',120,false)||null}});
-        await tx.traceEvent.create({data:{lotId:lot.id,eventType:'RECEIVED',actorId:user.sub,description:str(input?.note,'Ghi chú',500,false)||'Nhập kho',metadata:{quantity,unit:ingredient.unit,enteredQuantity:entered.enteredQuantity,enteredUnit:entered.enteredUnit}}});
-        return lot;
-      });
-    } catch(error){if(error instanceof Prisma.PrismaClientKnownRequestError && error.code==='P2002') throw new ConflictException('Mã lô đã tồn tại trong kho bếp.');throw error;}
-  }
   async issue(user:AuthUser,kitchenId:string,lotId:string,input:any){
     await this.permitted(user,kitchenId,true);
     if(!uuid(lotId)) throw new BadRequestException('Mã lô không hợp lệ.');
