@@ -8,9 +8,10 @@ import { validateFoodSafetyForm } from './food-safety-forms';
 import { verifySamplesBeforeDispatch } from './dispatch-sample-policy';
 import { validateArrivalReceipt, arrivalAllowsService } from './arrival-receipt';
 import { validateServingStageReport } from './serving-stage-form';
+import { canKitchenRecordStage, stageOrderFor } from './stage-responsibility';
 
 const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sample'];
-const stages = ['PLATED', 'READY', 'DISPATCHED', 'ARRIVED'];
+const stages = stageOrderFor('CENTRAL');
 const asObject = (v: unknown): Record<string, any> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, any> : {};
 const asArray = (v: unknown): any[] => Array.isArray(v) ? v : [];
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, entry:unknown) =>
@@ -336,20 +337,20 @@ export class SupervisionService {
       } else if (action === 'stage_report') {
         const previousStage=journey[itemId];
         if (previousStage && !previousStage.revisionRequested) throw new ConflictException('Mốc đã lưu. Hãy mở điều chỉnh và nêu lý do trước khi báo cáo lại.');
-        const required = s.kitchenId && (await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}}))?.type === 'CENTRAL' ? stages : ['PLATED','READY'];
+        const kitchenKind=(await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}}))?.type;
+        const required = stageOrderFor(kitchenKind === 'CENTRAL' ? 'CENTRAL' : 'SCHOOL');
         if (!required.includes(itemId) || (!previousStage && required.find(x=>!journey[x])!==itemId)) throw new ConflictException('Cần báo cáo mốc theo thứ tự.');
         if (itemId === 'ARRIVED') throw new ForbiddenException('Mốc Đến trường do BGH lập phiếu và xác nhận, không do nhân viên bếp báo cáo.');
-        if (itemId === 'DISPATCHED' && user.role !== 'CENTRAL_KITCHEN') throw new ForbiddenException('Chỉ bếp trung tâm được báo cáo xuất bếp.');
+        if (!canKitchenRecordStage(user.role,user.kitchenId,s.kitchenId,
+          kitchenKind==='CENTRAL'?'CENTRAL':'SCHOOL',itemId))
+          throw new ForbiddenException('Chỉ bếp trực tiếp chế biến được ghi nhận Ra món, Sẵn sàng phục vụ và Xuất bếp.');
         if (itemId === 'DISPATCHED' && (!journey.PLATED?.confirmed || !journey.READY?.confirmed ||
           journey.PLATED?.revisionRequested || journey.READY?.revisionRequested))
           throw new ConflictException('Bếp phải hoàn tất Ra món và Sẵn sàng phục vụ trước khi xuất món thành phẩm đến trường.');
         if (itemId === 'DISPATCHED') verifySamplesBeforeDispatch(
           checks.food_sample, checks.processing, new Date(entry.at),
         );
-        if (['PLATED','READY'].includes(itemId) && (
-          user.kitchenId !== s.kitchenId ||
-          (required.includes('DISPATCHED') ? user.role !== 'CENTRAL_KITCHEN' : user.role !== 'SCHOOL_KITCHEN')))
-          throw new ForbiddenException('Ra món và Sẵn sàng phục vụ do bếp trực tiếp chế biến ghi nhận; trường chỉ xác nhận món đã giao đến.');
+        // The producing-kitchen authorization above applies to every reportable stage.
         // For a central kitchen, portioning and readiness happen BEFORE dispatch to school.
         // A school only confirms delivery of finished meals after DISPATCHED.
         let servingReport;
@@ -416,10 +417,10 @@ export class SupervisionService {
           history:previous?[...(previous.history??[]),{...previous,history:undefined}]:[]};
       } else if (action === 'stage_reopen') {
         if (itemId==='ARRIVED') throw new ForbiddenException('Phiếu tiếp nhận do BGH phụ trách, sử dụng chức năng Kiểm tra lại phiếu giao nhận.');
-        const centralKitchen=(await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}}))?.type==='CENTRAL';
-        if (user.kitchenId!==s.kitchenId ||
-          (centralKitchen ? user.role!=='CENTRAL_KITCHEN' : user.role!=='SCHOOL_KITCHEN'))
-          throw new ForbiddenException('Chỉ bếp trực tiếp thực hiện mốc được mở điều chỉnh.');
+        const kitchenKind=(await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}}))?.type;
+        if (!canKitchenRecordStage(user.role,user.kitchenId,s.kitchenId,
+          kitchenKind==='CENTRAL'?'CENTRAL':'SCHOOL',itemId))
+          throw new ForbiddenException('Chỉ bếp trực tiếp chế biến được mở điều chỉnh mốc của mình.');
         if (!journey[itemId] || journey[itemId].revisionRequested)
           throw new ConflictException('Mốc chưa có hồ sơ hoặc đang chờ cập nhật sau điều chỉnh.');
         if (note.length<10) throw new BadRequestException('Cần ghi lý do điều chỉnh tối thiểu 10 ký tự.');
@@ -459,7 +460,7 @@ export class SupervisionService {
         journey[itemId] = {...journey[itemId],confirmed:true,confirmedAt:entry.at,confirmedBy:user.sub,confirmationNote:note,...(arrival?{arrival,photos:arrival.photo?[arrival.photo]:[]}: {})};
       } else {
         const kitchen = await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}});
-        const required = kitchen?.type==='CENTRAL' ? stages : ['PLATED','READY'];
+        const required = stageOrderFor(kitchen?.type==='CENTRAL'?'CENTRAL':'SCHOOL');
         if (checkIds.some(id=>checks[id]?.status!=='confirmed') || required.some(id=>!journey[id]?.confirmed)) throw new ConflictException('Chưa đủ điều kiện xác nhận tổng thể.');
         if (kitchen?.type==='CENTRAL' && !arrivalAllowsService(journey.ARRIVED?.arrival))
           throw new ConflictException('Phiếu giao nhận có vấn đề chưa xử lý, không được duyệt hoàn tất bữa ăn.');
