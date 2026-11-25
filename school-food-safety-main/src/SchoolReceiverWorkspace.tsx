@@ -13,14 +13,14 @@ import './SchoolReceiverWorkspace.css'
 type Props = { schoolId: string; schoolName: string; date: string; view: 'overview' | 'menu' | 'supervision' }
 const mealTypes: SupervisionMealType[] = ['BREAKFAST', 'LUNCH', 'SNACK']
 const mealNames: Record<SupervisionMealType,string> = {BREAKFAST:'Bữa sáng',LUNCH:'Bữa trưa',SNACK:'Bữa xế'}
-const stages = ['DISPATCHED','ARRIVED','PLATED','READY'] as const
+const stages = ['PLATED','READY','DISPATCHED','ARRIVED'] as const
 type Stage = typeof stages[number]
 const stageNames: Record<Stage,string> = {DISPATCHED:'Xuất bếp',ARRIVED:'Đến trường',PLATED:'Ra món',READY:'Sẵn sàng phục vụ'}
 const stageHints: Record<Stage,string> = {
   DISPATCHED:'Bếp trung tâm báo cáo khi thức ăn rời bếp',
   ARRIVED:'Ghi nhận giao và kiểm tra tình trạng thức ăn tại trường',
-  PLATED:'Ghi nhận khi chia món tại trường',
-  READY:'Ghi nhận khi hoàn tất chuẩn bị, kèm ảnh thực tế'
+  PLATED:'Bếp chế biến ghi nhận khi chia suất món ăn thành phẩm',
+  READY:'Bếp chế biến kiểm tra suất ăn và chụp ảnh trước khi giao đi'
 }
 const labelDate=(date:string)=>new Date(date+'T12:00:00').toLocaleDateString('vi-VN')
 
@@ -47,7 +47,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
   const central=kitchen.data?.providerType==='CENTRAL'
   const order:Stage[]=kitchen.data ? (central?[...stages]:['PLATED','READY']) : []
   const next=order.find(stage=>!current[stage] || current[stage]?.revisionRequested)
-  const canReport=next==='ARRIVED'||next==='PLATED'||next==='READY'
+  const canReport=!central && (next==='PLATED'||next==='READY')
   const dateKind=supervisionDateKind(date)
   const canAct=dateKind!=='future'&&!record.data?.approvalCurrent
   const reset=()=>{setEditing(null);setNote('');setLateReason('');setPhoto('');setPhotoName('');setError('')}
@@ -72,7 +72,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
       if(editing==='READY'&&!photo)throw Error('Cần chọn ảnh thực tế của bữa ăn.')
       await writeServerSupervision(scope,{action:'stage_report',itemId:editing,note,lateReason,photo})
       await queryClient.invalidateQueries({queryKey:['supervision-server',schoolId,date,mealType]})
-      setNotice('Đã ghi nhận mốc '+stageNames[editing]+'. Chờ BGH xác nhận.')
+      setNotice('Đã ghi nhận mốc '+stageNames[editing]+' tại bếp sản xuất.')
       reset()
     }catch(e){setError(e instanceof Error?e.message:'Không cập nhật được mốc vận hành.')}
     finally{setBusy(false)}
@@ -99,7 +99,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
         </article>
       })}
       <div className="receiver-next card"><Truck size={20}/><div><strong>Quy trình tiếp nhận</strong>
-        <p>Bếp trung tâm ghi Xuất bếp; BGH lập phiếu xác nhận Đến trường. Nhân viên được phân công ghi Ra món và Sẵn sàng phục vụ; BGH kiểm tra, xác nhận từng mốc.</p>
+        <p>Bếp trung tâm thực hiện Ra món, Sẵn sàng phục vụ và Xuất bếp. BGH xác nhận món ăn thành phẩm đã giao đến; nhân viên trường không ghi kiểm thực hoặc mốc vận hành của bếp trung tâm.</p>
         <Link to="/giam-sat">Mở nhật ký tiếp nhận</Link></div></div>
     </div>}
     {view!=='overview'&&<>
@@ -117,7 +117,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
       {view==='supervision'&&<>
         <section className="card receiver-journey">
           <div className="receiver-title"><ClipboardCheck size={20}/><h3>Các mốc vận hành</h3></div>
-          <p>Chỉ ghi nhận sự kiện đã diễn ra thực tế. Xuất bếp do Bếp Long Hoa báo cáo; Nhật ký do đơn vị thực hiện lưu; BGH xem theo trường được quản lý.</p>
+          <p>Chỉ ghi nhận sự kiện đã diễn ra thực tế. Ra món, Sẵn sàng phục vụ và Xuất bếp do bếp sản xuất ghi nhận; BGH xác nhận giao nhận thành phẩm. Trường chỉ xem hồ sơ vận hành của bếp.</p>
           {record.isLoading?<p>Đang tải trạng thái vận hành…</p>:record.isError?<p className="error" role="alert">Không tải được trạng thái: {record.error instanceof Error?record.error.message:'Lỗi kết nối'}</p>:
             <div className="receiver-stage-list">
               {order.map(stage=>{
@@ -150,7 +150,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
             {editing==='READY'&&<label>Ảnh thực tế khi sẵn sàng phục vụ *<input type="file" required={!photo} accept="image/jpeg,image/png,image/webp" onChange={e=>void onPhoto(e.target.files?.[0])}/>{photoName&&<small>Ảnh đã chọn: {photoName}</small>}</label>}
             {dateKind==='past'&&<label>Lý do cập nhật hồ sơ ngày đã qua *<textarea required minLength={10} maxLength={1000} rows={2} value={lateReason} onChange={e=>setLateReason(e.target.value)}/></label>}
             {error&&<p className="error" role="alert">{error}</p>}
-            <div><button type="button" className="outline" onClick={reset}>Hủy</button><button className="primary" type="submit" disabled={busy||editing==='READY'&&!photo}>{busy?'Đang lưu…':'Lưu · Chờ BGH xác nhận'}</button></div>
+            <div><button type="button" className="outline" onClick={reset}>Hủy</button><button className="primary" type="submit" disabled={busy||editing==='READY'&&!photo}>{busy?'Đang lưu…':'Lưu phiếu vận hành'}</button></div>
           </form>
         </section>}
       </>}
