@@ -22,6 +22,7 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
   const [reversalReason,setReversalReason]=useState('')
   const [debtOnly,setDebtOnly]=useState(false)
   const [tab,setTab]=useState<'receipts'|'payments'>('receipts')
+  const [paymentFormOpen,setPaymentFormOpen]=useState(false)
   const [expanded,setExpanded]=useState<string|null>(null)
   const [receiptId,setReceiptId]=useState('')
   const [reference,setReference]=useState('')
@@ -37,10 +38,16 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
     if(!selected)return
     void execute(async()=>{
       await createSupplyPayment(kitchenId,{receiptId:selected.id,reference,amount:Number(amount),method,paidAt,note})
-      setReceiptId('');setReference('');setAmount('');setNote('')
+      setReceiptId('');setReference('');setAmount('');setNote('');setPaymentFormOpen(false)
     },'Đã ghi nhận phiếu thanh toán và cập nhật công nợ.')
   }
   return <div className="supply-finance">
+    <div className="supply-supplier-finance-actions">
+      {canEdit&&<button type="button" className={paymentFormOpen?'outline':'primary'}
+        onClick={()=>setPaymentFormOpen(open=>!open)}>
+        {paymentFormOpen?'Đóng biểu mẫu':'Ghi nhận thanh toán'}
+      </button>}
+    </div>
     <div className="management-kpis supply-finance-kpis">
       {[
         {label:'Tổng nhà cung cấp',value:String(finance.totals.suppliers),desc:finance.totals.activeSuppliers+' đang hoạt động',Icon:Building2},
@@ -99,8 +106,8 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
       </tbody></table></div>}
       {(tab==='receipts'&&!finance.receipts.length||tab==='payments'&&!finance.payments.length)&&<p className="muted">Chưa có chứng từ trong hệ thống.</p>}
     </section>
-    {canEdit&&<section className="card supply-panel supply-payment-panel">
-      <h3>Ghi nhận thanh toán nhà cung cấp</h3>
+    {canEdit&&paymentFormOpen&&<section className="card supply-panel supply-payment-panel">
+      <div className="supply-section-heading"><h3>Ghi nhận thanh toán nhà cung cấp</h3><button type="button" className="outline" onClick={()=>setPaymentFormOpen(false)}>Về danh sách</button></div>
       <p className="muted">Chỉ ghi nhận khoản thanh toán thực tế, không tự đánh dấu đã trả khi nhập kho. Mỗi khoản thanh toán liên kết với một phiếu nhập.</p>
       <form className="supply-form-grid" onSubmit={submit}>
         <label>Phiếu nhập còn nợ *<select required value={receiptId} onChange={event=>{setReceiptId(event.target.value);setAmount('')}}><option value="">Chọn phiếu nhập</option>{outstanding.map(row=><option value={row.id} key={row.id}>{row.number} · {row.supplier.name} · còn {cash(row.debt)}</option>)}</select></label>
@@ -109,7 +116,7 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
         <label>Hình thức thanh toán <select value={method} onChange={event=>setMethod(event.target.value as typeof method)}><option value="BANK_TRANSFER">Chuyển khoản</option><option value="CASH">Tiền mặt</option><option value="OTHER">Khác</option></select></label>
         <label>Ngày thanh toán <input type="date" required value={paidAt} onChange={event=>setPaidAt(event.target.value)}/></label>
         <label>Diễn giải / chứng từ <input value={note} maxLength={500} onChange={event=>setNote(event.target.value)}/></label>
-        <div style={{alignSelf:'end'}}><button className="primary" type="submit" disabled={busy||!selected}>Ghi nhận thanh toán</button></div>
+        <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy||!selected}>Lưu thanh toán</button><button type="button" className="outline" onClick={()=>setPaymentFormOpen(false)}>Hủy</button></div>
       </form>
       {!outstanding.length&&<p className="muted">Không có phiếu nhập còn nợ.</p>}
     </section>}
