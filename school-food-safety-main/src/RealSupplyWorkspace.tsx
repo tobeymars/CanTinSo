@@ -36,7 +36,7 @@ function SupplyDialog({onClose,busy,children,title='Tạo phiếu nhập kho',ey
     onCancel={event=>{event.preventDefault();if(!busy)onClose()}}>
     <header className="supply-receipt-modal__heading">
       <div><small>{eyebrow}</small><h2>{title}</h2><p>{description}</p></div>
-      <button type="button" className="supply-receipt-modal__close" title="Đóng cửa sổ" aria-label="Đóng biểu mẫu nhập kho" disabled={busy} onClick={onClose}><X size={20}/></button>
+      <button type="button" className="supply-receipt-modal__close" title="Đóng cửa sổ" aria-label="Đóng cửa sổ" disabled={busy} onClick={onClose}><X size={20}/></button>
     </header>
     <div className="supply-receipt-modal__content">{children}</div>
   </dialog>
