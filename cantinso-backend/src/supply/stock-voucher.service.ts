@@ -20,7 +20,10 @@ export class StockVoucherService {
         receipt:{select:{id:true,number:true,supplier:{select:{name:true}},lines:{
           include:{lot:{select:{lotCode:true,ingredient:{select:{name:true,unit:true}}}}}}}}},
       orderBy:{postedAt:'desc'},take:200});
-    return rows.map(row=>({...row,quantity:row.quantity===null?null:Number(row.quantity)}));
+    const users=await this.prisma.user.findMany({where:{id:{in:[...new Set(rows.map(row=>row.postedById))]}},select:{id:true,fullName:true}});
+    const names=new Map(users.map(user=>[user.id,user.fullName]));
+    return rows.map(row=>({...row,postedByName:names.get(row.postedById)??'Không xác định',
+      quantity:row.quantity===null?null:Number(row.quantity)}));
   }
   async evidence(user:AuthUser,kitchenId:string,voucherId:string,evidenceId:string){
     const {where}=await this.scope(user,kitchenId);
