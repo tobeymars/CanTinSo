@@ -262,7 +262,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         </tbody></table></div>
         {selectedVoucher&&<section className="supply-panel stock-voucher-view" aria-label="Chi tiết phiếu kho">
           <div className="supply-section-heading"><h3>{selectedVoucher.number} · {selectedVoucher.kind==='RECEIPT'?'Nhập kho':'Xuất kho'}</h3><button type="button" className="outline" onClick={()=>setSelectedVoucher(null)}>Đóng</button></div>
-          <p>Đã ghi sổ: {new Date(selectedVoucher.postedAt).toLocaleString('vi-VN')} · Người ghi sổ ID: {selectedVoucher.postedById}</p>
+          <p>Đã ghi sổ: {new Date(selectedVoucher.postedAt).toLocaleString('vi-VN')} · Người ghi sổ: {selectedVoucher.postedByName}</p>
           <p>Người kiểm tra: <strong>{selectedVoucher.inspection.inspector}</strong> · Người giao/nhận: {selectedVoucher.inspection.counterparty}</p>
           <p>Vị trí: {selectedVoucher.inspection.location} · Thời điểm: {selectedVoucher.inspection.actualTime} · Chứng từ: {selectedVoucher.inspection.documentNumber}</p>
           {selectedVoucher.receipt&&<p>Nhà cung cấp: {selectedVoucher.receipt.supplier.name} · {selectedVoucher.receipt.lines.map(line=>line.lot.lotCode+' / '+line.lot.ingredient.name).join(', ')}</p>}
