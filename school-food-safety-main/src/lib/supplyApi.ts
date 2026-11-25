@@ -29,6 +29,7 @@ export type StockEvidenceInput={category:'DELIVERY_NOTE'|'LOT_PHOTO'|'INVOICE'|'
 export type StockInspection={
  inspector:string;counterparty:string;location:string;documentNumber:string;actualTime:string;temperatureC:string;
  documents:'PASS'|'PENDING';packaging:'PASS'|'PENDING';sensory:'PASS'|'PENDING';transport:'PASS'|'PENDING';quantity:'PASS'|'PENDING';weighing:'PASS'|'PENDING';remarks:string;
+ approvedPlan?:{revisionId:string;ingredientId:string;dishVersionIds:string[]};
 }
 export type StockVoucher={
  id:string;kind:'RECEIPT'|'ISSUE'|'RETURN';status:string;number:string;postedAt:string;postedById:string;postedByName:string;inspection:StockInspection;schoolId:string|null;lotId:string|null;
