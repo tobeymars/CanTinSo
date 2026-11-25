@@ -13,14 +13,14 @@ import './SchoolReceiverWorkspace.css'
 type Props = { schoolId: string; schoolName: string; date: string; view: 'overview' | 'menu' | 'supervision' }
 const mealTypes: SupervisionMealType[] = ['BREAKFAST', 'LUNCH', 'SNACK']
 const mealNames: Record<SupervisionMealType,string> = {BREAKFAST:'Bữa sáng',LUNCH:'Bữa trưa',SNACK:'Bữa xế'}
-const stages = ['PLATED','READY','DISPATCHED','ARRIVED'] as const
+const stages = ['DISPATCHED','ARRIVED','PLATED','READY'] as const
 type Stage = typeof stages[number]
 const stageNames: Record<Stage,string> = {DISPATCHED:'Xuất bếp',ARRIVED:'Đến trường',PLATED:'Ra món',READY:'Sẵn sàng phục vụ'}
 const stageHints: Record<Stage,string> = {
   DISPATCHED:'Bếp trung tâm báo cáo khi thức ăn rời bếp',
   ARRIVED:'Ghi nhận giao và kiểm tra tình trạng thức ăn tại trường',
-  PLATED:'Bếp chế biến ghi nhận khi chia suất món ăn thành phẩm',
-  READY:'Bếp chế biến kiểm tra suất ăn và chụp ảnh trước khi giao đi'
+  PLATED:'Bếp chế biến ghi nhận chia suất sau khi thành phẩm đến trường',
+  READY:'Bếp chế biến kiểm tra suất ăn và lưu ảnh trước khi phục vụ'
 }
 const labelDate=(date:string)=>new Date(date+'T12:00:00').toLocaleDateString('vi-VN')
 
@@ -99,7 +99,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
         </article>
       })}
       <div className="receiver-next card"><Truck size={20}/><div><strong>Quy trình tiếp nhận</strong>
-        <p>Bếp trung tâm thực hiện Ra món, Sẵn sàng phục vụ và Xuất bếp. BGH xác nhận món ăn thành phẩm đã giao đến; nhân viên trường không ghi kiểm thực hoặc mốc vận hành của bếp trung tâm.</p>
+        <p>Bếp trung tâm ghi Xuất bếp, BGH xác nhận món đã Đến trường, sau đó bếp trung tâm ghi Ra món và Sẵn sàng phục vụ. Nhân viên trường không ghi thay nghiệp vụ của bếp trung tâm.</p>
         <Link to="/giam-sat">Mở nhật ký tiếp nhận</Link></div></div>
     </div>}
     {view!=='overview'&&<>
@@ -117,7 +117,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
       {view==='supervision'&&<>
         <section className="card receiver-journey">
           <div className="receiver-title"><ClipboardCheck size={20}/><h3>Các mốc vận hành</h3></div>
-          <p>Chỉ ghi nhận sự kiện đã diễn ra thực tế. Ra món, Sẵn sàng phục vụ và Xuất bếp do bếp sản xuất ghi nhận; BGH xác nhận giao nhận thành phẩm. Trường chỉ xem hồ sơ vận hành của bếp.</p>
+          <p>Chỉ ghi nhận sự kiện đã diễn ra thực tế. Trình tự: Xuất bếp → Đến trường → Ra món → Sẵn sàng phục vụ. BGH xác nhận giao nhận thành phẩm; bếp sản xuất ghi nhận các mốc của bếp.</p>
           {record.isLoading?<p>Đang tải trạng thái vận hành…</p>:record.isError?<p className="error" role="alert">Không tải được trạng thái: {record.error instanceof Error?record.error.message:'Lỗi kết nối'}</p>:
             <div className="receiver-stage-list">
               {order.map(stage=>{
