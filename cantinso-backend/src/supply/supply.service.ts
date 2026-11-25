@@ -195,7 +195,7 @@ export class SupplyService {
       }});
       await tx.stockVoucherEvidence.createMany({data:evidences.map(file=>({
         voucherId:voucher.id,category:file.category,filename:file.filename,mimeType:file.mimeType,
-        size:file.size,sha256:file.sha256,data:file.data,uploadedById:user.sub,
+        size:file.size,sha256:file.sha256,data:Uint8Array.from(file.data),uploadedById:user.sub,
       }))});
       await tx.traceEvent.create({data:{lotId,eventType:'ISSUED',actorId:user.sub,description:reason,metadata:{
         kind:'ISSUE',voucherId:voucher.id,voucherNumber,quantity,unit:lot.unit,
