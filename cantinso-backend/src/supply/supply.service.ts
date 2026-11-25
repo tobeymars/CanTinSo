@@ -190,6 +190,12 @@ export class SupplyService {
         }}},
       });
       if(!revision)throw new ForbiddenException('Phiếu xuất phải gắn với đúng phiên bản thực đơn đã duyệt của trường, ngày và bữa.');
+      const latestApproved=await this.prisma.mealPlanRevision.findFirst({
+        where:{mealPlan:{kitchenId,schoolId,serviceDate:day,mealType},status:'APPROVED'},
+        orderBy:{revisionNo:'desc'},select:{id:true},
+      });
+      if(latestApproved?.id!==revision.id)
+        throw new ConflictException('Có phiên bản thực đơn được duyệt mới hơn. Hãy làm mới dự trù trước khi xuất kho.');
       const selected=revision.items.filter(item=>item.dishVersion.ingredients.some(line=>line.ingredientId===input.ingredientId));
       if(!uuid(input.ingredientId)||!selected.length)
         throw new BadRequestException('Nguyên liệu không nằm trong các món mặc định của thực đơn đã duyệt.');
