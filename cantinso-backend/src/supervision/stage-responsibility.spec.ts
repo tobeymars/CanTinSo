@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import { canKitchenRecordStage, stageOrderFor } from './stage-responsibility';
 
 const kitchenId='kitchen-central';
-test('central kitchen portions and readies food before dispatch and school arrival',()=>{
- assert.deepEqual(stageOrderFor('CENTRAL'),['PLATED','READY','DISPATCHED','ARRIVED']);
+test('central kitchen dispatches, school receives, then kitchen records portioning and readiness',()=>{
+ assert.deepEqual(stageOrderFor('CENTRAL'),['DISPATCHED','ARRIVED','PLATED','READY']);
 });
 test('on-site cooking has only its own portioning and readiness stages',()=>{
  assert.deepEqual(stageOrderFor('SCHOOL'),['PLATED','READY']);
