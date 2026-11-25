@@ -435,7 +435,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         {issueLot&&canEdit&&<form className="supply-panel supply-issue-form" onSubmit={submitIssue}>
           <h3><ClipboardList size={18}/>Xuất kho · {issueLot.lotCode} ({readableStockQuantity(issueLot.remainingQty,issueLot.unit)} còn lại)</h3>
           <p className="muted">Chỉ ghi trừ tồn khi có đủ chứng từ và kiểm xuất đạt. Mã phiếu không được trùng trong kho.</p>
-          {issuePlanLink&&<p className="supply-plan-link"><strong>Liên kết thực đơn đã duyệt:</strong> {requirements.data?.schoolName} · {requirements.data?.serviceDate} · {requirements.data?.mealType} · phiên bản {requirements.data?.revisionNo}. Khối lượng thực xuất phải được cân lại; không tự trừ theo dự trù.</p>
+          {issuePlanLink&&<p className="supply-plan-link"><strong>Liên kết thực đơn đã duyệt:</strong> {requirements.data?.schoolName} · {requirements.data?.serviceDate} · {requirements.data?.mealType} · phiên bản {requirements.data?.revisionNo}. Khối lượng thực xuất phải được cân lại; không tự trừ theo dự trù.</p>}
           <label>Mã phiếu xuất *<input required maxLength={60} value={issue.voucherNumber} onChange={e=>setIssue(v=>({...v,voucherNumber:e.target.value}))} placeholder="XK-2026-001"/></label>
           <div style={{display:'grid',gridTemplateColumns:'minmax(160px,1fr) minmax(95px,140px)',gap:10}}>
             <label>Số lượng xuất *<input type="number" required min="0.000001" step="any" max={convertReceiptQuantity(issueLot.remainingQty,issueLot.unit,issue.unit||issueLot.unit)??undefined} value={issue.quantity} onChange={e=>setIssue(v=>({...v,quantity:e.target.value}))}/></label>
