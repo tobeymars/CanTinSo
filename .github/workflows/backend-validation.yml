@@ -56,5 +56,7 @@ jobs:
         run: npm run prisma:seed:annex7
       - name: Validate warehouse proof and inspection rules
         run: npm run test:stock-vouchers
+      - name: Validate serving-stage operations
+        run: npm run test:supervision-serving
       - name: Build NestJS backend
         run: npm run build
