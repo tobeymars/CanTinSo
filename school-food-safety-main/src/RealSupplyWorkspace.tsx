@@ -447,7 +447,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <small className="muted">Tồn có thể xuất: {formatReceiptQuantity(issueLot.remainingQty)} {issueLot.unit}. Hệ thống quy đổi trước khi trừ tồn.</small>
           <label>Trường được cấp nguyên liệu *<select required value={issue.schoolId} onChange={e=>setIssue(v=>({...v,schoolId:e.target.value}))}><option value="">Chọn trường nhận</option>{schoolQuery.data?.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           <label>Ngày sử dụng *<input type="date" required value={issue.serviceDate} onChange={e=>setIssue(v=>({...v,serviceDate:e.target.value}))}/></label>
-          <label>Bữa sử dụng *<select value={issue.mealType} onChange={e=>setIssue(v=>({...v,mealType:e.target.value as typeof issue.mealType}))}><option value="BREAKFAST">Bữa sáng</option><option value="LUNCH">Bữa trưa</option><option value="SNACK">Bữa xế</option></select></label>
+          <label>Bữa sử dụng *<select value={issue.mealType} onChange={e=>setIssue(v=>({...v,mealType:e.target.value as typeof issue.mealType}))}><option value="BREAKFAST">Bữa sáng</option><option value="LUNCH">Bữa trưa</option><option value="DINNER">Bữa tối</option><option value="SNACK">Bữa xế</option></select></label>
           <label>Lý do / chứng từ xuất *<input required maxLength={500} value={issue.note} onChange={e=>setIssue(v=>({...v,note:e.target.value}))}/></label>
           <StockInspectionFields kind="ISSUE" value={issueInspection} onChange={setIssueInspection}/>
           <StockEvidenceFields kind="ISSUE" value={issueEvidences} onChange={setIssueEvidences}/>
