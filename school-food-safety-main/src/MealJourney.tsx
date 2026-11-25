@@ -11,12 +11,12 @@ import breakfastDemo from './assets/dishes/porridge.svg'
 import snackDemo from './assets/dishes/fruit.svg'
 
 const centralSteps = [
-  { status: 'PLATED', label: 'Ra món' },
-  { status: 'READY', label: 'Sẵn sàng phục vụ' },
   { status: 'DISPATCHED', label: 'Xuất bếp' },
   { status: 'ARRIVED', label: 'Đến trường' },
+  { status: 'PLATED', label: 'Ra món' },
+  { status: 'READY', label: 'Sẵn sàng phục vụ' },
 ]
-const onSiteSteps = centralSteps.slice(0,2)
+const onSiteSteps = centralSteps.slice(2)
 
 /**
  * Hành trình công khai dùng chung cho 5 vai trò, ở Tổng quan, Giám sát và Tiến trình.
@@ -69,7 +69,7 @@ export function MealJourneyProgress({
     <div className="journey-summary">
       <span className="live-dot"/>
       <div><strong>{latest?.label ?? 'Chưa có mốc vận hành'}</strong>
-        <p>{!latest ? 'Chưa có bản ghi · Chờ đơn vị cập nhật' : lastConfirmed ? 'Mốc gần nhất đã xác nhận' : 'Đã báo cáo · Chờ Ban Giám hiệu xác nhận'}</p>
+        <p>{!latest ? 'Chưa có bản ghi · Chờ đơn vị cập nhật' : lastConfirmed ? 'Mốc gần nhất đã xác nhận' : 'Đã ghi nhận · Cần kiểm tra trạng thái'}</p>
       </div>
       <Clock3 size={20}/>
     </div>
@@ -82,7 +82,7 @@ export function MealJourneyProgress({
           <div className="timeline-title"><strong>{label}</strong><time>{event?.time ?? '—'}</time></div>
           <p>{event?.actor ?? 'Chưa có người ghi nhận'}</p>
           <span className={event?.confirmed ? 'confirmed-text' : 'pending-text'}>{!event ? 'Chưa ghi nhận' : event.confirmed ? 'Đã xác nhận' : 'Đã ghi nhận · Cần bếp xử lý'}</span>
-          {status === 'READY' && liveSupervision && <div className="journey-ready-evidence">{readyPhoto ? <button type="button" className="journey-ready-photo" onClick={onReadyPhotoClick} aria-label="Xem ảnh bếp ghi nhận trước khi giao món"><img src={readyPhoto} alt="Ảnh thực tế bếp ghi nhận" loading="lazy"/><span>Ảnh thực tế đã được BGH xác nhận</span></button> : <p className="muted">Chưa có ảnh phục vụ đã được BGH xác nhận.</p>}</div>}
+          {status === 'READY' && liveSupervision && <div className="journey-ready-evidence">{readyPhoto ? <button type="button" className="journey-ready-photo" onClick={onReadyPhotoClick} aria-label="Xem ảnh bếp ghi nhận trước khi giao món"><img src={readyPhoto} alt="Ảnh thực tế bếp ghi nhận" loading="lazy"/><span>Ảnh thực tế bếp đã ghi nhận</span></button> : <p className="muted">Chưa có ảnh thực tế bếp ghi nhận.</p>}</div>}
           {status === 'READY' && !liveSupervision && <div className="journey-ready-evidence">
             <button type="button" className="journey-ready-photo" onClick={onReadyPhotoClick} aria-label="Xem ảnh bước Sẵn sàng phục vụ">
               <img src={readyPhoto ?? placeholderPhoto} onError={e => {e.currentTarget.src=placeholderPhoto}} alt={readyPhoto ? 'Ảnh thực tế được duyệt công khai' : 'Ảnh minh họa DEMO tại bước Sẵn sàng phục vụ'} loading="lazy"/>
