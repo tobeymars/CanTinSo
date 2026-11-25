@@ -57,6 +57,10 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [returnOpen,setReturnOpen]=useState(false)
   const [issueLot,setIssueLot]=useState<SupplyLot|null>(null)
   const [section,setSection]=useState<'overview'|'stock'|'receipts'|'issues'|'transfers'|'lots'|'trace'>('overview')
+  const [receiptFormOpen,setReceiptFormOpen]=useState(false)
+  const [receiptSearch,setReceiptSearch]=useState('')
+  const [receiptPage,setReceiptPage]=useState(1)
+  const [receiptViewId,setReceiptViewId]=useState<string|null>(null)
   const [lotSearch,setLotSearch]=useState('')
   const [movementSearch,setMovementSearch]=useState('')
   const [moveLot,setMoveLot]=useState<SupplyLot|null>(null)
@@ -70,7 +74,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setViewingSupplier(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -146,6 +150,26 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const supplierPages=Math.max(1,Math.ceil(filteredSuppliers.length/10))
   const visibleSuppliers=filteredSuppliers.slice((Math.min(supplierPage,supplierPages)-1)*10,Math.min(supplierPage,supplierPages)*10)
   const matchedLots=(lots.data??[]).filter(lot=>(lot.lotCode+' '+lot.ingredient.name+' '+lot.supplier.name).toLocaleLowerCase('vi').includes(lotSearch.toLocaleLowerCase('vi')))
+  // A historical finance receipt may predate the new evidence-backed voucher model.
+  // Keep it visible without mislabelling it as a fully documented receipt.
+  const receiptVouchers=(vouchers.data??[]).filter(v=>v.kind==='RECEIPT')
+  const documentedReceiptIds=new Set(receiptVouchers.map(v=>v.receipt?.id).filter(Boolean))
+  const receiptRows=[
+    ...receiptVouchers.map(v=>({
+      id:v.id,number:v.number,postedAt:v.postedAt,supplier:v.receipt?.supplier.name??'Chưa có thông tin',
+      lineCount:v.receipt?.lines.length??0,amount:(finance.data?.receipts??[]).find(r=>r.id===v.receipt?.id)?.total??null,
+      voucher:v,
+    })),
+    ...(finance.data?.receipts??[]).filter(r=>!documentedReceiptIds.has(r.id)).map(r=>({
+      id:'legacy-'+r.id,number:r.number,postedAt:r.createdAt,supplier:r.supplier.name,
+      lineCount:r.lines.length,amount:r.total,voucher:null as StockVoucher|null,
+    })),
+  ].sort((a,b)=>new Date(b.postedAt).getTime()-new Date(a.postedAt).getTime())
+  const filteredReceipts=receiptRows.filter(row=>(row.number+' '+row.supplier+' '+row.postedAt).toLocaleLowerCase('vi').includes(receiptSearch.trim().toLocaleLowerCase('vi')))
+  const receiptPageCount=Math.max(1,Math.ceil(filteredReceipts.length/10))
+  const shownReceiptPage=Math.min(receiptPage,receiptPageCount)
+  const visibleReceipts=filteredReceipts.slice((shownReceiptPage-1)*10,shownReceiptPage*10)
+  const viewedReceipt=receiptRows.find(r=>r.id===receiptViewId)
   const matchedMovements=(movements.data??[]).filter(item=>(item.lot.lotCode+' '+item.lot.ingredient.name+' '+(item.description??'')).toLocaleLowerCase('vi').includes(movementSearch.toLocaleLowerCase('vi')))
   function confirmMove(e:FormEvent){e.preventDefault();if(!moveLot)return
     void execute(async()=>{await moveSupplyLot(activeId,moveLot.id,newLocation,moveReason);setMoveLot(null);setNewLocation('');setMoveReason('')},'Đã chuyển vị trí bảo quản và ghi nhật ký.')
@@ -264,10 +288,90 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy||!issueEvidences.some(x=>x.category==='ISSUE_PHOTO')||!issueEvidences.some(x=>x.category==='SCALE_PHOTO')}>Xác nhận xuất kho</button><button className="outline" type="button" onClick={()=>setIssueLot(null)}>Hủy</button></div>
         </form>}
       </>}
-      {section==='receipts'&&<>
-        <h3><PackagePlus size={18}/>Tiếp nhận lô nguyên liệu mới</h3>
-        <RealPurchaseReceipt key={activeId} kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>setSection('stock')}/>
-      </>}
+      {section==='receipts'&&<section className="supply-receipts-workspace">
+        <div className="supply-section-heading supply-receipts-heading">
+          <div>
+            <h3><PackagePlus size={19}/> Quản lý phiếu nhập kho</h3>
+            <p className="muted">Xem phiếu đã ghi nhận và kiểm tra chứng từ theo từng lô. Tạo phiếu mới bằng chức năng riêng, không chỉnh sửa số liệu đã ghi sổ.</p>
+          </div>
+          {canEdit&&<button type="button" className={receiptFormOpen?'outline':'primary'} onClick={()=>{setReceiptFormOpen(open=>!open);setReceiptViewId(null)}}>
+            {receiptFormOpen?'Đóng biểu mẫu':<><Plus size={16}/> Tạo phiếu nhập</>}
+          </button>}
+        </div>
+        {receiptFormOpen&&canEdit&&<section className="supply-receipt-editor" aria-label="Tạo phiếu nhập kho">
+          <div className="supply-receipt-editor__heading">
+            <strong>Phiếu nhập nguyên liệu mới</strong>
+            <button type="button" className="outline" onClick={()=>setReceiptFormOpen(false)}>Quay về danh sách</button>
+          </div>
+          <RealPurchaseReceipt key={activeId} kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>{setReceiptFormOpen(false);setReceiptViewId(null);setReceiptPage(1)}}/>
+        </section>}
+        {!receiptFormOpen&&<>
+          <div className="management-toolbar supply-filterbar supply-receipt-filterbar">
+            <label>Tìm kiếm phiếu nhập
+              <input value={receiptSearch} onChange={e=>{setReceiptSearch(e.target.value);setReceiptPage(1)}} placeholder="Mã phiếu, nhà cung cấp, ngày nhập…"/>
+            </label>
+            <span className="muted">{filteredReceipts.length} phiếu nhập</span>
+          </div>
+          {vouchers.isLoading||(canEdit&&finance.isLoading)?<p role="status" className="muted">Đang tải danh sách phiếu nhập…</p>:
+          <div className="supply-table-scroll">
+            <table className="supply-table supply-receipt-list">
+              <thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Nhà cung cấp</th><th>Số dòng</th><th>Giá trị</th><th>Hồ sơ</th><th>Thao tác</th></tr></thead>
+              <tbody>
+                {visibleReceipts.map(row=><tr key={row.id}>
+                  <td><strong>{row.number}</strong></td>
+                  <td>{new Date(row.postedAt).toLocaleString('vi-VN')}</td>
+                  <td>{row.supplier}</td>
+                  <td>{row.lineCount}</td>
+                  <td>{row.amount===null?'—':row.amount.toLocaleString('vi-VN')+' đ'}</td>
+                  <td>{row.voucher?<span className="supply-receipt-status">Đã lưu {row.voucher.evidences.length} minh chứng</span>:<span className="muted">Phiếu cũ · chưa có hồ sơ số hóa</span>}</td>
+                  <td><button type="button" className="outline" aria-label={'Xem phiếu '+row.number} onClick={()=>setReceiptViewId(current=>current===row.id?null:row.id)}>{receiptViewId===row.id?'Đóng':'Xem chi tiết'}</button></td>
+                </tr>)}
+                {!visibleReceipts.length&&<tr><td colSpan={7} className="supply-empty-receipts">Không tìm thấy phiếu nhập. {canEdit?'Chọn “Tạo phiếu nhập” để lập phiếu mới.':'Chưa có phiếu trong phạm vi được xem.'}</td></tr>}
+              </tbody>
+            </table>
+          </div>}
+          <div className="management-pagination supply-receipt-pagination">
+            <span>Trang {shownReceiptPage}/{receiptPageCount} · Hiển thị {visibleReceipts.length}/{filteredReceipts.length} phiếu</span>
+            <button type="button" className="outline" disabled={shownReceiptPage===1} onClick={()=>setReceiptPage(page=>Math.max(1,page-1))}>Trước</button>
+            <button type="button" className="outline" disabled={shownReceiptPage>=receiptPageCount} onClick={()=>setReceiptPage(page=>Math.min(receiptPageCount,page+1))}>Sau</button>
+          </div>
+          {viewedReceipt&&<section className="supply-panel supply-receipt-detail" aria-label={'Chi tiết phiếu '+viewedReceipt.number}>
+            <div className="supply-section-heading">
+              <h3><ClipboardList size={17}/> Chi tiết phiếu {viewedReceipt.number}</h3>
+              <button type="button" className="outline" onClick={()=>setReceiptViewId(null)}>Đóng</button>
+            </div>
+            <div className="supply-receipt-detail__facts">
+              <div><small>Thời điểm ghi nhận</small><strong>{new Date(viewedReceipt.postedAt).toLocaleString('vi-VN')}</strong></div>
+              <div><small>Nhà cung cấp</small><strong>{viewedReceipt.supplier}</strong></div>
+              <div><small>Giá trị phiếu</small><strong>{viewedReceipt.amount===null?'Không có dữ liệu':viewedReceipt.amount.toLocaleString('vi-VN')+' đ'}</strong></div>
+              <div><small>Số dòng nguyên liệu</small><strong>{viewedReceipt.lineCount}</strong></div>
+            </div>
+            {viewedReceipt.voucher?<>
+              <p><strong>Người ghi sổ:</strong> {viewedReceipt.voucher.postedByName} · <strong>Người kiểm nhận:</strong> {viewedReceipt.voucher.inspection.inspector}</p>
+              <p><strong>Người giao:</strong> {viewedReceipt.voucher.inspection.counterparty} · <strong>Địa điểm:</strong> {viewedReceipt.voucher.inspection.location} · <strong>Giờ kiểm:</strong> {viewedReceipt.voucher.inspection.actualTime}</p>
+              <p><strong>Số chứng từ:</strong> {viewedReceipt.voucher.inspection.documentNumber} · <strong>Ghi chú:</strong> {viewedReceipt.voucher.inspection.remarks||'Không có'}</p>
+              {!!viewedReceipt.voucher.receipt?.lines.length&&<div className="supply-table-scroll"><table className="supply-table">
+                <thead><tr><th>Lô hàng</th><th>Nguyên liệu</th><th>Lượng thực nhập</th></tr></thead>
+                <tbody>{viewedReceipt.voucher.receipt.lines.map((line,i)=><tr key={i}>
+                  <td>{line.lot.lotCode}</td><td>{line.lot.ingredient.name}</td><td>{Number(line.quantity).toLocaleString('vi-VN')} {line.lot.ingredient.unit}</td>
+                </tr>)}</tbody>
+              </table></div>}
+              <div className="supply-receipt-detail__proof">
+                <strong>Ảnh và giấy tờ minh chứng ({viewedReceipt.voucher.evidences.length})</strong>
+                <div className="stock-voucher-evidences">{viewedReceipt.voucher.evidences.map(file=><button type="button" className="outline" key={file.id} onClick={()=>void(async()=>{
+                  try{
+                    const content=await downloadStockVoucherEvidence(activeId,viewedReceipt.voucher!.id,file.id)
+                    const bytes=Uint8Array.from(atob(content.base64),c=>c.charCodeAt(0))
+                    const url=URL.createObjectURL(new Blob([bytes],{type:content.mimeType}))
+                    const link=document.createElement('a');link.href=url;link.download=content.filename;link.click()
+                    setTimeout(()=>URL.revokeObjectURL(url),3000)
+                  }catch(e){setError(e instanceof Error?e.message:'Không tải được chứng từ.')}
+                })()}>{file.filename} · {file.category}</button>)}</div>
+              </div>
+            </>:<p className="muted">Phiếu được lập trước khi triển khai bộ chứng từ điện tử. Hệ thống không tự tạo hoặc giả lập ảnh, biên bản cho dữ liệu cũ.</p>}
+          </section>}
+        </>}
+      </section>}
       {section==='trace'&&<>
         <h3>Phiếu kho đã ghi sổ · Truy xuất biên bản và tệp minh chứng</h3>
         <div className="supply-table-scroll"><table className="supply-table"><thead><tr><th>Mã phiếu</th><th>Nghiệp vụ</th><th>Thời điểm</th><th>Minh chứng</th><th>Thao tác</th></tr></thead><tbody>
