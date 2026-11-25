@@ -82,7 +82,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
   void revision
   const saved = serverMode ? {events: Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({...item,status:status as JourneyStatus,actorLabel:serverQuery.data?.actors?.[item.actorId??'']??(item.actorRole==='SCHOOL_ADMIN'?'BGH':'Bếp'),photos:item.photos??[],time:item.time??'',note:item.note??''}))} : getSavedJourney(scope)
   const centralDelivery = serverMode && contextQuery.data?.kitchen?.type === 'CENTRAL'
-  const stages = serverMode && contextQuery.data?.kitchen ? (centralDelivery ? ['PLATED','READY','DISPATCHED','ARRIVED'] : ['PLATED','READY']) as JourneyStatus[] : stagesForSchool(school.mode, role)
+  const stages = serverMode && contextQuery.data?.kitchen ? (centralDelivery ? ['DISPATCHED','ARRIVED','PLATED','READY'] : ['PLATED','READY']) as JourneyStatus[] : stagesForSchool(school.mode, role)
   const dateKind=serverMode?supervisionDateKind(date):'today'
   const locked=dateKind==='future'
   const mealApproved=false // Trạng thái cũ không khóa sổ tác nghiệp của bếp.
@@ -171,7 +171,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
       <div>
         <div className="section-kicker">CẬP NHẬT CÁC MỐC VẬN HÀNH</div>
         <h2>{serverMode && isBoard && centralDelivery ? 'Xác nhận tiếp nhận món ăn thành phẩm' : 'Trạng thái từ bếp đến phục vụ'} · {mealLabel}</h2>
-        <p className="muted">{serverMode && isBoard && centralDelivery ? 'Bếp trung tâm ghi nhận Ra món, Sẵn sàng phục vụ và Xuất bếp trước khi vận chuyển. Nhà trường chỉ đối chiếu món, số suất, tình trạng thực nhận và xác nhận giao nhận thành phẩm.' : 'Bếp trực tiếp chế biến thực hiện Ra món và Sẵn sàng phục vụ trước khi xuất món thành phẩm. Nhà trường chỉ kiểm tra, xác nhận giao nhận khi món đến trường. Hồ sơ được lưu theo trường.'}</p>
+        <p className="muted">{serverMode && isBoard && centralDelivery ? 'Bếp trung tâm ghi nhận Xuất bếp trước; BGH trường xác nhận Đến trường; sau đó bếp trung tâm ghi nhận Ra món và Sẵn sàng phục vụ. Nhà trường chỉ tiếp nhận thành phẩm, không tiếp nhận nguyên liệu.' : 'Trình tự bếp trung tâm: Xuất bếp → Đến trường (BGH xác nhận) → Ra món → Sẵn sàng phục vụ (bếp ghi nhận). Trường chỉ xác nhận giao nhận thành phẩm; hồ sơ được lưu theo trường.'}</p>
       </div>
       {canUpdate && <div className="supervision-checklist-actions">
         {next && <button type="button" className="primary" onClick={() => edit({ action: 'report', stage: next })}><Pencil size={16}/>Cập nhật: {stageNames[next]}</button>}
@@ -356,12 +356,12 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
             </div>
           })()}
           {isServingReport(editing) && <>
-            <p className="supervision-edit-guidance">{editing.stage==='PLATED'?'Bếp trực tiếp chế biến ghi nhận chia suất và đối chiếu từng món theo thực đơn được BGH duyệt. Với bếp trung tâm, việc ra món diễn ra trước khi xuất món đến trường.':'Chỉ ghi Sẵn sàng phục vụ sau khi bếp đã hoàn tất Ra món đạt. Với bếp trung tâm, đây là kiểm tra suất thành phẩm trước khi xuất bếp; phải có ảnh thực tế.'}</p>
+            <p className="supervision-edit-guidance">{editing.stage==='PLATED'?'Bếp ghi nhận Ra món sau khi BGH trường đã xác nhận nhận món thành phẩm. Đối chiếu số suất đã giao nhận với thực đơn được duyệt, ghi giờ và tình trạng thực tế.':'Chỉ ghi Sẵn sàng phục vụ sau khi bếp đã hoàn tất Ra món đạt; cần kiểm tra khu vực phục vụ, số suất và lưu ảnh thực tế.'}</p>
             <fieldset className="arrival-section"><legend>A. Thông tin bữa ăn và người thực hiện</legend>
               <div className="arrival-grid"><div><small>Trường</small><strong>{school.name}</strong></div><div><small>Thực đơn đã duyệt</small><strong>{contextQuery.data?.menu?.servings.toLocaleString('vi-VN')??'Đang tải…'} suất</strong></div></div>
               {editing.stage==='PLATED' && contextQuery.data?.kitchen?.type==='CENTRAL' && <div className="arrival-grid">
                 <div><small>Bếp cung cấp</small><strong>{contextQuery.data.kitchen.name}</strong></div>
-                <div><small>Trình tự</small><strong>Ra món → Sẵn sàng phục vụ → Xuất bếp → Trường tiếp nhận</strong></div>
+                <div><small>Trình tự</small><strong>Xuất bếp → Đến trường → Ra món → Sẵn sàng phục vụ</strong></div>
               </div>}
               <div className="arrival-grid">
                 {editing.stage==='PLATED' && <label>Bắt đầu chia suất *<input type="time" required value={portionStartAt} onChange={event=>setPortionStartAt(event.target.value)}/></label>}
