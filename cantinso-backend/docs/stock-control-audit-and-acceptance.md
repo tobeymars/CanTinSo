@@ -27,6 +27,14 @@
 - Bắt buộc ảnh lô xuất và ảnh cân thực tế.
 - Ghi StockVoucher + evidences + TraceEvent(ISSUED) và trừ remainingQty cùng transaction. Unique(kitchenId,number) ngăn xác nhận cùng phiếu nhiều lần.
 
+## 3b. Nhập hoàn nguyên liệu dư từ phiếu xuất
+- Chỉ nhập hoàn nguyên liệu **chưa sơ chế hoặc chế biến** và còn đủ điều kiện bảo quản, sử dụng.
+- Bắt buộc chọn phiếu xuất gốc của đúng bếp; số lượng hoàn lũy kế không vượt số đã xuất gốc.
+- Biên bản nhập hoàn ghi người hoàn, người kiểm, khu vực, giờ cân, đánh giá bao gói, kiểm đếm, bảo quản.
+- Bắt buộc ảnh nguyên liệu hoàn và ảnh cân thực tế; lý do hoàn tối thiểu 10 ký tự.
+- Tạo StockVoucher(kind RETURN, sourceVoucherId), StockVoucherEvidence và TraceEvent(RETURNED), tăng tồn trong một transaction serializable. Không sửa phiếu xuất gốc.
+- Chặn hoàn lô đã cách ly hoặc hết hạn; phiếu hoàn phải truy ngược được đến phiếu xuất.
+
 ## 4. Kiểm tra thẩm định nội bộ
 1. Nhập hợp lệ: phiếu + tệp + tồn tăng đúng, truy ngược theo lô.
 2. Thiếu ảnh, chứng từ hoặc dữ liệu kiểm nhận: báo 400, tồn không thay đổi.
@@ -40,10 +48,12 @@
 10. BGH trường A không tải được chứng từ phiếu xuất cho trường B; UBND không được ghi sổ.
 11. Mỗi minh chứng tải về xác minh SHA-256; không có API thay thế tệp đã lưu.
 12. Sự kiện nhập/xuất vẫn truy xuất được khi nhà cung cấp bị ngừng hoạt động.
+13. Nhập hoàn có ảnh cân, nguyên liệu an toàn và phiếu xuất gốc hợp lệ; số lượng hoàn lũy kế không vượt lượng đã xuất.
+14. Nhập hoàn nhiều giao dịch đồng thời không làm vượt tồn lô hoặc số lượng xuất gốc.
 
 ## 5. Những phần chưa triển khai trọn vẹn (không gọi là nghiệm thu)
 - Phiếu nháp lưu DB, xác nhận nhiều người, chữ ký số/điện tử kiểm chứng, chính sách xác thực danh tính.
-- Phiếu từ chối/cách ly, phiếu trả nhà cung cấp, nhập hoàn, hủy hàng, bút toán điều chỉnh/đảo.
+- Phiếu từ chối/cách ly, phiếu trả nhà cung cấp, hủy hàng, bút toán điều chỉnh/đảo (nhập hoàn nguyên liệu đủ điều kiện đã được bổ sung).
 - Xuất kho nhiều dòng trong một phiếu, FEFO tự động, kiểm kê đối chiếu kế toán kho.
 - Tự tạo dự trù từ công thức theo tỷ lệ ăn được; ProductionBatch và đối soát hao hụt thực tế.
 - Mẫu chuẩn theo từng loại thực phẩm/tuyến pháp lý, quy định lưu trữ và số hóa hồ sơ, quyền giám sát khi thay đổi phân công.
