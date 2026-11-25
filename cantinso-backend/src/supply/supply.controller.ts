@@ -4,12 +4,15 @@ import { RolesGuard } from '../common/roles.guard';
 import { Roles } from '../common/roles.decorator';
 import { AuthUser, CurrentUser } from '../common/current-user.decorator';
 import { SupplyService } from './supply.service';
+import { StockVoucherService } from './stock-voucher.service';
 
 @Controller('supply')
 @UseGuards(JwtAuthGuard,RolesGuard)
 @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN','SCHOOL_ADMIN','UBND_ADMIN')
 export class SupplyController {
-  constructor(private readonly service:SupplyService){}
+  constructor(private readonly service:SupplyService,private readonly vouchers:StockVoucherService){}
+  @Get(':kitchenId/vouchers') vouchersList(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.vouchers.list(user,kitchenId);}
+  @Get(':kitchenId/vouchers/:voucherId/evidences/:evidenceId') voucherEvidence(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('voucherId') voucherId:string,@Param('evidenceId') evidenceId:string){return this.vouchers.evidence(user,kitchenId,voucherId,evidenceId);}
   @Get('kitchens') kitchens(@CurrentUser() user:AuthUser){return this.service.kitchens(user);}
   @Get(':kitchenId/schools') schools(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.schools(user,kitchenId);}
   @Get(':kitchenId/ingredients') ingredients(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){return this.service.ingredients(user,kitchenId);}
