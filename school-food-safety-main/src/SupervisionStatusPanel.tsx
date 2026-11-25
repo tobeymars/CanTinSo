@@ -100,7 +100,7 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   }, [])
   // Recalculate after writes in this tab and cross-tab storage changes.
   void revision
-  const statusLabel = (status: CheckStatus) => serverMode && status === 'confirmed' ? 'Đã xác nhận' : labels[status]
+  const statusLabel = (status: CheckStatus) => serverMode ? status === 'confirmed' ? 'Bếp đã ghi nhận' : status === 'reported' ? 'Có vấn đề cần xử lý' : status === 'revision_requested' ? 'Đang điều chỉnh' : 'Chưa cập nhật' : labels[status]
   const checks = serverMode ? CHECK_DEFINITIONS.map(def => {const record=serverQuery.data?.checks[def.id];return {id:def.id,status:(record?.status ?? 'not_reported') as CheckStatus,history:(record?.history ?? []).map((event: any) => ({ id: String(event.id), action: event.action === 'request_revision' ? 'request_revision' : event.action, actorLabel: event.actorRole === 'SCHOOL_ADMIN' ? 'Ban Giám hiệu' : 'Bếp', recordedAt: event.at, note: [event.note, event.lateReason ? 'Lý do ghi muộn: '+event.lateReason : ''].filter(Boolean).join(' · '), evidenceRef: event.evidenceRef ?? '', ingredientReceipts: Array.isArray(event.ingredientReceipts) ? event.ingredientReceipts : [] })) as ReturnType<typeof readSupervisionStatuses>[number]['history']}}) : readSupervisionStatuses(scope)
   const demoIngredientCatalog = useMemo(() => supervisionIngredientCatalog(school.id), [school.id])
   const ingredientCatalog = serverMode ? (contextQuery.data?.lots ?? []).map(lot=>({
@@ -111,10 +111,10 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
   const evidenceOptions = editing && !serverMode ? supervisionEvidenceCatalog(scope, editing.id) : []
   const dateKind=serverMode?supervisionDateKind(date):'today'
   const dateLocked=dateKind==='future'
-  const approvedMeal=serverMode && !!serverQuery.data?.approvalCurrent
+  const approvedMeal=false // Phiên bản cũ có BGH duyệt; dữ liệu bếp không còn bị khóa bởi phê duyệt này.
   const isSchoolReceiver = serverMode && role === 'school_kitchen' && !getStoredUser()?.kitchenId && contextQuery.data?.kitchen?.type === 'CENTRAL'
   const canReport = (serverMode ? (role === 'central_kitchen' || role === 'school_kitchen') && !isSchoolReceiver : canReportSupervision(role, school.mode)) && !dateLocked && !approvedMeal
-  const canConfirm = canConfirmSupervision(role) && !dateLocked
+  const canConfirm = !serverMode && canConfirmSupervision(role) && !dateLocked
   const confirmedCount = checks.filter(item => item.status === 'confirmed').length
   const pendingCount = checks.filter(item => item.status === 'reported').length
   const mealLabel = mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'
@@ -178,10 +178,10 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
         <div>
           <div className="section-kicker">KIỂM THỰC VÀ LƯU MẪU THEO BỮA</div>
           <h2>Trạng thái giám sát · {mealLabel}</h2>
-          <p className="muted">Cập nhật riêng theo trường, ngày và bữa. Hồ sơ bếp báo cáo chỉ chuyển sang đã xác nhận khi Ban Giám hiệu đối chiếu.</p>
+          <p className="muted">Bếp tự ghi nhận và chịu trách nhiệm về hồ sơ kiểm thực, lưu mẫu theo trường · ngày · bữa. BGH theo dõi trong phạm vi trường quản lý; mọi chỉnh sửa có lịch sử.</p>
         </div>
         <div className="supervision-checklist-actions">
-          <span className="supervision-check-count"><ShieldCheck size={16}/>{confirmedCount}/{checks.length} đã xác nhận</span>
+          <span className="supervision-check-count"><ShieldCheck size={16}/>{confirmedCount}/{checks.length} đã ghi nhận</span>
           {canReport && <button type="button" className="primary" disabled={(serverMode && (serverQuery.isLoading || contextQuery.isLoading || serverQuery.isError || contextQuery.isError)) || !checks.some(item => item.status === 'not_reported' || item.status === 'revision_requested')} onClick={() => {
             const first = checks.find(item => item.status === 'not_reported' || item.status === 'revision_requested')
             if (first) start(first.id, 'report')
@@ -206,15 +206,15 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
             <div className="supervision-check-main">
               <strong>{def.label}</strong>
               <p>{def.description}</p>
-              {def.id === 'ingredient_receipt' && Array.isArray(reportedIngredients) && reportedIngredients.length > 0 && (canReport || canConfirm) && <div className="supervision-ingredient-summary"><strong>{reportedIngredients.length} nguyên liệu đã ghi nhận</strong><span>{reportedIngredients.map(line => `${line.ingredientName}: ${(line.displayQuantity ?? line.quantity).toLocaleString('vi-VN')} ${line.displayUnit ?? line.unit}`).join(' · ')}</span></div>}
+              {def.id === 'ingredient_receipt' && Array.isArray(reportedIngredients) && reportedIngredients.length > 0 && (canReport || canConfirm || serverMode) && <div className="supervision-ingredient-summary"><strong>{reportedIngredients.length} nguyên liệu đã ghi nhận</strong><span>{reportedIngredients.map(line => `${line.ingredientName}: ${(line.displayQuantity ?? line.quantity).toLocaleString('vi-VN')} ${line.displayUnit ?? line.unit}`).join(' · ')}</span></div>}
               {serverMode && ['processing','before_serving','food_sample'].includes(def.id) && Boolean(serverQuery.data?.checks[def.id]?.inspection) && <details className="sif-report-details"><summary>Xem nội dung kiểm thực đã báo cáo</summary><InspectionReadout inspection={serverQuery.data?.checks[def.id]?.inspection}/></details>}
-              {latest && (canReport || canConfirm) && <small>{latest.actorLabel} · {formatTimestamp(latest.recordedAt)} · {latest.evidenceRef ? `Tham chiếu: ${latest.evidenceRef}` : 'Không có tham chiếu'}</small>}
-              {showHistory && (canReport || canConfirm) && item.history.length > 0 && <ol className="supervision-status-history">{item.history.map(entry => <li key={entry.id}><strong>{actionLabels[entry.action]}</strong> · {formatTimestamp(entry.recordedAt)} · {entry.note}</li>)}</ol>}
+              {latest && (canReport || canConfirm || serverMode) && <small>{latest.actorLabel} · {formatTimestamp(latest.recordedAt)} · {latest.evidenceRef ? `Tham chiếu: ${latest.evidenceRef}` : 'Không có tham chiếu'}</small>}
+              {showHistory && (canReport || canConfirm || serverMode) && item.history.length > 0 && <ol className="supervision-status-history">{item.history.map(entry => <li key={entry.id}><strong>{actionLabels[entry.action]}</strong> · {formatTimestamp(entry.recordedAt)} · {entry.note}</li>)}</ol>}
             </div>
             <div className="supervision-check-controls">
               <span className={`supervision-check-pill ${item.status}`}>{item.status === 'confirmed' ? <CheckCircle2 size={13}/> : <Clock3 size={13}/>} {statusLabel(item.status)}</span>
               {canReport && (item.status === 'not_reported' || item.status === 'revision_requested') && <button className="outline" type="button" onClick={() => start(def.id, 'report')}>Cập nhật</button>}
-              {canConfirm && serverMode && item.status === 'confirmed' && <button className="outline" type="button" onClick={() => start(def.id, 'reopen')}>Mở điều chỉnh</button>}
+              {serverMode && canReport && (item.status === 'confirmed' || item.status === 'reported') && <button className="outline" type="button" onClick={() => start(def.id, 'reopen')}>Mở điều chỉnh</button>}
               {canConfirm && item.status === 'reported' && <><button className="primary" type="button" onClick={() => start(def.id, 'confirm')}>Xác nhận</button><button className="outline" type="button" onClick={() => start(def.id, 'request_revision')}>Yêu cầu bổ sung</button></>}
             </div>
           </article>
@@ -223,18 +223,18 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
       {serverMode && serverQuery.data && <SupervisionSampleLifecycle key={scope.schoolId+'-'+date+'-'+mealType} scope={scope} data={serverQuery.data} role={role}/>}
       <div className="supervision-check-footer">
         <p><ShieldAlert size={16}/> Nhật ký tự báo cáo không thay thế hồ sơ, biên bản hoặc kết luận của cơ quan có thẩm quyền. {serverMode ? 'Dữ liệu được ghi nhận trên hệ thống.' : 'Dữ liệu DEMO chỉ lưu trên trình duyệt này.'}</p>
-        {(canReport || canConfirm) && <button type="button" className="text-button" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Ẩn lịch sử cập nhật' : 'Xem lịch sử cập nhật'}</button>}
+        {(canReport || canConfirm || serverMode) && <button type="button" className="text-button" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Ẩn lịch sử cập nhật' : 'Xem lịch sử cập nhật'}</button>}
       </div>
       {editing && selected && <div className="supervision-edit-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setEditing(null) }}>
         <section role="dialog" aria-modal="true" aria-labelledby="supervision-edit-title" className="supervision-edit-dialog">
-          <div className="dialog-head"><h2 id="supervision-edit-title">{editing.action === 'report' ? 'Cập nhật trạng thái' : editing.action === 'confirm' ? 'Xác nhận trạng thái' : editing.action === 'reopen' ? 'Mở điều chỉnh kiểm thực' : 'Yêu cầu bổ sung'}</h2><button type="button" className="icon-button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
+          <div className="dialog-head"><h2 id="supervision-edit-title">{editing.action === 'report' ? 'Bếp ghi nhận kiểm thực' : editing.action === 'confirm' ? 'Xác nhận trạng thái' : editing.action === 'reopen' ? 'Bếp mở điều chỉnh kiểm thực' : 'Yêu cầu bổ sung'}</h2><button type="button" className="icon-button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
           <p className="supervision-edit-context">{school.name} · {date} · {mealLabel} · <strong>{selected.label}</strong></p>
           <form onSubmit={submit} className="supervision-edit-form">
             {editing.action === 'report' && <label>Mã sổ / mã mẫu / tham chiếu hồ sơ <span aria-hidden="true">*</span>
               {serverMode ? <input required maxLength={180} value={evidenceRef} onChange={event => setEvidenceRef(event.target.value)} placeholder="Nhập mã hồ sơ thực tế đã đối chiếu" /> : <Select label="Tham chiếu hồ sơ" required searchable value={evidenceRef} options={evidenceOptions} placeholder={evidenceOptions.length ? 'Tìm và chọn hồ sơ' : 'Chưa có hồ sơ phù hợp'} searchPlaceholder="Tìm theo mã, loại hồ sơ hoặc nguyên liệu…" onValueChange={setEvidenceRef}/>}
               {!serverMode && evidenceOptions.length === 0 && <small className="supervision-reference-empty">Chưa có hồ sơ thuộc đúng trường, ngày và bữa để liên kết.</small>}
             </label>}
-            {editing.action !== 'report' && <p className="supervision-edit-guidance">{editing.action === 'confirm' ? 'BGH xác nhận đã đối chiếu nội dung báo cáo.' : 'Mục này chuyển về Cần bổ sung để bếp cập nhật lại. Xác nhận tổng thể trước đó sẽ không còn hiện hành, nhưng lịch sử vẫn được lưu.'}</p>}
+            {editing.action !== 'report' && <p className="supervision-edit-guidance">{editing.action === 'confirm' ? 'BGH xác nhận đã đối chiếu nội dung báo cáo.' : 'Mục này chuyển sang trạng thái đang điều chỉnh. Bản cũ, lý do, người thực hiện và thời điểm vẫn được giữ trong lịch sử.'}</p>}
             {editing.id === 'ingredient_receipt' && editing.action === 'report' && <fieldset className="supervision-ingredient-fieldset">
               <legend>Nguyên liệu đã tiếp nhận <span aria-hidden="true">*</span></legend>
               <p>{serverMode ? "Chọn lô đã xuất từ kho bếp cho đúng trường, ngày và bữa. Mỗi lô chỉ được chọn một lần." : "Thêm từng dòng, tìm và chọn trong toàn bộ danh mục kho của trường. Mỗi nguyên liệu chỉ được chọn một lần."}</p>
