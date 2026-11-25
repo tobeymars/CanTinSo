@@ -4,6 +4,7 @@ import { AuthUser } from '../common/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupplyService } from './supply.service';
 import { canonicalQuantity } from './quantity-units';
+import { validateStockEvidence, validateStockInspection } from './stock-voucher-policy';
 
 const code=(v:unknown,label:string,max=100,required=true)=>{
   const value=typeof v==='string'?v.trim():'';
@@ -71,6 +72,11 @@ export class SupplyFinanceService {
     if(!uuid(supplierId))throw new BadRequestException('Nhà cung cấp không hợp lệ.');
     const supplier=await this.prisma.supplier.findFirst({where:{id:supplierId,kitchenId,status:'ACTIVE'},select:{id:true}});
     if(!supplier)throw new BadRequestException('Nhà cung cấp không còn hoạt động trong bếp.');
+    const inspection=validateStockInspection(body?.inspection,'RECEIPT');
+    const evidences=validateStockEvidence(body?.evidences,'RECEIPT');
+    if(body?.invoiceNumber && inspection.documentNumber!==body.invoiceNumber &&
+       inspection.documentNumber!==body.reference)
+      throw new BadRequestException('Số chứng từ kiểm nhận không khớp hóa đơn hoặc phiếu giao.');
     const inputLines=body?.lines;
     if(!Array.isArray(inputLines)||inputLines.length<1||inputLines.length>50)throw new BadRequestException('Phiếu nhập cần từ 1 đến 50 dòng.');
     const ingredientIds=[...new Set(inputLines.map((line:any)=>line?.ingredientId))];
@@ -98,6 +104,14 @@ export class SupplyFinanceService {
           reference:code(body?.reference,'Tham chiếu',100,false)||null,
           description:code(body?.description,'Diễn giải',500,false)||null,total,createdById:user.sub,
         }});
+        const voucher=await tx.stockVoucher.create({data:{
+          kitchenId,number:'NK-'+number,kind:'RECEIPT',receiptId:receipt.id,
+          inspection,postedById:user.sub,
+        }});
+        await tx.stockVoucherEvidence.createMany({data:evidences.map(file=>({
+          voucherId:voucher.id,category:file.category,filename:file.filename,mimeType:file.mimeType,
+          size:file.size,sha256:file.sha256,data:file.data,uploadedById:user.sub,
+        }))});
         for(const line of lines){
           const ingredient=ingredients.find(x=>x.id===line.ingredientId)!;
           const lot=await tx.inventoryLot.create({data:{
@@ -109,9 +123,9 @@ export class SupplyFinanceService {
             receiptId:receipt.id,lotId:lot.id,quantity:line.quantity,enteredQuantity:line.enteredQuantity,enteredUnit:line.enteredUnit,unitPrice:line.unitPrice,amount:line.amount,
           }});
           await tx.traceEvent.create({data:{lotId:lot.id,eventType:'RECEIVED',actorId:user.sub,
-            description:'Nhập kho theo phiếu '+number,metadata:{receiptId:receipt.id,receiptNumber:number,quantity:line.quantity,unit:ingredient.unit,enteredQuantity:line.enteredQuantity,enteredUnit:line.enteredUnit}}});
+            description:'Nhập kho theo phiếu '+number,metadata:{receiptId:receipt.id,voucherId:voucher.id,receiptNumber:number,quantity:line.quantity,unit:ingredient.unit,enteredQuantity:line.enteredQuantity,enteredUnit:line.enteredUnit}}});
         }
-        return {id:receipt.id,number,total,lines:lines.length};
+        return {id:receipt.id,number,total,lines:lines.length,voucherId:voucher.id,evidenceCount:evidences.length};
       });
     }catch(error){
       if(error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2002')
