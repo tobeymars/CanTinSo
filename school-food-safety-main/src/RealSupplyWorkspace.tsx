@@ -199,7 +199,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     setIssueLot(lot)
     setIssuePlanLink({revisionId:requirements.data.revisionId,ingredientId})
     setIssue({...emptyIssue(),schoolId:requirements.data.schoolId,
-      serviceDate:requirements.data.serviceDate,mealType:requirements.data.mealType as 'BREAKFAST'|'LUNCH'|'SNACK',
+      serviceDate:requirements.data.serviceDate,mealType:requirements.data.mealType as 'BREAKFAST'|'LUNCH'|'DINNER'|'SNACK',
       quantity:actual>0?String(actual):'',unit:lot.unit,
       note:'Xuất nguyên liệu chế biến theo thực đơn đã duyệt · phiên bản '+requirements.data.revisionNo})
     setIssueInspection(emptyInspection());setIssueEvidences([])
