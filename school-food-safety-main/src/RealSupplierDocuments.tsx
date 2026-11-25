@@ -26,6 +26,7 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
 }){
  const docs=useQuery({queryKey:['supply-documents',kitchenId,supplierId],queryFn:()=>getSupplierDocuments(kitchenId,supplierId),enabled:!!kitchenId&&!!supplierId})
  const [file,setFile]=useState<File|null>(null)
+ const [addOpen,setAddOpen]=useState(false)
  const [receiptId,setReceiptId]=useState('')
  const [category,setCategory]=useState('registration')
  const [documentNumber,setDocumentNumber]=useState('')
@@ -39,7 +40,7 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
    const base64=await toBase64(file)
    await uploadSupplierDocument(kitchenId,supplierId,{category,receiptId,filename:file.name,mimeType:file.type,base64,documentNumber,issuer,issuedAt,expiresAt})
    await docs.refetch()
-   setFile(null);setReceiptId('');setDocumentNumber('');setIssuer('');setIssuedAt('');setExpiresAt('');setFileError('')
+   setFile(null);setReceiptId('');setDocumentNumber('');setIssuer('');setIssuedAt('');setExpiresAt('');setFileError('');setAddOpen(false)
   },'Đã lưu chứng từ nhà cung cấp. Hồ sơ chưa mặc nhiên được xác minh.')
  }
  async function download(id:string){
@@ -68,8 +69,9 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
    </tr>)}
   </tbody></table></div>
   {!records.length&&!docs.isLoading&&<p className="muted">Nhà cung cấp chưa có chứng từ.</p>}
-  {canEdit&&<form className="supply-documents-form" onSubmit={submit}>
-    <h4>Thêm hồ sơ / chứng từ</h4>
+  {canEdit&&!addOpen&&<div className="supply-supplier-document-actions"><button type="button" className="primary" onClick={()=>setAddOpen(true)}><Plus size={16}/> Thêm hồ sơ / chứng từ</button></div>}
+  {canEdit&&addOpen&&<form className="supply-documents-form" onSubmit={submit}>
+    <div className="supply-section-heading"><h4>Thêm hồ sơ / chứng từ</h4><button type="button" className="outline" onClick={()=>{setAddOpen(false);setFile(null);setFileError('')}}>Về danh sách</button></div>
     <div className="supply-form-grid">
      <label>Loại hồ sơ<select value={category} onChange={e=>setCategory(e.target.value)}>{kinds.map(kind=><option key={kind.id} value={kind.id}>{kind.label}</option>)}</select></label>
      <label>Gắn với phiếu nhập<select value={receiptId} onChange={e=>setReceiptId(e.target.value)}><option value="">Không liên kết</option>{receipts.filter(item=>item.supplierId===supplierId).map(item=><option key={item.id} value={item.id}>{item.number}</option>)}</select></label>
@@ -79,7 +81,7 @@ export default function RealSupplierDocuments({kitchenId,supplierId,supplierName
      <label>Ngày hết hạn<input type="date" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>
      <label>Tệp PDF / ảnh (tối đa 2 MB) *<input required type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={e=>{setFile(e.target.files?.[0]??null);setFileError('')}}/></label>
     </div>
-    <div><button className="primary" type="submit" disabled={busy||!file}><Plus size={15}/>Thêm chứng từ</button></div>
+    <div className="supply-form-actions"><button className="primary" type="submit" disabled={busy||!file}><Plus size={15}/>Lưu chứng từ</button><button className="outline" type="button" onClick={()=>{setAddOpen(false);setFile(null);setFileError('')}}>Hủy</button></div>
   </form>}
   {fileError&&<p className="error" role="alert">{fileError}</p>}
  </section>
