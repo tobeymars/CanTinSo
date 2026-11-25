@@ -10,7 +10,7 @@ import { validateArrivalReceipt, arrivalAllowsService } from './arrival-receipt'
 import { validateServingStageReport } from './serving-stage-form';
 
 const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sample'];
-const stages = ['DISPATCHED', 'ARRIVED', 'PLATED', 'READY'];
+const stages = ['PLATED', 'READY', 'DISPATCHED', 'ARRIVED'];
 const asObject = (v: unknown): Record<string, any> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, any> : {};
 const asArray = (v: unknown): any[] => Array.isArray(v) ? v : [];
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, entry:unknown) =>
@@ -340,15 +340,18 @@ export class SupervisionService {
         if (!required.includes(itemId) || (!previousStage && required.find(x=>!journey[x])!==itemId)) throw new ConflictException('Cần báo cáo mốc theo thứ tự.');
         if (itemId === 'ARRIVED') throw new ForbiddenException('Mốc Đến trường do BGH lập phiếu và xác nhận, không do nhân viên bếp báo cáo.');
         if (itemId === 'DISPATCHED' && user.role !== 'CENTRAL_KITCHEN') throw new ForbiddenException('Chỉ bếp trung tâm được báo cáo xuất bếp.');
+        if (itemId === 'DISPATCHED' && (!journey.PLATED?.confirmed || !journey.READY?.confirmed ||
+          journey.PLATED?.revisionRequested || journey.READY?.revisionRequested))
+          throw new ConflictException('Bếp phải hoàn tất Ra món và Sẵn sàng phục vụ trước khi xuất món thành phẩm đến trường.');
         if (itemId === 'DISPATCHED') verifySamplesBeforeDispatch(
           checks.food_sample, checks.processing, new Date(entry.at),
         );
-        if (itemId !== 'DISPATCHED' && (user.role !== 'SCHOOL_KITCHEN' ||
-          (user.kitchenId !== s.kitchenId && user.schoolId !== s.schoolId)))
-          throw new ForbiddenException('Chỉ nhân viên bếp tại trường hoặc nhân viên phục vụ đúng trường được ghi nhận ra món, phục vụ.');
-        if (required[0]==='DISPATCHED' && ['PLATED','READY'].includes(itemId) &&
-          (!journey.ARRIVED?.confirmed || !arrivalAllowsService(journey.ARRIVED.arrival)))
-          throw new ConflictException('BGH chưa chấp nhận phiếu giao nhận. Không được chuyển sang ra món hoặc phục vụ.');
+        if (['PLATED','READY'].includes(itemId) && (
+          user.kitchenId !== s.kitchenId ||
+          (required.includes('DISPATCHED') ? user.role !== 'CENTRAL_KITCHEN' : user.role !== 'SCHOOL_KITCHEN')))
+          throw new ForbiddenException('Ra món và Sẵn sàng phục vụ do bếp trực tiếp chế biến ghi nhận; trường chỉ xác nhận món đã giao đến.');
+        // For a central kitchen, portioning and readiness happen BEFORE dispatch to school.
+        // A school only confirms delivery of finished meals after DISPATCHED.
         let servingReport;
         if (itemId==='PLATED' || itemId==='READY') {
           const plan=await tx.mealPlan.findUnique({
@@ -360,19 +363,11 @@ export class SupervisionService {
           servingReport=validateServingStageReport(body,itemId,
             revision?.items.map(row=>({id:row.id,name:row.dishVersion.dish.name}))??[],
             revision?.ageGroups.reduce((total,row)=>total+row.plannedServings,0)??0,date);
-          if(itemId==='PLATED' && required[0]==='DISPATCHED') {
-            const accepted=journey.ARRIVED?.arrival;
-            if(!accepted || accepted.result!=='ACCEPTED')
-              throw new ConflictException('Chưa có phiếu tiếp nhận được BGH chấp nhận.');
-            if(servingReport.actualServings>accepted.receivedServings)
-              throw new BadRequestException('Số suất chia không thể vượt số suất đã tiếp nhận tại trường.');
-            if(servingReport.portionStartAt && accepted.arrivalTime &&
-              servingReport.portionStartAt<accepted.arrivalTime)
-              throw new BadRequestException('Giờ bắt đầu chia suất không thể trước giờ thức ăn đến trường.');
-          }
+          // Quantities are checked against the APPROVED meal plan by validateServingStageReport.
+          // Do not compare against a school handover that has not happened yet.
           if(itemId==='READY') {
             if(!journey.PLATED?.confirmed || journey.PLATED?.revisionRequested)
-              throw new ConflictException('Mốc Ra món phải được BGH xác nhận trước khi chuyển Sẵn sàng phục vụ.');
+              throw new ConflictException('Bếp phải ghi nhận Ra món đạt và hoàn tất điều chỉnh trước khi Sẵn sàng phục vụ.');
             const platedTime=journey.PLATED?.serving?.occurredAt;
             if(typeof platedTime==='string' && body.occurredAt < platedTime)
               throw new ConflictException('Giờ Sẵn sàng phục vụ không được trước giờ Ra món.');
@@ -391,7 +386,7 @@ export class SupervisionService {
         if (itemId !== 'ARRIVED') throw new BadRequestException('Chỉ hỗ trợ xác nhận mốc Đến trường.');
         const kitchen = await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}});
         if (kitchen?.type !== 'CENTRAL') throw new ConflictException('Bếp tại trường không có mốc Đến trường.');
-        if (!journey.DISPATCHED || journey.DISPATCHED.revisionRequested) throw new ConflictException('Bếp trung tâm phải báo cáo Xuất bếp hợp lệ trước khi tiếp nhận.');
+        if (!journey.DISPATCHED?.confirmed || journey.DISPATCHED.revisionRequested) throw new ConflictException('Bếp trung tâm phải hoàn tất xuất món thành phẩm trước khi trường tiếp nhận.');
         const previous = journey.ARRIVED;
         if (action === 'stage_arrival_confirm' && previous) throw new ConflictException('Mốc Đến trường đã có hồ sơ. Vui lòng sử dụng quy trình duyệt hoặc điều chỉnh hiện có.');
         if (action === 'stage_arrival_resolve' && (!previous?.confirmed || arrivalAllowsService(previous.arrival)))
@@ -421,10 +416,10 @@ export class SupervisionService {
           history:previous?[...(previous.history??[]),{...previous,history:undefined}]:[]};
       } else if (action === 'stage_reopen') {
         if (itemId==='ARRIVED') throw new ForbiddenException('Phiếu tiếp nhận do BGH phụ trách, sử dụng chức năng Kiểm tra lại phiếu giao nhận.');
-        if (itemId==='DISPATCHED' ? (user.role!=='CENTRAL_KITCHEN' || user.kitchenId!==s.kitchenId)
-          : (user.role!=='SCHOOL_KITCHEN' ||
-            (user.kitchenId!==s.kitchenId && user.schoolId!==s.schoolId)))
-          throw new ForbiddenException('Chỉ đơn vị thực hiện mốc được mở điều chỉnh.');
+        const centralKitchen=(await tx.kitchen.findUnique({where:{id:s.kitchenId},select:{type:true}}))?.type==='CENTRAL';
+        if (user.kitchenId!==s.kitchenId ||
+          (centralKitchen ? user.role!=='CENTRAL_KITCHEN' : user.role!=='SCHOOL_KITCHEN'))
+          throw new ForbiddenException('Chỉ bếp trực tiếp thực hiện mốc được mở điều chỉnh.');
         if (!journey[itemId] || journey[itemId].revisionRequested)
           throw new ConflictException('Mốc chưa có hồ sơ hoặc đang chờ cập nhật sau điều chỉnh.');
         if (note.length<10) throw new BadRequestException('Cần ghi lý do điều chỉnh tối thiểu 10 ký tự.');
