@@ -351,3 +351,34 @@
   .supply-receipt-modal__content .supply-form-footer{justify-content:stretch}
   .supply-receipt-modal__content .supply-form-footer button{width:100%}
 }
+
+/* Supplier registry: list-first layout with a single modal per action. */
+.supply-supplier-summary{display:grid;gap:14px;min-width:0}
+.supply-supplier-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.supply-supplier-heading>div:first-child{flex:1;min-width:240px}
+.supply-supplier-heading h3{display:flex;gap:8px;align-items:center;margin-bottom:5px}
+.supply-supplier-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.supply-supplier-actions button{display:inline-flex;align-items:center;gap:6px}
+.supply-supplier-row-actions{display:flex;gap:7px;flex-wrap:wrap}
+.supply-supplier-row-actions button{white-space:nowrap}
+.supply-supplier-pagination{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap}
+.supply-supplier-status-dialog{display:grid;gap:13px;font-size:13px}
+.supply-supplier-status-dialog p{line-height:1.6}
+.supply-receipt-modal__content>.supply-panel{border:0;box-shadow:none;padding:0;background:transparent}
+.supply-receipt-modal__content .supply-vendor-form{display:grid;gap:17px}
+.supply-receipt-modal__content .supply-vendor-form .supply-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.supply-receipt-modal__content .supply-documents{box-shadow:none;border:0;padding:0}
+.supply-receipt-modal__content .supply-documents>.card-header{display:none}
+.supply-supplier-document-actions,.supply-supplier-finance-actions{display:flex;justify-content:flex-end;padding:12px 0}
+.supply-receipt-modal__content .supply-documents-form{border:1px solid var(--border,#d7e1ef);padding:17px;border-radius:12px}
+.supply-receipt-modal__content .supply-finance{display:grid;gap:14px}
+.supply-receipt-modal__content .supply-finance-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+.supply-receipt-modal__content .supply-finance-panel{padding:14px}
+.supply-receipt-modal__content .supply-payment-panel{padding:16px}
+@media(max-width:720px){
+ .supply-supplier-heading>div:first-child{min-width:0}
+ .supply-supplier-actions{width:100%}
+ .supply-supplier-actions button{flex:1 1 auto;justify-content:center}
+ .supply-receipt-modal__content .supply-vendor-form .supply-form-grid{grid-template-columns:1fr}
+ .supply-receipt-modal__content .supply-finance-kpis{grid-template-columns:1fr}
+}
