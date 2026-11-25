@@ -117,7 +117,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
       {view==='supervision'&&<>
         <section className="card receiver-journey">
           <div className="receiver-title"><ClipboardCheck size={20}/><h3>Các mốc vận hành</h3></div>
-          <p>Chỉ ghi nhận sự kiện đã diễn ra thực tế. Xuất bếp do Bếp Long Hoa báo cáo; BGH xác nhận từng mốc.</p>
+          <p>Chỉ ghi nhận sự kiện đã diễn ra thực tế. Xuất bếp do Bếp Long Hoa báo cáo; Nhật ký do đơn vị thực hiện lưu; BGH xem theo trường được quản lý.</p>
           {record.isLoading?<p>Đang tải trạng thái vận hành…</p>:record.isError?<p className="error" role="alert">Không tải được trạng thái: {record.error instanceof Error?record.error.message:'Lỗi kết nối'}</p>:
             <div className="receiver-stage-list">
               {order.map(stage=>{
@@ -127,7 +127,7 @@ export default function SchoolReceiverWorkspace({schoolId,schoolName,date,view}:
                 return <article key={stage} className="receiver-stage">
                   {confirmed?<CheckCircle2 color="#148063" size={21}/>:<Clock3 size={21}/>}
                   <div><strong>{stageNames[stage]}</strong><small>{stageHints[stage]}</small>
-                    {event&&<small>{event.time??''} · {confirmed?'Đã được BGH xác nhận':event.revisionRequested?'BGH yêu cầu bổ sung':'Đang chờ BGH xác nhận'}</small>}
+                    {event&&<small>{event.time??''} · {confirmed?(stage==='ARRIVED'?'BGH xác nhận đã nhận':'Đơn vị đã ghi nhận'):event.revisionRequested?'Đang điều chỉnh':'Cần đơn vị kiểm tra lại'}</small>}
                     {event?.note&&<p>{event.note}</p>}
                   </div>
                   <div><span>{confirmed?'Đã xác nhận':event?'Chờ xác nhận':'Chưa cập nhật'}</span>
