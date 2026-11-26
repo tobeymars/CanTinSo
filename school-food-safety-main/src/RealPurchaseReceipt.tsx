@@ -4,14 +4,14 @@ import { Plus, Trash2 } from 'lucide-react'
 import { createSupplyPurchase } from './lib/supplyApi'
 import type { StockEvidenceInput } from './lib/supplyApi'
 import { StockEvidenceFields,StockInspectionFields,emptyInspection } from './StockVoucherEvidenceFields'
-import type { SupplyIngredient,SupplySupplier } from './lib/supplyApi'
+import type { SupplyIngredient,SupplySupplier,SupplyLot } from './lib/supplyApi'
 import { convertReceiptQuantity, receiptUnitOptions, formatReceiptQuantity, preferredReceiptUnit } from './lib/supervisionUnits'
 
 type Line={key:number;ingredientId:string;lotCode:string;quantity:string;deliveredQuantity:string;rejectionReason:string;origin:string;producer:string;packagingStatus:'PASS'|'PENDING';sensoryStatus:'PASS'|'PENDING';unit:string;unitPrice:string;expiryDate:string;storageLocation:string}
 const blank=(key:number):Line=>({key,ingredientId:'',lotCode:'',quantity:'',deliveredQuantity:'',rejectionReason:'',origin:'',producer:'',packagingStatus:'PENDING',sensoryStatus:'PENDING',unit:'',unitPrice:'',expiryDate:'',storageLocation:''})
 const cash=(n:number)=>n.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
-export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,canEdit,busy,execute,onSaved}:{
-  kitchenId:string;ingredients:SupplyIngredient[];suppliers:SupplySupplier[];canEdit:boolean;busy:boolean;
+export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,existingLots,canEdit,busy,execute,onSaved}:{
+  kitchenId:string;ingredients:SupplyIngredient[];suppliers:SupplySupplier[];existingLots:SupplyLot[];canEdit:boolean;busy:boolean;
   execute:(action:()=>Promise<unknown>,success:string)=>Promise<void>;onSaved:()=>void;
 }){
   const [number,setNumber]=useState('')
@@ -46,6 +46,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
   if(!canEdit)return <p className="muted">Bạn chỉ có quyền xem phiếu nhập, không được tạo chứng từ.</p>
   return <form className="supply-purchase-form" onSubmit={submit}>
     <h3>Phiếu nhập nguyên liệu · nhiều dòng hàng</h3>
+    <p className="muted">Nhập mã lô mới để tạo lô riêng, hoặc nhập lại đúng mã lô đã có để cộng số lượng tồn. Lô cũ chỉ được cộng khi cùng nguyên liệu, nhà cung cấp, hạn dùng, vị trí bảo quản và nguồn gốc; lô đã hết hoặc cách ly không được tự cộng. Mỗi lần nhập vẫn có số phiếu và chứng từ riêng.</p>
     <p className="muted">Có thể chọn kg/g hoặc lít/ml. Đơn giá tính trên đúng đơn vị đã chọn; hệ thống quy đổi tồn kho riêng. Khi đổi đơn vị, cả số lượng và đơn giá được quy đổi để giữ nguyên thành tiền (tối đa 6 chữ số thập phân cho đơn giá).</p>
     <div className="supply-form-grid supply-purchase-meta">
       <label>Số phiếu nhập *<input required maxLength={60} value={number} onChange={e=>setNumber(e.target.value)} placeholder="NK-2026-0001"/></label>
@@ -62,6 +63,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
       {lines.map((line,index)=>{
         const base=ingredients.find(item=>item.id===line.ingredientId)?.unit??''
         const normalized=base&&line.quantity?convertReceiptQuantity(Number(line.quantity),line.unit||base,base):null
+        const matchedLot=existingLots.find(lot=>lot.lotCode===line.lotCode.trim())
         return <section className="supply-receipt-line" key={line.key}>
           <div className="supply-receipt-line__head">
             <div><span className="supply-step">Dòng {index+1}</span><strong>{ingredients.find(item=>item.id===line.ingredientId)?.name??'Chọn nguyên liệu'}</strong></div>
@@ -75,6 +77,10 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,can
               </select>
             </label>
             <label>Mã lô *<input aria-label={'Mã lô dòng '+(index+1)} required maxLength={100} value={line.lotCode} onChange={e=>change(line.key,{lotCode:e.target.value})} placeholder="Ví dụ: LO-2026-001"/></label>
+            {matchedLot&&<p className="muted supply-wide" role="status" style={{margin:'0 0 8px',lineHeight:1.6}}>
+              <strong>Đã có lô {matchedLot.lotCode}:</strong> {matchedLot.ingredient.name} · {matchedLot.supplier.name} · còn {formatReceiptQuantity(matchedLot.remainingQty,matchedLot.unit)} · hạn dùng {matchedLot.expiryDate?.slice(0,10)??'Chưa có'}.
+              {matchedLot.status!=='AVAILABLE'||matchedLot.remainingQty<=0?' Lô không được nhập bổ sung tự động.':' Nếu các thông tin trùng khớp, lần nhập mới sẽ cộng vào lô này.'}
+            </p>}
             <label>Số lượng hàng giao *<input type="number" min="0.000001" step="any" required value={line.deliveredQuantity} onChange={e=>change(line.key,{deliveredQuantity:e.target.value})} placeholder="Số hàng giao"/></label>
             <label>Số lượng chấp nhận nhập kho *<input aria-label={'Số lượng dòng '+(index+1)} type="number" required min="0.000001" step="any" value={line.quantity} onChange={e=>change(line.key,{quantity:e.target.value})} placeholder="Thực nhập"/></label>
             <label>Xuất xứ/nguồn gốc *<input required maxLength={160} value={line.origin} onChange={e=>change(line.key,{origin:e.target.value})} placeholder="Địa điểm / cơ sở xuất xứ"/></label>
