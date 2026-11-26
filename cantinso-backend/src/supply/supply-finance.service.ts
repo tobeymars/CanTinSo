@@ -47,7 +47,7 @@ export class SupplyFinanceService {
       this.prisma.supplierPayment.findMany({where:{kitchenId},orderBy:{paidAt:'desc'},include:{
         receipt:{select:{id:true,number:true}},supplier:{select:{id:true,name:true}},
       }}),
-      this.prisma.inventoryLot.count({where:{kitchenId,purchaseReceiptLine:null}}),
+      this.prisma.inventoryLot.count({where:{kitchenId,purchaseReceiptLines:{none:{}}}}),
     ]);
     const supplierRows=suppliers.map(supplier=>{
       const theirs=receipts.filter(receipt=>receipt.supplierId===supplier.id);
@@ -131,22 +131,56 @@ export class SupplyFinanceService {
         }))});
         for(const line of lines){
           const ingredient=ingredients.find(x=>x.id===line.ingredientId)!;
-          const lot=await tx.inventoryLot.create({data:{
-            kitchenId,supplierId,ingredientId:line.ingredientId,lotCode:line.lotCode,
-            quantity:line.quantity,remainingQty:line.quantity,unit:ingredient.unit,
-            expiryDate:line.expiryDate,storageLocation:line.storageLocation,
-          }});
+          const existing=await tx.inventoryLot.findUnique({
+            where:{kitchenId_lotCode:{kitchenId,lotCode:line.lotCode}},
+            select:{id:true,ingredientId:true,supplierId:true,unit:true,expiryDate:true,
+              storageLocation:true,status:true,quantity:true,remainingQty:true},
+          });
+          let lot:{id:string};
+          if(existing){
+            if(existing.ingredientId!==line.ingredientId||existing.supplierId!==supplierId||
+              existing.unit!==ingredient.unit||
+              (existing.expiryDate?.toISOString().slice(0,10)??null)!==(line.expiryDate?.toISOString().slice(0,10)??null)||
+              (existing.storageLocation??'')!==(line.storageLocation??''))
+              throw new ConflictException('Mã lô '+line.lotCode+' đã tồn tại nhưng nguyên liệu, nhà cung cấp, hạn dùng hoặc vị trí không khớp. Không tự động gộp.');
+            if(existing.status!=='AVAILABLE' || Number(existing.remainingQty)<=0)
+              throw new ConflictException('Lô '+line.lotCode+' đã hết tồn, cách ly hoặc ngừng sử dụng; không thể nhập bổ sung tự động.');
+            // Nguồn gốc / nhà sản xuất phải trùng dữ liệu kiểm nhận từ phiếu nhập trước.
+            const original=await tx.stockVoucher.findFirst({
+              where:{kitchenId,kind:'RECEIPT',receipt:{lines:{some:{lotId:existing.id}}}},
+              orderBy:{postedAt:'asc'},select:{inspection:true},
+            });
+            const inspected=original?.inspection && typeof original.inspection==='object' &&
+              !Array.isArray(original.inspection) ? original.inspection as Record<string,unknown> : null;
+            const priorLines=Array.isArray(inspected?.lineInspections)?inspected.lineInspections:[];
+            const prior=priorLines.find((value:unknown)=>value!==null&&typeof value==='object'&&
+              (value as Record<string,unknown>).lotCode===line.lotCode) as Record<string,unknown>|undefined;
+            if(!prior || prior.origin!==line.origin || prior.producer!==line.producer)
+              throw new ConflictException('Không xác minh được nguồn gốc hoặc nhà sản xuất trùng với lô '+line.lotCode+'. Không cho phép cộng gộp.');
+            const updated=await tx.inventoryLot.updateMany({
+              where:{id:existing.id,kitchenId,status:'AVAILABLE',quantity:existing.quantity,remainingQty:existing.remainingQty},
+              data:{quantity:{increment:line.quantity},remainingQty:{increment:line.quantity}},
+            });
+            if(updated.count!==1)throw new ConflictException('Tồn lô vừa thay đổi. Hãy tải lại phiếu nhập.');
+            lot={id:existing.id};
+          }else{
+            lot=await tx.inventoryLot.create({data:{
+              kitchenId,supplierId,ingredientId:line.ingredientId,lotCode:line.lotCode,
+              quantity:line.quantity,remainingQty:line.quantity,unit:ingredient.unit,
+              expiryDate:line.expiryDate,storageLocation:line.storageLocation,
+            }});
+          }
           await tx.purchaseReceiptLine.create({data:{
             receiptId:receipt.id,lotId:lot.id,quantity:line.quantity,enteredQuantity:line.enteredQuantity,enteredUnit:line.enteredUnit,unitPrice:line.unitPrice,amount:line.amount,
           }});
           await tx.traceEvent.create({data:{lotId:lot.id,eventType:'RECEIVED',actorId:user.sub,
-            description:'Nhập kho theo phiếu '+number,metadata:{receiptId:receipt.id,voucherId:voucher.id,receiptNumber:number,quantity:line.quantity,unit:ingredient.unit,enteredQuantity:line.enteredQuantity,enteredUnit:line.enteredUnit}}});
+            description:'Nhập kho theo phiếu '+number,metadata:{receiptId:receipt.id,voucherId:voucher.id,receiptNumber:number,quantity:line.quantity,unit:ingredient.unit,enteredQuantity:line.enteredQuantity,enteredUnit:line.enteredUnit,topUp:!!existing}}});
         }
         return {id:receipt.id,number,total,lines:lines.length,voucherId:voucher.id,evidenceCount:evidences.length};
       });
     }catch(error){
       if(error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2002')
-        throw new ConflictException('Số phiếu hoặc mã lô đã tồn tại trong kho bếp.');
+        throw new ConflictException('Số phiếu đã tồn tại hoặc mã lô bị nhập trùng đồng thời. Hãy kiểm tra dữ liệu và thử lại.');
       throw error;
     }
   }
