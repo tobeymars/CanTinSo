@@ -221,6 +221,7 @@ model Kitchen {
   dishQrs     DishQr[]
   schools     KitchenSchoolAssignment[]
   shiftTasks KitchenShiftTask[]
+  disposalRecords InventoryDisposal[]
   createdAt   DateTime                  @default(now()) @map("created_at")
   updatedAt   DateTime                  @updatedAt @map("updated_at")
 
@@ -371,6 +372,7 @@ model InventoryLot {
   supplier        Supplier     @relation(fields: [supplierId], references: [id])
   ingredient      Ingredient   @relation(fields: [ingredientId], references: [id])
   traceEvents     TraceEvent[]
+  disposalRecords InventoryDisposal[]
   purchaseReceiptLine PurchaseReceiptLine?
 
   @@unique([schoolId, lotCode])
@@ -1007,4 +1009,28 @@ model KitchenShiftTask {
   @@unique([kitchenId,serviceDate,role,taskId])
   @@index([kitchenId,serviceDate])
   @@map("kitchen_shift_tasks")
+}
+
+/** Phiếu xử lý lô quá hạn, không dùng thay phiếu xuất nguyên liệu chế biến. */
+model InventoryDisposal {
+  id String @id @default(uuid()) @db.Uuid
+  kitchenId String @map("kitchen_id") @db.Uuid
+  kitchen Kitchen @relation(fields:[kitchenId],references:[id],onDelete:Restrict)
+  lotId String @map("lot_id") @db.Uuid
+  lot InventoryLot @relation(fields:[lotId],references:[id],onDelete:Restrict)
+  number String
+  quantity Decimal @db.Decimal(12,3)
+  unit String
+  reason String
+  method String
+  evidenceReference String @map("evidence_reference")
+  handlerName String @map("handler_name")
+  status String @default("DRAFT")
+  createdById String @map("created_by_id") @db.Uuid
+  completedById String? @map("completed_by_id") @db.Uuid
+  completedAt DateTime? @map("completed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@unique([kitchenId,number])
+  @@index([lotId,status])
+  @@map("inventory_disposals")
 }
