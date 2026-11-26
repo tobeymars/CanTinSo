@@ -38,6 +38,8 @@ npm run test:supervision-serving
 Check 'Serving stage tests'
 npm run test:supervision-stages
 Check 'Stage responsibility tests'
+npm run test:supervision-dispatch
+Check 'Dispatch handover form tests'
 Write-Host '[10/12] Backend build'
 npm run build
 Check 'Backend build'
