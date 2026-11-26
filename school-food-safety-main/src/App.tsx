@@ -1445,7 +1445,7 @@ function Shell() {
             </button>
           </div>
           <SpotlightCard
-            className="school-hero"
+            className={`school-hero${isRealKitchenAccount ? " kitchen-school-hero" : ""}`}
             spotlightColor="#e4bc70"
             intensity={0.3}
             spotlightSize={300}
@@ -1465,29 +1465,38 @@ function Shell() {
                   <span><ShieldCheck size={14} /> Trường được phân công</span>
                 </div>
               ) : isRealKitchenAccount ? (
-                <div className="school-picker">
-                  <div className="school-picker-locked" style={{ marginBottom: isRealCentralKitchen ? 12 : 0 }}>
-                    <strong>{realKitchenQuery.data?.kitchen.name ?? (realKitchenQuery.isLoading ? "Đang tải thông tin bếp…" : "Không tải được thông tin bếp")}</strong>
-                    <span><ShieldCheck size={14} /> Bếp theo tài khoản đăng nhập</span>
+                <div className="kitchen-school-context">
+                  <div className="kitchen-school-identity">
+                    <span className="kitchen-school-caption">BẾP ĐANG ĐĂNG NHẬP</span>
+                    <strong className="kitchen-school-name">{realKitchenQuery.data?.kitchen.name ?? (realKitchenQuery.isLoading ? "Đang tải thông tin bếp…" : "Không tải được thông tin bếp")}</strong>
+                    <span className="kitchen-school-verified"><ShieldCheck size={15} /> Bếp theo tài khoản đăng nhập</span>
                   </div>
                   {isRealCentralKitchen && (
-                    centralKitchenSchools.length > 0 ? (
-                      <Select
-                        label="Trường đang phục vụ"
-                        variant="hero"
-                        value={school.id}
-                        onValueChange={setSchool}
-                        options={centralKitchenSchools.map((item) => ({
-                          value: item.id,
-                          label: item.name,
-                          description: "Trường thuộc phân công của bếp trung tâm",
-                        }))}
-                      />
-                    ) : (
-                      <p role="status" style={{ margin: 0 }}>
-                        {realKitchenQuery.isLoading ? "Đang tải danh sách trường phục vụ…" : realKitchenQuery.isError ? "Không tải được danh sách trường. Vui lòng thử lại." : "Bếp chưa có trường đang được phân công phục vụ."}
-                      </p>
-                    )
+                    <div className="kitchen-school-assignment">
+                      <span className="kitchen-school-caption">TRƯỜNG ĐANG PHỤC VỤ</span>
+                      {centralKitchenSchools.length > 0 ? (
+                        <>
+                          <Select
+                            label="Chọn trường đang phục vụ"
+                            className="kitchen-school-select"
+                            variant="hero"
+                            value={school.id}
+                            onValueChange={setSchool}
+                            options={centralKitchenSchools.map((item) => ({
+                              value: item.id,
+                              label: item.name,
+                              description: "Trường thuộc phân công của bếp trung tâm",
+                            }))}
+                            searchable={centralKitchenSchools.length > 5}
+                          />
+                          <span className="kitchen-school-hint">{centralKitchenSchools.length} trường được phân công · Nhấn để chuyển trường</span>
+                        </>
+                      ) : (
+                        <p className="kitchen-school-empty" role="status">
+                          {realKitchenQuery.isLoading ? "Đang tải danh sách trường phục vụ…" : realKitchenQuery.isError ? "Không tải được danh sách trường. Vui lòng thử lại." : "Bếp chưa có trường đang được phân công phục vụ."}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : (
