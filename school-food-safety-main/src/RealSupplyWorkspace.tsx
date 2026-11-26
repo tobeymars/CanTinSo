@@ -626,7 +626,14 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         {disposals.isError&&<p role="alert">Không tải được danh sách phiếu xử lý.</p>}
         <div className="supply-table-scroll"><table className="supply-table"><thead><tr><th>Số phiếu</th><th>Lô</th><th>Số lượng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
           {(disposals.data??[]).map(item=><tr key={item.id}>
-            <td><strong>{item.number}</strong><small style={{display:'block'}}>{item.lot.ingredient.name}</small></td>
+            <td><strong>{item.number}</strong><small style={{display:'block'}}>{item.lot.ingredient.name}</small>
+              <details style={{marginTop:6}}><summary style={{cursor:'pointer'}}>Xem hồ sơ xử lý</summary>
+                <p><strong>Lý do:</strong> {item.reason}</p>
+                <p><strong>Phương án:</strong> {item.method}</p>
+                <p><strong>Chứng từ:</strong> {item.evidenceReference}</p>
+                <p><strong>Người phụ trách:</strong> {item.handlerName}</p>
+                <p><strong>Ghi nhận:</strong> {date(item.createdAt)}{item.completedAt?' · Hoàn tất '+date(item.completedAt):''}</p>
+              </details></td>
             <td>{item.lot.lotCode}</td><td>{fmt(item.quantity)} {item.unit}</td>
             <td>{item.status==='DRAFT'?'Chờ hoàn tất xử lý':'Đã xử lý · ghi giảm tồn'}</td>
             <td>{canEdit&&item.status==='DRAFT'&&<button type="button" className="outline" disabled={busy} onClick={()=>postDisposal(item.id,item.number)}>Xác nhận đã xử lý</button>}</td>
