@@ -22,7 +22,7 @@ function InspectionItem({item,canPublish,onPublish,busy}:{item:InspectionRecord;
    <div><ClipboardCheck size={17}/><span><small>Nội dung cần theo dõi</small><strong>{item.findingCount} nội dung</strong></span></div>
   </div>
   <div className="inspection-authority"><ShieldCheck size={19}/><span><small>Đơn vị thực hiện theo biên bản</small><strong>{item.authority}</strong></span></div>
-  <div className="inspection-scope"><small>Phạm vi kiểm tra</small><p>{item.scope}</p><small>Tham chiếu minh chứng</small><p>{item.evidenceReference}</p></div>
+  <div className="inspection-scope"><small>Phạm vi kiểm tra</small><p>{item.scope}</p>{item.evidenceReference && <><small>Tham chiếu minh chứng nội bộ</small><p>{item.evidenceReference}</p></>}</div>
   <footer className="inspection-record-footer"><span>{item.recordNumber}</span><span>{item.publishedAt?`Công khai ${new Date(item.publishedAt).toLocaleString('vi-VN')}`:'Chưa công khai'}</span></footer>
   {canPublish&&item.status==='DRAFT'&&<button type="button" className="primary inspection-publish-button" disabled={busy} onClick={()=>onPublish(item.id)}><ShieldCheck size={16}/> Công khai hồ sơ này</button>}
  </article>
