@@ -933,3 +933,23 @@ form .feedback-photo-picker.disabled{cursor:not-allowed;opacity:.6}
 .supervision-context-link:hover{text-decoration-thickness:2px}
 .supervision-context-link:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:2px}
 @media(max-width:650px){.supervision-context-summary{font-size:12px;column-gap:7px}.supervision-context-divider{display:none}.supervision-context-summary>span:not(.supervision-context-divider){flex-basis:100%}}
+
+
+/* Canh thẳng phần thông tin dưới tiêu đề kiểm thực với lề của card header. */
+.supervision-checklist > .supervision-context-summary{
+  margin:0 24px 12px;
+  padding:0;
+  align-items:center;
+  column-gap:12px;
+  row-gap:6px;
+  line-height:1.55;
+}
+.supervision-checklist > .supervision-context-summary:first-of-type{margin-top:0}
+.supervision-checklist .supervision-context-link{
+  margin-left:4px;
+  white-space:nowrap;
+}
+@media(max-width:600px){
+  .supervision-checklist > .supervision-context-summary{margin:0 15px 12px;column-gap:9px}
+  .supervision-checklist .supervision-context-link{margin-left:0}
+}
