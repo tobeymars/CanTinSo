@@ -756,7 +756,7 @@ function SupervisionMealContent({
     ...data,servings:contextQuery.data?.menu?.servings??0,
     dishes:contextQuery.data?.menu?.dishes.map(item=>item.name)??[],
     dishDetails:[],events:realEvents,kitchen:contextQuery.data?.kitchen?.name??'Chưa phân công bếp',
-    photo:'',publicInspection:null,suppliers:0,transportDistanceKm:null,transportDurationMinutes,mealUseByAt:null,
+    photo:'',publicInspection:null,suppliers:0,transportDistanceKm:contextQuery.data?.transportDistanceKm??null,transportDurationMinutes,mealUseByAt:null,
   } : data;
   const visibleStages = stagesForSchool(effectiveSchool.mode, role);
   const visibleEvents = effectiveData.events.filter(event => visibleStages.some(stage => stage === event.status));
