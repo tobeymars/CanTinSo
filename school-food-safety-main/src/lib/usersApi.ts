@@ -179,3 +179,9 @@ export const createCentralKitchen = (payload: CreateCentralKitchenPayload) =>
     method: "POST",
     body: JSON.stringify(payload),
   });
+
+export const assignCentralKitchenSchools = (kitchenId: string, schoolIds: string[]) =>
+  request<{success:boolean;assigned:number}>(`/users/central-kitchens/${encodeURIComponent(kitchenId)}/assign-schools`, {
+    method: "POST",
+    body: JSON.stringify({schoolIds}),
+  });
