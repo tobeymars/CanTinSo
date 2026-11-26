@@ -1,4 +1,4 @@
-import {
+import { BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -284,6 +284,47 @@ export class UsersService {
         },
       },
       orderBy: { createdAt: "desc" },
+    });
+  }
+
+  /** Bổ sung trường cho bếp đã tồn tại, không tạo bếp hoặc tài khoản mới. */
+  async assignCentralKitchenSchools(actor: AuthUser, kitchenId: string, schoolIds: unknown) {
+    if (actor.role !== UserRole.UBND_ADMIN && actor.role !== UserRole.SUPER_ADMIN)
+      throw new ForbiddenException("Không có quyền phân công trường.");
+    if (actor.role === UserRole.UBND_ADMIN && !actor.wardId)
+      throw new ForbiddenException("Tài khoản UBND chưa được gán phường.");
+    if (!Array.isArray(schoolIds) || schoolIds.length < 1 || schoolIds.length > 100 ||
+        schoolIds.some(id => typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) ||
+        new Set(schoolIds).size !== schoolIds.length)
+      throw new BadRequestException("Danh sách trường không hợp lệ hoặc bị trùng.");
+    return this.prisma.$transaction(async tx => {
+      const kitchen = await tx.kitchen.findUnique({
+        where:{id:kitchenId},select:{id:true,type:true,wardId:true,isActive:true},
+      });
+      if (!kitchen || kitchen.type !== 'CENTRAL') throw new NotFoundException("Không tìm thấy bếp trung tâm.");
+      if (!kitchen.isActive) throw new ConflictException("Bếp đang bị khóa.");
+      if (!kitchen.wardId || (actor.role === UserRole.UBND_ADMIN && actor.wardId !== kitchen.wardId))
+        throw new ForbiddenException("Bếp không thuộc phường quản lý.");
+      const schools = await tx.school.findMany({
+        where:{id:{in:schoolIds},wardId:kitchen.wardId},
+        select:{id:true,name:true},
+      });
+      if(schools.length !== schoolIds.length)
+        throw new ForbiddenException("Có trường không thuộc cùng phường hoặc không tồn tại.");
+      const assigned=await tx.kitchenSchoolAssignment.findMany({
+        where:{schoolId:{in:schoolIds},isActive:true,endsAt:null},
+        include:{school:{select:{name:true}},kitchen:{select:{name:true}}},
+      });
+      if(assigned.length)
+        throw new ConflictException('Trường "'+assigned[0].school.name+'" đang được phân công cho "'+assigned[0].kitchen.name+'".');
+      const onsite=await tx.kitchen.findFirst({
+        where:{schoolId:{in:schoolIds},type:'SCHOOL',isActive:true},select:{schoolId:true},
+      });
+      if(onsite) throw new ConflictException("Có trường đang có bếp tại trường hoạt động.");
+      await tx.kitchenSchoolAssignment.createMany({
+        data:schoolIds.map((schoolId:string)=>({kitchenId,schoolId,isActive:true})),
+      });
+      return {success:true,assigned:schoolIds.length};
     });
   }
 
