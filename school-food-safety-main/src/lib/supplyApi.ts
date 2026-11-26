@@ -86,3 +86,18 @@ export const reverseSupplyPayment=(kitchenId:string,paymentId:string,reason:stri
 export type SupplyMinimum={ingredientId:string;minimumQty:string;ingredient:{name:string;unit:string}}
 export const getSupplyMinimums=(kitchenId:string)=>request<SupplyMinimum[]>(kitchenPath(kitchenId)+'/minimums')
 export const setSupplyMinimum=(kitchenId:string,ingredientId:string,minimumQty:number,unit:string)=>request<SupplyMinimum>(kitchenPath(kitchenId)+'/minimums/'+encodeURIComponent(ingredientId),{method:'PUT',body:JSON.stringify({minimumQty,unit})})
+
+export type InventoryDisposal={
+  id:string;kitchenId:string;lotId:string;number:string;quantity:number;unit:string;
+  reason:string;method:string;evidenceReference:string;handlerName:string;
+  status:'DRAFT'|'COMPLETED';createdAt:string;completedAt:string|null;
+  lot:{lotCode:string;ingredient:{name:string}};
+}
+export type InventoryDisposalInput={
+  number:string;quantity:number;reason:string;method:string;evidenceReference:string;handlerName:string;
+}
+export const getInventoryDisposals=(kitchenId:string)=>request<InventoryDisposal[]>(kitchenPath(kitchenId)+'/disposals')
+export const createInventoryDisposal=(kitchenId:string,lotId:string,input:InventoryDisposalInput)=>
+  request<InventoryDisposal>(kitchenPath(kitchenId)+'/lots/'+encodeURIComponent(lotId)+'/disposals',{method:'POST',body:JSON.stringify(input)})
+export const completeInventoryDisposal=(kitchenId:string,disposalId:string)=>
+  request<{id:string;lotId:string;quantity:number;remainingQty:number;status:'COMPLETED'}>(kitchenPath(kitchenId)+'/disposals/'+encodeURIComponent(disposalId)+'/complete',{method:'POST'})
