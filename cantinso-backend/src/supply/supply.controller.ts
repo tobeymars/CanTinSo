@@ -59,6 +59,20 @@ export class SupplyController {
   @Post(':kitchenId/lots/:lotId/issues')
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
   issue(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('lotId') lotId:string,@Body() body:unknown){return this.service.issue(user,kitchenId,lotId,body);}
+  @Get(':kitchenId/disposals')
+  disposals(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string){
+    return this.service.disposalList(user,kitchenId);
+  }
+  @Post(':kitchenId/lots/:lotId/disposals')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  createDisposal(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('lotId') lotId:string,@Body() body:unknown){
+    return this.service.createDisposal(user,kitchenId,lotId,body);
+  }
+  @Post(':kitchenId/disposals/:disposalId/complete')
+  @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
+  completeDisposal(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('disposalId') disposalId:string){
+    return this.service.completeDisposal(user,kitchenId,disposalId);
+  }
   @Patch(':kitchenId/lots/:lotId/status')
   @Roles('CENTRAL_KITCHEN','SCHOOL_KITCHEN')
   lotStatus(@CurrentUser() user:AuthUser,@Param('kitchenId') kitchenId:string,@Param('lotId') lotId:string,@Body() body:unknown){
