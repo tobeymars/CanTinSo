@@ -14,7 +14,15 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
  const available=lots.filter(lot=>lot.status==='AVAILABLE'&&lot.remainingQty>0&&!expired.includes(lot))
  const receiptEvents=movements.filter(event=>event.eventType==='RECEIVED')
  const issueEvents=movements.filter(event=>event.eventType==='ISSUED')
- const priced=new Map(finance?.receipts.flatMap(receipt=>receipt.lines.map(line=>[line.lot.id,line.quantity>0?line.amount/line.quantity:0] as const))??[])
+ const purchaseByLot=new Map<string,{quantity:number;amount:number}>()
+ for(const receipt of finance?.receipts??[]){
+   for(const line of receipt.lines){
+     const prev=purchaseByLot.get(line.lot.id)??{quantity:0,amount:0}
+     purchaseByLot.set(line.lot.id,{quantity:prev.quantity+line.quantity,amount:prev.amount+line.amount})
+   }
+ }
+ // Tính đơn giá bình quân có trọng số khi một lô được bổ sung qua nhiều phiếu nhập.
+ const priced=new Map([...purchaseByLot.entries()].filter(([,v])=>v.quantity>0).map(([id,v])=>[id,v.amount/v.quantity]))
  const valued=lots.filter(lot=>priced.has(lot.id))
  const stockValue=valued.reduce((sum,lot)=>sum+Math.round(lot.remainingQty*(priced.get(lot.id)??0)),0)
  const unpriced=lots.filter(lot=>!priced.has(lot.id))
