@@ -1,4 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { fetchMyKitchenContext } from './lib/myKitchenApi'
+import { loadMealPlanWorkspace } from './lib/mealPlanApi'
+import { listKitchenLegal } from './lib/kitchenLegalApi'
+import { getStoredUser } from './lib/authApi'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarClock, Check, ChefHat, ClipboardCheck, Clock3, CookingPot, PackageCheck, Route, ShieldCheck, Sparkles, SprayCan, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -24,21 +29,62 @@ const roleViews:Record<CentralKitchenRole,RoleView>={
   sanitation:{icon:SprayCan,kicker:'VỆ SINH & BÀN GIAO KHU VỰC',title:'Giữ nhịp vệ sinh xuyên suốt ca.',description:'Checklist trước, trong và sau chế biến cho từng khu vực được phân công.',metrics:[{label:'Khu vực theo dõi',value:'6',note:'Phạm vi bếp DEMO'},{label:'Đã kiểm tra',value:'4/6',note:'Theo checklist trên máy'},{label:'Lượt trong ca',value:'3',note:'Đầu ca · giữa ca · cuối ca'},{label:'Bàn giao cuối ca',value:'14:30',note:'Theo lịch minh họa'}],tasks:[{id:'clean-start',time:'05:30',title:'Kiểm tra vệ sinh đầu ca',detail:'Khu sơ chế, bếp nóng và dụng cụ.'},{id:'clean-mid',time:'09:20',title:'Vệ sinh sau đóng gói',detail:'Khu chia suất và lối bàn giao.'},{id:'clean-end',time:'14:00',title:'Checklist cuối ca',detail:'Ghi nhận khu vực đã hoàn tất bàn giao.'}],primary:{label:'Xem hồ sơ giám sát',path:'/giam-sat'},secondary:{label:'Xem giấy tờ & điều kiện',path:'/ho-so'}},
 }
 
-function readCompleted(role:CentralKitchenRole,date:string):string[]{try{const value:unknown=JSON.parse(localStorage.getItem(`demo-kitchen-tasks-${role}-${date}`)??'[]');return Array.isArray(value)&&value.every(item=>typeof item==='string')?value:[]}catch{return[]}}
+function readCompleted(role:CentralKitchenRole,date:string,kitchenId:string):string[]{
+ try {
+  const value:unknown=JSON.parse(localStorage.getItem(`kitchen-tasks-${kitchenId}-${role}-${date}`)??'[]')
+  return Array.isArray(value)&&value.every(item=>typeof item==='string')?value:[]
+ } catch{return []}
+}
 
 export default function CentralKitchenRoleDashboard({role,date}:{role:CentralKitchenRole;date:string}){
   const view=roleViews[role]
   const Icon=view.icon
-  const [completed,setCompleted]=useState(()=>readCompleted(role,date))
+  const user=getStoredUser()
+  const real=user?.role==='CENTRAL_KITCHEN'&&!!user.kitchenId
+  const kitchenQuery=useQuery({queryKey:['dashboard-kitchen',user?.kitchenId],queryFn:fetchMyKitchenContext,enabled:real})
+  const plansQuery=useQuery({queryKey:['dashboard-meal-plans',user?.kitchenId],queryFn:loadMealPlanWorkspace,enabled:real})
+  const legalQuery=useQuery({queryKey:['dashboard-legal',user?.kitchenId],queryFn:listKitchenLegal,enabled:real})
+  const kitchenId=user?.kitchenId??'demo'
+  const [completed,setCompleted]=useState<string[]>(()=>readCompleted(role,date,kitchenId))
+  useEffect(()=>setCompleted(readCompleted(role,date,kitchenId)),[role,date,kitchenId])
+  const assignedSchools=kitchenQuery.data?.kitchen.schools??[]
+  const schoolIds=new Set(assignedSchools.map(item=>item.school.id))
+  const plans=(plansQuery.data?.plans??[]).filter(plan=>schoolIds.has(plan.schoolId)&&plan.serviceDate.slice(0,10)===date)
+  const approved=plans.map(plan=>plan.revisions.find(rev=>rev.status==='APPROVED')).filter((rev):rev is NonNullable<typeof rev>=>!!rev)
+  const servings=approved.reduce((sum,revision)=>sum+revision.ageGroups.reduce((n,g)=>n+g.plannedServings,0),0)
+  const dishes=new Set(approved.flatMap(revision=>revision.items.map(item=>item.dishVersion.dish.name)))
+  const documents=legalQuery.data??[]
+  const reviewDue=documents.filter(doc=>doc.status==='expiring'||doc.status==='missing'||(!!doc.expiresAt&&doc.expiresAt<=new Date(Date.now()+60*86400000).toISOString().slice(0,10))).length
+  const dataLoading=kitchenQuery.isPending||plansQuery.isPending||legalQuery.isPending
+  const dataError=kitchenQuery.isError||plansQuery.isError||legalQuery.isError
+  const formatted=(value:number)=>value.toLocaleString('vi-VN')
+  const computed=(label:string):{value:string;note:string}|null=>{
+    if(label==='Trường nhận'||label==='Điểm giao')return{value:formatted(assignedSchools.length),note:'Trường được phân công cho bếp'}
+    if(['Suất dự kiến','Tổng suất dự kiến','Suất chờ giao'].includes(label))return{value:formatted(servings),note:'Từ thực đơn đã duyệt trong ngày'}
+    if(label==='Món cần chế biến'||label==='Món trong kế hoạch')return{value:formatted(dishes.size),note:'Món thuộc thực đơn được duyệt trong ngày'}
+    if(label==='Hồ sơ cần rà soát')return{value:formatted(reviewDue),note:'Hồ sơ thiếu, sắp hết hạn hoặc đã đánh dấu cần rà soát'}
+    if(label==='Chuyến hôm nay')return{value:formatted(new Set(plans.map(p=>p.schoolId)).size),note:'Số trường có kế hoạch giao trong ngày; không phải chuyến xe thực tế'}
+    return null
+  }
+  const metrics=real?view.metrics.map(metric=>{
+    if(dataLoading)return{...metric,value:'…',note:'Đang tải dữ liệu hệ thống'}
+    if(dataError)return{...metric,value:'—',note:'Không tải được dữ liệu hệ thống'}
+    const actual=computed(metric.label)
+    return {...metric,...(actual??{value:'—',note:'Chưa có dữ liệu nghiệp vụ được ghi nhận'})}
+  }):view.metrics
   const progress=Math.round(completed.length/view.tasks.length*100)
   const today=new Date(`${date}T12:00:00`).toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})
-  const toggle=(id:string)=>{const next=completed.includes(id)?completed.filter(item=>item!==id):[...completed,id];setCompleted(next);localStorage.setItem(`demo-kitchen-tasks-${role}-${date}`,JSON.stringify(next))}
+  const toggle=(id:string)=>{
+    const next=completed.includes(id)?completed.filter(item=>item!==id):[...completed,id]
+    setCompleted(next)
+    localStorage.setItem(`kitchen-tasks-${kitchenId}-${role}-${date}`,JSON.stringify(next))
+  }
   const status=useMemo(()=>completed.length===view.tasks.length?'Đã hoàn thành checklist':completed.length?'Đang thực hiện':'Chưa bắt đầu',[completed.length,view.tasks.length])
   return <div className="kitchen-role-dashboard">
-    <section className="card kitchen-role-hero"><div className="kitchen-role-icon"><Icon size={27}/></div><div><span>{view.kicker}</span><h2>{view.title}</h2><p>{view.description}</p></div><div className="kitchen-role-identity"><small>VAI TRÒ ĐANG XEM</small><strong>{centralKitchenRoleLabels[role]}</strong><em>Frontend DEMO · {today}</em></div></section>
-    <div className="kitchen-role-metrics">{view.metrics.map(metric=><article className="card" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.note}</small></article>)}</div>
-    <div className="kitchen-role-grid"><section className="card kitchen-task-card"><header><div><span className="section-kicker">CÔNG VIỆC TRONG CA</span><h2>Checklist ưu tiên</h2></div><div className="task-progress"><strong>{completed.length}/{view.tasks.length}</strong><span>{status}</span></div></header><div className="task-progress-track" aria-label={`Tiến độ ${progress}%`}><i style={{width:`${progress}%`}}/></div><div className="kitchen-task-list">{view.tasks.map(task=><button className={completed.includes(task.id)?'completed':''} onClick={()=>toggle(task.id)} key={task.id} aria-pressed={completed.includes(task.id)}><span className="task-check">{completed.includes(task.id)?<Check size={16}/>:<Clock3 size={15}/>}</span><time>{task.time}</time><div><strong>{task.title}</strong><p>{task.detail}</p></div></button>)}</div><p className="kitchen-task-note"><ShieldCheck size={15}/>Checklist chỉ lưu trên trình duyệt và không thay thế biên bản nghiệp vụ.</p></section>
-      <aside className="card kitchen-role-actions"><div className="kitchen-role-action-heading"><Sparkles size={20}/><div><span className="section-kicker">LỐI TẮT THEO VAI TRÒ</span><h2>Tiếp tục công việc</h2></div></div><Link className="primary" to={view.primary.path}>{view.primary.label}<ArrowRight size={16}/></Link><Link className="outline" to={view.secondary.path}>{view.secondary.label}<ArrowRight size={16}/></Link><div className="shift-summary"><CalendarClock size={18}/><div><small>CA ĐANG ÁP DỤNG</small><strong>{role==='packing'||role==='dispatcher'?'Ca hành chính · 07:00–15:00':'Ca sáng · 05:30–13:30'}</strong><span>Bếp trung tâm An Tâm · Dữ liệu DEMO</span></div></div></aside>
+    <section className="card kitchen-role-hero"><div className="kitchen-role-icon"><Icon size={27}/></div><div><span>{view.kicker}</span><h2>{view.title}</h2><p>{real?view.description.replace('Bếp trung tâm An Tâm',kitchenQuery.data?.kitchen.name??'bếp được phân công'):view.description}</p></div><div className="kitchen-role-identity"><small>VAI TRÒ ĐANG XEM</small><strong>{centralKitchenRoleLabels[role]}</strong><em>{real?'Dữ liệu hệ thống':'Frontend DEMO'} · {today}</em></div></section>
+    <div className="kitchen-role-metrics">{metrics.map(metric=><article className="card" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.note}</small></article>)}</div>
+    <div className="kitchen-role-grid"><section className="card kitchen-task-card"><header><div><span className="section-kicker">CÔNG VIỆC TRONG CA</span><h2>Checklist ưu tiên</h2></div><div className="task-progress"><strong>{completed.length}/{view.tasks.length}</strong><span>{status}</span></div></header><div className="task-progress-track" aria-label={`Tiến độ ${progress}%`}><i style={{width:`${progress}%`}}/></div><div className="kitchen-task-list">{view.tasks.map(task=><button className={completed.includes(task.id)?'completed':''} onClick={()=>toggle(task.id)} key={task.id} aria-pressed={completed.includes(task.id)}><span className="task-check">{completed.includes(task.id)?<Check size={16}/>:<Clock3 size={15}/>}</span><time>{task.time}</time><div><strong>{task.title}</strong><p>{task.detail}</p></div></button>)}</div><p className="kitchen-task-note"><ShieldCheck size={15}/>Checklist cá nhân lưu trên trình duyệt này; không xác nhận thay hồ sơ nghiệp vụ.</p></section>
+      <aside className="card kitchen-role-actions"><div className="kitchen-role-action-heading"><Sparkles size={20}/><div><span className="section-kicker">LỐI TẮT THEO VAI TRÒ</span><h2>Tiếp tục công việc</h2></div></div><Link className="primary" to={view.primary.path}>{view.primary.label}<ArrowRight size={16}/></Link><Link className="outline" to={view.secondary.path}>{view.secondary.label}<ArrowRight size={16}/></Link><div className="shift-summary"><CalendarClock size={18}/><div><small>CA ĐANG ÁP DỤNG</small><strong>{role==='packing'||role==='dispatcher'?'Ca hành chính · 07:00–15:00':'Ca sáng · 05:30–13:30'}</strong><span>{real?(kitchenQuery.data?.kitchen.name??'Đang tải thông tin bếp')+' · Lịch ca tham khảo': 'Bếp trung tâm An Tâm · Dữ liệu DEMO'}</span></div></div></aside>
     </div>
   </div>
 }
