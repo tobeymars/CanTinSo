@@ -220,6 +220,7 @@ model Kitchen {
   supervisionMeals SupervisionMeal[]
   dishQrs     DishQr[]
   schools     KitchenSchoolAssignment[]
+  shiftTasks KitchenShiftTask[]
   createdAt   DateTime                  @default(now()) @map("created_at")
   updatedAt   DateTime                  @updatedAt @map("updated_at")
 
@@ -990,4 +991,20 @@ model PublicInspectionRecord {
 
   @@index([schoolId, serviceDate, mealType, status])
   @@map("public_inspection_records")
+}
+
+/** Checklist công việc hiện hữu của dashboard bếp, khóa theo bếp + ngày + vai trò + đầu việc. */
+model KitchenShiftTask {
+  id String @id @default(uuid()) @db.Uuid
+  kitchenId String @map("kitchen_id") @db.Uuid
+  kitchen Kitchen @relation(fields:[kitchenId], references:[id], onDelete:Restrict)
+  serviceDate DateTime @map("service_date") @db.Date
+  role String
+  taskId String @map("task_id")
+  completed Boolean @default(false)
+  updatedById String @map("updated_by_id") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([kitchenId,serviceDate,role,taskId])
+  @@index([kitchenId,serviceDate])
+  @@map("kitchen_shift_tasks")
 }
