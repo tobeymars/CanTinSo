@@ -44,6 +44,24 @@ function SupplyDialog({onClose,busy,children,title='Tạo phiếu nhập kho',ey
 
 const emptySupplier=()=>({code:'',name:'',taxCode:'',contactName:'',phone:'',email:'',address:'',note:''})
 const emptyIssue=()=>({voucherNumber:'',quantity:'',unit:'',note:'',schoolId:'',serviceDate:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),mealType:'LUNCH' as 'BREAKFAST'|'LUNCH'|'DINNER'|'SNACK'})
+const traceEventLabels:Record<string,string>={
+  RECEIVED:'Nhập kho',
+  ISSUED:'Xuất kho',
+  RETURNED:'Nhập hoàn kho',
+  INSPECTED:'Đã kiểm tra',
+  STORED:'Chuyển vị trí bảo quản',
+  PREPARED:'Sơ chế',
+  COOKED:'Chế biến',
+  SERVED:'Đã phục vụ',
+  REJECTED:'Cách ly / không đạt',
+}
+function traceEventLabel(event:{eventType:string;metadata:unknown}):string{
+  if(event.eventType==='REJECTED'&&event.metadata&&typeof event.metadata==='object'&&!Array.isArray(event.metadata)){
+    const meta=event.metadata as Record<string,unknown>
+    if(meta.action==='EXPIRED_LOT_DISPOSAL')return 'Đã xử lý lô quá hạn'
+  }
+  return traceEventLabels[event.eventType]??'Sự kiện khác'
+}
 const fmt=(value:number)=>value.toLocaleString('vi-VN',{maximumFractionDigits:3})
 const date=(value?:string|null)=>value?new Date(value).toLocaleDateString('vi-VN'):'Chưa có'
 const expired=(value?:string|null)=>!!value&&value.slice(0,10)<new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
@@ -137,7 +155,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   }
   function exportWarehouseCsv(){
     const rows=section==='trace'
-      ? [['Thời điểm','Mã lô','Nguyên liệu','Loại sự kiện','Diễn giải'],...matchedMovements.map(item=>[item.occurredAt,item.lot.lotCode,item.lot.ingredient.name,item.eventType,item.description??''])]
+      ? [['Thời điểm','Mã lô','Nguyên liệu','Loại sự kiện','Diễn giải'],...matchedMovements.map(item=>[item.occurredAt,item.lot.lotCode,item.lot.ingredient.name,traceEventLabel(item),item.description??''])]
       : section==='receipts'
         ? [['Phiếu nhập','Ngày nhập','Nhà cung cấp','Tổng tiền VND','Đã trả VND','Còn nợ VND'],...(finance.data?.receipts??[]).map(item=>[item.number,item.createdAt,item.supplier.name,String(item.total),String(item.paid),String(item.debt)])]
         : [['Mã lô','Nguyên liệu','Nhà cung cấp','Số lượng nhập','Số lượng tồn','Đơn vị','Hạn dùng','Vị trí','Trạng thái'],...matchedLots.map(item=>[item.lotCode,item.ingredient.name,item.supplier.name,String(item.quantity),String(item.remainingQty),item.unit,item.expiryDate??'',item.storageLocation??'',item.status])];
@@ -610,7 +628,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
         <label>Tìm mã lô hoặc nguyên liệu <input value={movementSearch} onChange={e=>setMovementSearch(e.target.value)} placeholder="Mã lô / nguyên liệu / diễn giải"/></label>
         {movements.data?.length===0&&<p className="muted">Chưa có nhật ký.</p>}
         <div className="supply-table-scroll"><table className="supply-table supply-table--events"><thead><tr><th>Thời điểm</th><th>Nguyên liệu</th><th>Mã lô</th><th>Loại</th><th>Nội dung</th></tr></thead><tbody>
-        {matchedMovements.map(item=><tr key={item.id}><td>{date(item.occurredAt)}</td><td>{item.lot.ingredient.name}</td><td>{item.lot.lotCode}</td><td>{item.eventType==='RECEIVED'?'Nhập kho':item.eventType==='ISSUED'?'Xuất kho':item.eventType}</td><td>{item.description}</td></tr>)}
+        {matchedMovements.map(item=><tr key={item.id}><td>{date(item.occurredAt)}</td><td>{item.lot.ingredient.name}</td><td>{item.lot.lotCode}</td><td>{traceEventLabel(item)}</td><td>{item.description}</td></tr>)}
         </tbody></table></div>
       </>}
       {section==='transfers'&&<div className="supply-panel supply-transfer-section">
