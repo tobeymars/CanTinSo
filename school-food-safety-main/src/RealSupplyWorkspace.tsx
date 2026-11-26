@@ -250,7 +250,11 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
     {activeId&&<p className="muted"><strong>Kho: {kitchens.find(k=>k.id===activeId)?.name}</strong> · {canEdit?'Có quyền cập nhật':'Chỉ xem'}</p>}
     {isLoading&&<p role="status">Đang tải thông tin…</p>}
     {failure&&<p className="error" role="alert">{failure instanceof Error?failure.message:'Không tải được dữ liệu kho.'}</p>}
-    {!isLoading&&!failure&&!activeId&&<div className="empty-state">Tài khoản chưa được phân quyền xem bếp nào.</div>}
+    {!isLoading&&!failure&&!activeId&&<div className="empty-state" role="status">
+      {role==='school_board'
+        ? 'Trường chưa có bếp nấu tại trường, vì vậy BGH không có kho nguyên liệu hoặc nhà cung cấp nội bộ để xem. Kho của bếp trung tâm thuộc quyền quản lý riêng của bếp; nhà trường theo dõi thực đơn và việc giao nhận món ăn trong Giám sát & an toàn.'
+        : 'Tài khoản chưa được phân quyền xem bếp nào.'}
+    </div>}
     {error&&<p className="error" role="alert">{error}</p>}
     {notice&&<p role="status" className="supervision-status-message">{notice}</p>}
     {activeId&&mode==='suppliers'&&<>
