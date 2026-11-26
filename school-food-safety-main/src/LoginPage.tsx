@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sprout, UtensilsCrossed, ClipboardCheck, Shield } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sprout } from "lucide-react";
 import { login, type AuthUser } from "./lib/authApi";
 import "./LoginPage.css";
 
@@ -37,19 +37,10 @@ export default function LoginPage({ onSuccess }: { onSuccess: (user: AuthUser) =
           <div className="login-intro-body">
             <span className="login-intro-kicker"><span className="login-intro-dot" /> NỀN TẢNG QUẢN LÝ TẬP TRUNG</span>
             <h2>Minh bạch từng khâu.<br/><em>An tâm từng bữa.</em></h2>
-            <p>Kết nối nhà trường, bếp ăn và đơn vị quản lý trên cùng một nền tảng.</p>
-            <div className="login-illustration" aria-hidden="true">
-              <div className="login-illustration-glow" />
-              <div className="login-illustration-card login-illustration-card--main">
-                <span className="login-illustration-symbol"><UtensilsCrossed size={27}/></span>
-                <span><small>QUẢN LÝ BỮA ĂN</small><strong>Đầy đủ · Dễ theo dõi</strong></span>
-                <CheckCircle2 size={21} className="login-illustration-check"/>
-              </div>
-              <div className="login-illustration-card login-illustration-card--secondary">
-                <span className="login-illustration-symbol"><ClipboardCheck size={23}/></span>
-                <span><small>NHẬT KÝ VẬN HÀNH</small><strong>Truy xuất rõ ràng</strong></span>
-              </div>
-              <div className="login-illustration-chip"><Shield size={15}/> Theo đúng phạm vi phân quyền</div>
+            <p>Kết nối bếp ăn, nhà trường và đơn vị quản lý.</p>
+            <div className="login-intro-features" aria-label="Những chức năng chính">
+              <span>Thực đơn & dinh dưỡng</span>
+              <span>Giám sát & truy xuất</span>
             </div>
           </div>
 
