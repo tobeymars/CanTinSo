@@ -34,10 +34,15 @@ export class PublicInspectionService {
 
   async list(user:AuthUser,schoolId:string,date:string,mealType:string) {
     const scope=await this.scope(user,schoolId,date,mealType);
-    return this.prisma.publicInspectionRecord.findMany({
+    const records=await this.prisma.publicInspectionRecord.findMany({
       where:{...scope,...(user.role==='UBND_ADMIN'?{}:{status:'PUBLISHED'})},
       orderBy:[{publishedAt:'desc'},{createdAt:'desc'}],
     });
+    // Không chuyển tham chiếu tài liệu nội bộ hay ID cán bộ sang tài khoản trường/bếp.
+    return records.map(({createdById,publishedById,evidenceReference,...record})=>({
+      ...record,
+      ...(user.role==='UBND_ADMIN'?{evidenceReference}:{}),
+    }));
   }
 
   async create(user:AuthUser,schoolId:string,date:string,mealType:string,body:Record<string,unknown>) {
