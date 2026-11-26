@@ -184,6 +184,7 @@ model School {
   dishApprovals        DishApproval[]
   supervisionMeals     SupervisionMeal[]
   foodSafetyChecks     FoodSafetyCheck[]
+  publicInspectionRecords PublicInspectionRecord[]
   hikvisionEnrollments HikvisionStudentEnrollment[]
   createdAt            DateTime                     @default(now()) @map("created_at")
   updatedAt            DateTime                     @updatedAt @map("updated_at")
@@ -961,4 +962,32 @@ model KitchenStockMinimum {
  ingredient Ingredient @relation(fields:[ingredientId],references:[id],onDelete:Restrict)
  @@unique([kitchenId,ingredientId])
  @@map("kitchen_stock_minimums")
+}
+
+/** Biên bản kiểm tra do cán bộ UBND nhập theo chứng từ của cơ quan có thẩm quyền.
+ * Khác hoàn toàn với nhật ký kiểm thực do bếp lập. */
+model PublicInspectionRecord {
+  id String @id @default(uuid()) @db.Uuid
+  schoolId String @map("school_id") @db.Uuid
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  serviceDate DateTime @map("service_date") @db.Date
+  mealType String @map("meal_type")
+  recordNumber String @unique @map("record_number")
+  title String
+  authority String
+  inspectedAt DateTime @map("inspected_at") @db.Date
+  scope String
+  summary String
+  findingCount Int @map("finding_count")
+  outcome String
+  evidenceReference String @map("evidence_reference")
+  status String @default("DRAFT")
+  createdById String @map("created_by_id") @db.Uuid
+  publishedById String? @map("published_by_id") @db.Uuid
+  publishedAt DateTime? @map("published_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId, serviceDate, mealType, status])
+  @@map("public_inspection_records")
 }
