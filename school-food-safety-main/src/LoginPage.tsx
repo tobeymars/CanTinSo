@@ -37,7 +37,7 @@ export default function LoginPage({ onSuccess }: { onSuccess: (user: AuthUser) =
           <div className="login-intro-body">
             <span className="login-intro-kicker"><span className="login-intro-dot" /> NỀN TẢNG QUẢN LÝ TẬP TRUNG</span>
             <h2>Minh bạch từng khâu.<br/><em>An tâm từng bữa.</em></h2>
-            <p>Kết nối nhà trường, bếp ăn và đơn vị quản lý trong một quy trình vận hành rõ ràng, nhất quán.</p>
+            <p>Kết nối nhà trường, bếp ăn và đơn vị quản lý trên cùng một nền tảng.</p>
             <div className="login-illustration" aria-hidden="true">
               <div className="login-illustration-glow" />
               <div className="login-illustration-card login-illustration-card--main">
@@ -64,7 +64,7 @@ export default function LoginPage({ onSuccess }: { onSuccess: (user: AuthUser) =
           <div className="login-heading">
             <span className="login-eyebrow">CHÀO MỪNG TRỞ LẠI</span>
             <h1 id="login-title">Đăng nhập tài khoản</h1>
-            <p>Sử dụng tài khoản được cấp để truy cập không gian làm việc của bạn.</p>
+            <p>Đăng nhập bằng tài khoản do đơn vị cấp.</p>
           </div>
 
           <form className="login-form" onSubmit={handleSubmit} aria-busy={loading}>
