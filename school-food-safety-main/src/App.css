@@ -887,3 +887,39 @@ form .feedback-photo-picker.disabled{cursor:not-allowed;opacity:.6}
 .supervision-dispatch-dialog .arrival-review-photo{max-width:100%;max-height:240px;object-fit:contain;border-radius:11px;border:1px solid #e0e7f1}
 .supervision-dispatch-dialog .supervision-edit-buttons{position:sticky;bottom:-26px;z-index:2;background:#fff;padding:14px 0 4px;border-top:1px solid #e7edf5}
 @media(max-width:680px){.supervision-dispatch-dialog{width:min(100%,96vw);padding:18px 14px}.supervision-dispatch-dialog .arrival-grid,.supervision-dispatch-dialog .arrival-dish{grid-template-columns:minmax(0,1fr)}.supervision-dispatch-dialog .arrival-section{padding:14px}.supervision-dispatch-dialog .supervision-edit-buttons{bottom:-18px}}
+
+
+/* Bếp trung tâm: tên bếp và bộ chọn trường là hai khu vực riêng, không xếp ngang. */
+.school-hero.kitchen-school-hero{min-height:286px;align-items:stretch;background-image:linear-gradient(90deg,rgba(14,34,83,.97) 0%,rgba(18,42,98,.94) 42%,rgba(19,40,86,.68) 70%,rgba(19,40,86,.18) 100%),url('/images/canteen/view-8.jpg')}
+.school-hero.kitchen-school-hero .hero-content{width:min(100%,760px);max-width:100%;padding:28px 34px 23px;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:0;min-width:0}
+.kitchen-school-hero .hero-eyebrow{margin-bottom:19px;font-size:11px;letter-spacing:1.5px}
+.kitchen-school-context{display:grid;grid-template-columns:minmax(210px,.9fr) minmax(280px,1.1fr);gap:28px;align-items:start;width:100%;min-width:0}
+.kitchen-school-identity,.kitchen-school-assignment{display:flex;flex-direction:column;min-width:0}
+.kitchen-school-assignment{padding-left:27px;border-left:1px solid rgba(255,255,255,.22)}
+.kitchen-school-caption{font-size:10px;line-height:1.5;font-weight:800;letter-spacing:1.3px;color:#f4d296}
+.kitchen-school-name{display:block;margin-top:7px;color:#fff;font-size:clamp(24px,2.1vw,32px);font-weight:800;line-height:1.22;letter-spacing:-.65px;overflow-wrap:anywhere}
+.kitchen-school-verified{display:flex;align-items:center;gap:7px;margin-top:12px;color:#e2eaff;font-size:12px;font-weight:600;line-height:1.5}
+.kitchen-school-verified svg{flex:none;color:#f4c96b}
+.kitchen-school-hero .kitchen-school-assignment .apple-select.hero{width:100%;min-width:0;margin-top:9px}
+.kitchen-school-hero .kitchen-school-assignment .apple-select.hero .apple-select-trigger{width:100%;max-width:none;min-width:0;min-height:53px;margin:0;padding:8px 10px 8px 15px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:12px;box-shadow:0 6px 20px rgba(2,12,42,.11);font-size:18px;font-weight:750;letter-spacing:-.2px}
+.kitchen-school-hero .kitchen-school-assignment .apple-select.hero .apple-select-trigger:hover,.kitchen-school-hero .kitchen-school-assignment .apple-select.hero .apple-select-trigger[aria-expanded=true]{background:rgba(255,255,255,.19);border-color:rgba(255,255,255,.57)}
+.kitchen-school-hero .kitchen-school-assignment .glide-select-label{min-width:0;text-overflow:ellipsis}
+.kitchen-school-hint{display:block;margin-top:9px;color:#dce5fb;font-size:11px;font-weight:600;line-height:1.5}
+.kitchen-school-empty{margin:10px 0 0;color:#fff;font-size:13px;line-height:1.55}
+.kitchen-school-hero .hero-address{margin-top:17px;margin-bottom:0;color:#dce5f8;font-size:12px;line-height:1.5}
+.kitchen-school-hero .hero-bottom{margin-top:16px;font-size:11px;flex-wrap:wrap;gap:12px}
+@media(max-width:900px){
+ .school-hero.kitchen-school-hero .hero-content{width:min(100%,680px);padding:25px}
+ .kitchen-school-context{gap:18px;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}
+ .kitchen-school-assignment{padding-left:18px}
+}
+@media(max-width:650px){
+ .school-hero.kitchen-school-hero{min-height:0;background-image:linear-gradient(90deg,rgba(14,34,83,.98),rgba(19,40,86,.82)),url('/images/canteen/view-8.jpg')}
+ .school-hero.kitchen-school-hero .hero-content{padding:24px 20px}
+ .kitchen-school-hero .hero-eyebrow{margin-bottom:17px;letter-spacing:1px}
+ .kitchen-school-context{grid-template-columns:minmax(0,1fr);gap:20px}
+ .kitchen-school-name{font-size:27px}
+ .kitchen-school-assignment{padding:18px 0 0;border-left:0;border-top:1px solid rgba(255,255,255,.22)}
+ .kitchen-school-hero .kitchen-school-assignment .apple-select.hero .apple-select-trigger{font-size:17px;max-width:100%}
+ .kitchen-school-hero .hero-address{margin-top:16px}
+}
