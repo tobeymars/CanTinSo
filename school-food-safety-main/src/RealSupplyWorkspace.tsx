@@ -493,7 +493,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           </button>}
         </div>
         {receiptFormOpen&&canEdit&&<SupplyDialog busy={busy} onClose={()=>setReceiptFormOpen(false)}>
-          <RealPurchaseReceipt key={activeId} kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>{setReceiptFormOpen(false);setReceiptViewId(null);setReceiptPage(1)}}/>
+          <RealPurchaseReceipt key={activeId} kitchenId={activeId} suppliers={suppliers.data??[]} ingredients={ingredients.data??[]} existingLots={lots.data??[]} canEdit={canEdit} busy={busy} execute={execute} onSaved={()=>{setReceiptFormOpen(false);setReceiptViewId(null);setReceiptPage(1)}}/>
         </SupplyDialog>}
         <>
           <div className="management-toolbar supply-filterbar supply-receipt-filterbar">
