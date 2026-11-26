@@ -62,5 +62,7 @@ jobs:
         run: npm run test:supervision-stages
       - name: Validate approved meal-plan warehouse forecasts
         run: npm run test:stock-forecast
+      - name: Validate school versus central kitchen inventory boundaries
+        run: npm run test:school-warehouse-access
       - name: Build NestJS backend
         run: npm run build
