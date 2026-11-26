@@ -6,9 +6,9 @@ import { Boxes, ClipboardList, PackagePlus, Plus, RefreshCw, Truck, X } from 'lu
 import type { ViewRole } from './lib/store'
 import {
   getSupplyKitchens,getSupplySuppliers,getSupplyIngredients,getSupplyLots,getSupplyMovements,getSupplySchools,getSupplyFinance,getSupplyMinimums,getStockVouchers,downloadStockVoucherEvidence,returnSupplyIssue,getSupplyApprovedPlans,getSupplyIngredientRequirements,
-  issueSupplyLot,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,importSupplySuppliers,setSupplyMinimum,
+  issueSupplyLot,getInventoryDisposals,createInventoryDisposal,completeInventoryDisposal,saveSupplySupplier,updateSupplySupplierStatus,changeSupplyLotStatus,moveSupplyLot,importSupplySuppliers,setSupplyMinimum,
 } from './lib/supplyApi'
-import type { SupplySupplier,SupplyLot,StockEvidenceInput,StockVoucher } from './lib/supplyApi'
+import type { SupplySupplier,SupplyLot,StockEvidenceInput,StockVoucher,InventoryDisposalInput } from './lib/supplyApi'
 import { StockInspectionFields,StockEvidenceFields,emptyInspection } from './StockVoucherEvidenceFields'
 import './WarehouseManagement.css'
 import './RealSupplyWorkspace.css'
@@ -61,6 +61,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const suppliers=useQuery({queryKey:['supply-suppliers',activeId],queryFn:()=>getSupplySuppliers(activeId),enabled:!!activeId})
   const ingredients=useQuery({queryKey:['supply-ingredients',activeId],queryFn:()=>getSupplyIngredients(activeId),enabled:!!activeId&&mode==='warehouse'})
   const lots=useQuery({queryKey:['supply-lots',activeId],queryFn:()=>getSupplyLots(activeId),enabled:!!activeId&&mode==='warehouse'})
+  const disposals=useQuery({queryKey:['supply-disposals',activeId],queryFn:()=>getInventoryDisposals(activeId),enabled:!!activeId&&mode==='warehouse'})
   const movements=useQuery({queryKey:['supply-movements',activeId],queryFn:()=>getSupplyMovements(activeId),enabled:!!activeId&&mode==='warehouse'})
   const vouchers=useQuery({queryKey:['supply-vouchers',activeId],queryFn:()=>getStockVouchers(activeId),enabled:!!activeId&&mode==='warehouse'})
   const approvedPlans=useQuery({queryKey:['supply-approved-plans',activeId],queryFn:()=>getSupplyApprovedPlans(activeId),enabled:!!activeId&&mode==='warehouse'&&canEdit})
@@ -103,6 +104,9 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [newLocation,setNewLocation]=useState('')
   const [moveReason,setMoveReason]=useState('')
   const [statusLot,setStatusLot]=useState<SupplyLot|null>(null)
+  const [disposalLot,setDisposalLot]=useState<SupplyLot|null>(null)
+  const [disposalForm,setDisposalForm]=useState<InventoryDisposalInput>({number:'',quantity:0,reason:'Nguyên liệu hết hạn sử dụng',method:'',evidenceReference:'',handlerName:''})
+
   const [statusReason,setStatusReason]=useState('')
   const [thresholdIngredient,setThresholdIngredient]=useState('')
   const [thresholdQty,setThresholdQty]=useState('')
@@ -110,7 +114,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setIssuePlanLink(null);setSelectedPlanRevisionId('');setViewingSupplier(null);setVendorDialogOpen(false);setFinanceDialogOpen(false);setStatusTarget(null);setImportDraft(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
+  useEffect(()=>{setEditingVendor(null);setVendor(emptySupplier());setIssueLot(null);setIssuePlanLink(null);setSelectedPlanRevisionId('');setViewingSupplier(null);setVendorDialogOpen(false);setFinanceDialogOpen(false);setStatusTarget(null);setImportDraft(null);setSupplierPage(1);setMoveLot(null);setStatusLot(null);setDisposalLot(null);setSection('overview');setReceiptFormOpen(false);setReceiptViewId(null);setReceiptSearch('');setReceiptPage(1);setSelectedVoucher(null);setReturnOpen(false);setIssueInspection(emptyInspection());setIssueEvidences([]);setError('');setNotice('')},[activeId])
   async function refresh(){
     await Promise.all([
       qc.invalidateQueries({queryKey:['supply-suppliers',activeId]}),
@@ -118,6 +122,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       qc.invalidateQueries({queryKey:['supply-lots',activeId]}),
       qc.invalidateQueries({queryKey:['supply-minimums',activeId]}),
       qc.invalidateQueries({queryKey:['supply-movements',activeId]}),
+      qc.invalidateQueries({queryKey:['supply-disposals',activeId]}),
       qc.invalidateQueries({queryKey:['supply-plan-requirements',activeId]}),
       qc.invalidateQueries({queryKey:['supply-approved-plans',activeId]}),
       qc.invalidateQueries({queryKey:['supply-vouchers',activeId]}),
@@ -229,6 +234,17 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
   const matchedMovements=(movements.data??[]).filter(item=>(item.lot.lotCode+' '+item.lot.ingredient.name+' '+(item.description??'')).toLocaleLowerCase('vi').includes(movementSearch.toLocaleLowerCase('vi')))
   function confirmMove(e:FormEvent){e.preventDefault();if(!moveLot)return
     void execute(async()=>{await moveSupplyLot(activeId,moveLot.id,newLocation,moveReason);setMoveLot(null);setNewLocation('');setMoveReason('')},'Đã chuyển vị trí bảo quản và ghi nhật ký.')
+  }
+  function submitDisposal(e:FormEvent){
+    e.preventDefault();if(!disposalLot)return
+    void execute(async()=>{
+      await createInventoryDisposal(activeId,disposalLot.id,disposalForm)
+      setDisposalLot(null)
+    },'Đã tạo phiếu xử lý nháp. Tồn kho chưa bị trừ; chỉ xác nhận hoàn tất sau khi xử lý thực tế.')
+  }
+  function postDisposal(id:string,number:string){
+    if(!window.confirm('Xác nhận nguyên liệu của phiếu '+number+' đã được xử lý thực tế theo chứng từ? Thao tác sẽ ghi giảm tồn kho và không thể hoàn tác.'))return
+    void execute(()=>completeInventoryDisposal(activeId,id),'Đã hoàn tất phiếu xử lý và trừ tồn kho. Lịch sử được giữ lại để truy xuất.')
   }
   function confirmStatus(e:FormEvent){e.preventDefault();if(!statusLot)return
     const nextStatus=statusLot.status==='QUARANTINED'?'AVAILABLE':'QUARANTINED'
@@ -434,6 +450,9 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           {canEdit&&lot.status==='AVAILABLE'&&!expired(lot.expiryDate)&&lot.remainingQty>0&&<button type="button" className="outline" onClick={()=>{setIssuePlanLink(null);setIssueLot(lot);setIssue({...emptyIssue(),unit:preferredReceiptUnit(lot.unit,lot.remainingQty)})}}>Xuất lô</button>}
           {canEdit&&lot.status!=='DEPLETED'&&<button type="button" className="outline" onClick={()=>{setMoveLot(lot);setNewLocation(lot.storageLocation??'');setMoveReason('');setSection('transfers')}}>Chuyển vị trí</button>}
           {canEdit&&(lot.status==='AVAILABLE'||lot.status==='QUARANTINED')&&<button type="button" className="outline" onClick={()=>{setStatusLot(lot);setStatusReason('')}}>{lot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'}</button>}
+          {canEdit&&lot.remainingQty>0&&expired(lot.expiryDate)&&['QUARANTINED','EXPIRED'].includes(lot.status)&&<button type="button" className="outline" onClick={()=>{
+            setDisposalLot(lot);setDisposalForm({number:'',quantity:lot.remainingQty,reason:'Nguyên liệu hết hạn sử dụng',method:'',evidenceReference:'',handlerName:''});setError('');setSection('lots')
+          }}>Lập phiếu xử lý</button>}
         </div></td></tr>)}
         </tbody></table></div>
         {issueLot&&canEdit&&<form className="supply-panel supply-issue-form" onSubmit={submitIssue}>
@@ -599,6 +618,33 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           <button className="primary" type="submit" disabled={busy}>Xác nhận chuyển vị trí</button>
         </form>}
       </div>}
+
+      {section==='lots'&&<section className="card supply-panel">
+        <h3>Phiếu xử lý nguyên liệu quá hạn</h3>
+        <p className="muted">Phiếu nháp không làm giảm tồn. Chỉ xác nhận khi xử lý thực tế đã hoàn tất và có chứng từ đối chiếu.</p>
+        {disposals.isLoading&&<p>Đang tải phiếu xử lý…</p>}
+        {disposals.isError&&<p role="alert">Không tải được danh sách phiếu xử lý.</p>}
+        <div className="supply-table-scroll"><table className="supply-table"><thead><tr><th>Số phiếu</th><th>Lô</th><th>Số lượng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
+          {(disposals.data??[]).map(item=><tr key={item.id}>
+            <td><strong>{item.number}</strong><small style={{display:'block'}}>{item.lot.ingredient.name}</small></td>
+            <td>{item.lot.lotCode}</td><td>{fmt(item.quantity)} {item.unit}</td>
+            <td>{item.status==='DRAFT'?'Chờ hoàn tất xử lý':'Đã xử lý · ghi giảm tồn'}</td>
+            <td>{canEdit&&item.status==='DRAFT'&&<button type="button" className="outline" disabled={busy} onClick={()=>postDisposal(item.id,item.number)}>Xác nhận đã xử lý</button>}</td>
+          </tr>)}
+        </tbody></table></div>
+        {!disposals.isLoading&&!disposals.data?.length&&<p className="muted">Chưa có phiếu xử lý nào.</p>}
+      </section>}
+      {disposalLot&&canEdit&&<form onSubmit={submitDisposal} className="card supply-panel supply-status-form">
+        <h3>Lập phiếu xử lý · {disposalLot.lotCode}</h3>
+        <p className="muted">Tồn thực tế: {readableStockQuantity(disposalLot.remainingQty,disposalLot.unit)} · Đơn vị lưu kho: {disposalLot.unit}. Lô phải được cách ly trước khi xử lý.</p>
+        <label>Số phiếu xử lý *<input required maxLength={60} value={disposalForm.number} onChange={e=>setDisposalForm({...disposalForm,number:e.target.value})}/></label>
+        <label>Số lượng xử lý ({disposalLot.unit}) *<input required type="number" min="0.001" step="0.001" max={disposalLot.remainingQty} value={disposalForm.quantity||''} onChange={e=>setDisposalForm({...disposalForm,quantity:Number(e.target.value)})}/></label>
+        <label>Lý do xử lý *<textarea required minLength={10} maxLength={600} value={disposalForm.reason} onChange={e=>setDisposalForm({...disposalForm,reason:e.target.value})}/></label>
+        <label>Phương án xử lý thực tế *<textarea required minLength={8} maxLength={400} value={disposalForm.method} onChange={e=>setDisposalForm({...disposalForm,method:e.target.value})} placeholder="Ví dụ: Tiêu hủy theo quy trình nội bộ"/></label>
+        <label>Biên bản hoặc chứng từ tham chiếu *<input required minLength={3} maxLength={240} value={disposalForm.evidenceReference} onChange={e=>setDisposalForm({...disposalForm,evidenceReference:e.target.value})}/></label>
+        <label>Người phụ trách *<input required minLength={2} maxLength={120} value={disposalForm.handlerName} onChange={e=>setDisposalForm({...disposalForm,handlerName:e.target.value})}/></label>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}><button className="primary" type="submit" disabled={busy}>Lưu phiếu nháp</button><button type="button" className="outline" disabled={busy} onClick={()=>setDisposalLot(null)}>Hủy</button></div>
+      </form>}
       {statusLot&&canEdit&&<form onSubmit={confirmStatus} className="card supply-panel supply-status-form">
         <h3>{statusLot.status==='QUARANTINED'?'Mở cách ly':'Cách ly'} · {statusLot.lotCode}</h3>
         <label>Lý do và căn cứ *<input required maxLength={500} value={statusReason} onChange={e=>setStatusReason(e.target.value)}/></label>
