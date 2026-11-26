@@ -260,6 +260,49 @@ export class UsersService {
       : null;
   }
 
+  /** Dữ liệu checklist của đúng bếp đăng nhập, không tin kitchenId do client gửi lên. */
+  private kitchenTaskScope(actor:AuthUser,date:string,role:string,taskId?:string) {
+    if (actor.role!==UserRole.CENTRAL_KITCHEN || !actor.kitchenId)
+      throw new ForbiddenException("Chỉ tài khoản bếp trung tâm được cập nhật checklist.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+      throw new BadRequestException("Ngày không hợp lệ.");
+    const serviceDate=new Date(date+'T00:00:00.000Z');
+    if(Number.isNaN(serviceDate.getTime()) || serviceDate.toISOString().slice(0,10)!==date)
+      throw new BadRequestException("Ngày không hợp lệ.");
+    const tasks:Record<string,string[]>={
+      manager:['manager-staff','manager-menu','manager-dispatch'],
+      head_chef:['chef-menu','chef-prep','chef-batch'],
+      prep:['prep-rice','prep-vegetable','prep-meat'],
+      cook:['cook-main','cook-soup','cook-handover'],
+      packing:['pack-label','pack-count','pack-handover'],
+      dispatcher:['dispatch-vehicle','dispatch-portion','dispatch-event'],
+      sanitation:['clean-start','clean-mid','clean-end'],
+    };
+    if(!Object.prototype.hasOwnProperty.call(tasks,role)|| (taskId!==undefined&&!tasks[role].includes(taskId)))
+      throw new BadRequestException("Vai trò hoặc công việc không hợp lệ.");
+    return {kitchenId:actor.kitchenId,serviceDate,role,taskId};
+  }
+
+  async readKitchenShiftTasks(actor:AuthUser,date:string,role:string) {
+    const scope=this.kitchenTaskScope(actor,date,role);
+    const rows=await this.prisma.kitchenShiftTask.findMany({
+      where:{kitchenId:scope.kitchenId,serviceDate:scope.serviceDate,role:scope.role},
+      select:{taskId:true,completed:true,updatedAt:true},
+    });
+    return rows;
+  }
+
+  async updateKitchenShiftTask(actor:AuthUser,date:string,role:string,taskId:string,body:{completed?:unknown}) {
+    const scope=this.kitchenTaskScope(actor,date,role,taskId);
+    if(typeof body?.completed!=='boolean')throw new BadRequestException("Trạng thái công việc phải đúng/sai.");
+    return this.prisma.kitchenShiftTask.upsert({
+      where:{kitchenId_serviceDate_role_taskId:{kitchenId:scope.kitchenId,serviceDate:scope.serviceDate,role,taskId}},
+      create:{kitchenId:scope.kitchenId,serviceDate:scope.serviceDate,role,taskId,completed:body.completed,updatedById:actor.sub},
+      update:{completed:body.completed,updatedById:actor.sub},
+      select:{taskId:true,completed:true,updatedAt:true},
+    });
+  }
+
   async listCentralKitchens(actor: AuthUser) {
     if (actor.role !== UserRole.SUPER_ADMIN && actor.role !== UserRole.UBND_ADMIN) {
       throw new ForbiddenException("Bạn không có quyền quản lý bếp trung tâm.");
