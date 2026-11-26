@@ -444,6 +444,11 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
       {(section==='stock'||section==='lots'||section==='issues')&&<>
         <h3><Boxes size={19}/>{section==='issues'?'Chọn lô để xuất kho':'Tồn kho theo lô'} ({matchedLots.length})</h3>
         <label>Tìm mã lô / nguyên liệu / nhà cung cấp <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Nhập từ khóa để lọc…"/></label>
+        {section==='lots'&&<p className="muted" role="note" style={{lineHeight:1.65,margin:'9px 0 14px'}}>
+          <strong>Phiếu xử lý lô quá hạn:</strong> Nút “Lập phiếu xử lý” chỉ hiện khi lô đã hết hạn sử dụng, vẫn còn tồn và đã được cách ly.
+          Lô còn hạn hoặc đã hết tồn không cần lập phiếu xử lý quá hạn. Với lô quá hạn chưa cách ly, hãy chọn “Cách ly” và ghi rõ lý do trước.
+        </p>}
+
         {lots.data?.length===0&&<p className="muted">Bếp chưa có lô nguyên liệu thật. Hãy tạo nhà cung cấp và nhập kho.</p>}
         <div className="supply-table-scroll"><table className="supply-table supply-table--lots"><thead><tr><th>Lô</th><th>Nguyên liệu</th><th>Nhà cung cấp</th><th>Tồn</th><th>Hạn dùng</th><th>Trạng thái</th><th></th></tr></thead><tbody>
         {matchedLots.map(lot=><tr key={lot.id}><td><strong>{lot.lotCode}</strong><small style={{display:'block'}}>{lot.storageLocation||'Chưa cập nhật vị trí'}</small></td><td>{lot.ingredient.name}</td><td>{lot.supplier.name}</td><td><strong>{readableStockQuantity(lot.remainingQty,lot.unit)}</strong>{readableStockQuantity(lot.remainingQty,lot.unit)!==fmt(lot.remainingQty)+' '+lot.unit&&<small style={{display:'block'}}>Số liệu kho: {fmt(lot.remainingQty)} {lot.unit}</small>}</td><td>{date(lot.expiryDate)}</td><td>{lot.remainingQty<=0||lot.status==='DEPLETED'?'Đã hết':expired(lot.expiryDate)?(lot.status==='QUARANTINED'||lot.status==='EXPIRED'?'Quá hạn · đã cách ly':'Quá hạn · cần cách ly'):lot.status==='AVAILABLE'?'Có thể xuất':'Cách ly / tạm ngưng'}</td><td><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
