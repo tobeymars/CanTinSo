@@ -22,6 +22,8 @@ Check 'Warehouse voucher tests'
 Write-Host '[5/12] Approved menu ingredient forecast tests'
 npm run test:stock-forecast
 Check 'Approved menu forecast tests'
+npm run test:school-warehouse-access
+Check 'School warehouse access tests'
 Write-Host '[6/12] Supervision date policy tests'
 npm run test:supervision-dates
 Check 'Supervision date tests'
