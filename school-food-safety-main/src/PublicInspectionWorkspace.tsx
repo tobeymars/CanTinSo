@@ -60,7 +60,7 @@ export default function PublicInspectionWorkspace({scope}:{scope:SupervisionScop
    <label>Số biên bản<input required maxLength={100} minLength={3} value={form.recordNumber} onChange={e=>update('recordNumber',e.target.value)} placeholder="Số/ký hiệu trên biên bản gốc"/></label>
    <label>Tiêu đề kết quả kiểm tra<input required maxLength={200} minLength={2} value={form.title} onChange={e=>update('title',e.target.value)}/></label>
    <label>Cơ quan, đơn vị thực hiện<input required maxLength={200} minLength={5} value={form.authority} onChange={e=>update('authority',e.target.value)}/></label>
-   <label>Ngày kiểm tra<input type="date" required max={new Date().toLocaleDateString('en-CA')} value={form.inspectedAt} onChange={e=>update('inspectedAt',e.target.value)}/></label>
+   <label>Ngày kiểm tra<input type="date" required max={new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)} value={form.inspectedAt} onChange={e=>update('inspectedAt',e.target.value)}/></label>
    <label>Phạm vi kiểm tra<textarea required minLength={10} maxLength={1000} rows={2} value={form.scope} onChange={e=>update('scope',e.target.value)}/></label>
    <label>Tóm tắt kết quả<textarea required minLength={10} maxLength={4000} rows={3} value={form.summary} onChange={e=>update('summary',e.target.value)}/></label>
    <label>Số nội dung cần theo dõi<input type="number" required min={0} max={10000} value={form.findingCount} onChange={e=>update('findingCount',Number(e.target.value))}/></label>
