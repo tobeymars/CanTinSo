@@ -12,6 +12,7 @@
     "test:supervision-arrival": "tsx --test src/supervision/arrival-receipt.spec.ts",
     "test:supervision-serving": "tsx --test src/supervision/serving-stage-form.spec.ts",
     "test:supervision-stages": "tsx --test src/supervision/stage-responsibility.spec.ts",
+    "test:supervision-dispatch": "tsx --test src/supervision/dispatch-stage-form.spec.ts",
     "test:supervision-food": "tsx --test src/supervision/food-safety-forms.spec.ts src/supervision/dispatch-sample-policy.spec.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
