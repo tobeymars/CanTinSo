@@ -78,7 +78,7 @@ export default function RealPurchaseReceipt({kitchenId,ingredients,suppliers,exi
             </label>
             <label>Mã lô *<input aria-label={'Mã lô dòng '+(index+1)} required maxLength={100} value={line.lotCode} onChange={e=>change(line.key,{lotCode:e.target.value})} placeholder="Ví dụ: LO-2026-001"/></label>
             {matchedLot&&<p className="muted supply-wide" role="status" style={{margin:'0 0 8px',lineHeight:1.6}}>
-              <strong>Đã có lô {matchedLot.lotCode}:</strong> {matchedLot.ingredient.name} · {matchedLot.supplier.name} · còn {formatReceiptQuantity(matchedLot.remainingQty,matchedLot.unit)} · hạn dùng {matchedLot.expiryDate?.slice(0,10)??'Chưa có'}.
+              <strong>Đã có lô {matchedLot.lotCode}:</strong> {matchedLot.ingredient.name} · {matchedLot.supplier.name} · còn {formatReceiptQuantity(matchedLot.remainingQty)+' '+matchedLot.unit} · hạn dùng {matchedLot.expiryDate?.slice(0,10)??'Chưa có'}.
               {matchedLot.status!=='AVAILABLE'||matchedLot.remainingQty<=0?' Lô không được nhập bổ sung tự động.':' Nếu các thông tin trùng khớp, lần nhập mới sẽ cộng vào lô này.'}
             </p>}
             <label>Số lượng hàng giao *<input type="number" min="0.000001" step="any" required value={line.deliveredQuantity} onChange={e=>change(line.key,{deliveredQuantity:e.target.value})} placeholder="Số hàng giao"/></label>
