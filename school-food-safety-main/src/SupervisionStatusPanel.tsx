@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CheckCircle2, ClipboardCheck, Clock3, FileClock, Pencil, Plus, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { isServerSupervisionScope, readServerSupervision, readSupervisionContext, writeServerSupervision } from './lib/supervisionApi'
 import type { School } from './lib/data'
 import type { ViewRole } from './lib/store'
@@ -193,8 +194,21 @@ export default function SupervisionStatusPanel({ school, date, mealType, role }:
         </div>
       </div>
       {serverMode && contextQuery.isError && <p className="error" role="alert">Không lấy được dữ liệu kho, thực đơn theo trường và bữa từ hệ thống.</p>}
-      {serverMode && contextQuery.data?.menu && <p className="muted">Thực đơn: {contextQuery.data.menu.dishes.map(dish=>dish.name).join(', ') || 'Chưa có món được duyệt'} · {contextQuery.data.menu.servings} suất dự kiến</p>}
-      {serverMode && contextQuery.data && <p className="muted">Hồ sơ pháp lý bếp: {contextQuery.data.legalDocuments.length} hồ sơ · {contextQuery.data.legalDocuments.filter(doc=>doc.status==='valid').length} hồ sơ đánh dấu còn hiệu lực. Xem chi tiết tại Hồ sơ pháp lý & điều kiện bếp.</p>}
+      {serverMode && contextQuery.data?.menu && (
+        <p className="supervision-context-summary">
+          <span><strong>Thực đơn đã duyệt:</strong> {contextQuery.data.menu.dishes.map(dish=>dish.name).join(', ') || 'Chưa có món'}</span>
+          <span className="supervision-context-divider" aria-hidden="true">·</span>
+          <span><strong>Số suất dự kiến:</strong> {contextQuery.data.menu.servings.toLocaleString('vi-VN')} suất</span>
+        </p>
+      )}
+      {serverMode && contextQuery.data && (
+        <p className="supervision-context-summary">
+          <span><strong>Hồ sơ pháp lý của bếp:</strong> {contextQuery.data.legalDocuments.length} hồ sơ</span>
+          <span className="supervision-context-divider" aria-hidden="true">·</span>
+          <span>{contextQuery.data.legalDocuments.filter(doc=>doc.status==='valid').length} hồ sơ được đánh dấu còn hiệu lực</span>
+          <Link to="/ho-so-phap-ly" className="supervision-context-link">Xem hồ sơ pháp lý</Link>
+        </p>
+      )}
       {message && <div className="supervision-status-message" role="status"><CheckCircle2 size={16}/><span>{message}</span><button type="button" aria-label="Đóng thông báo" onClick={() => setMessage('')}><X size={15}/></button></div>}
       <div className="supervision-check-rows">
         {CHECK_DEFINITIONS.map(def => {
