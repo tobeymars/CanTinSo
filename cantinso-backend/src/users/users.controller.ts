@@ -33,6 +33,12 @@ export class UsersController {
     return this.users.createCentralKitchen(user, dto);
   }
 
+  @Post('central-kitchens/:id/assign-schools')
+  @Roles('SUPER_ADMIN', 'UBND_ADMIN')
+  assignCentralKitchenSchools(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: {schoolIds?:string[]}) {
+    return this.users.assignCentralKitchenSchools(user,id,body?.schoolIds);
+  }
+
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.users.list(user);
