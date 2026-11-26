@@ -116,8 +116,8 @@ export function MealJourneyPanel({school, serviceDate, mealType='LUNCH', data, r
       <p className="muted shared-journal-context">Nhật ký riêng cho {mealType === 'BREAKFAST' ? 'bữa sáng' : mealType === 'LUNCH' ? 'bữa trưa' : 'bữa xế'}, cùng nguồn dữ liệu công khai ở mọi vai trò</p>
     </div></div>
     {school.mode === 'CENTRAL_KITCHEN' && role !== 'school_kitchen' && <div className="transport-facts" aria-label="Thông tin vận chuyển từ bếp trung tâm đến trường">
-      <div><span className="transport-icon"><MapPin size={18}/></span><span><small>Khoảng cách</small><strong>{data.transportDistanceKm !== null ? `${data.transportDistanceKm.toLocaleString('vi-VN')} km` : 'Chưa ghi nhận'}</strong></span></div>
-      <div><span className="transport-icon"><Timer size={18}/></span><span><small>Thời gian vận chuyển</small><strong>{data.transportDurationMinutes !== null ? `${data.transportDurationMinutes} phút` : 'Chưa ghi nhận'}</strong></span></div>
+      <div><span className="transport-icon"><MapPin size={18}/></span><span><small>Khoảng cách đường bộ dự kiến</small><strong>{data.transportDistanceKm !== null ? `${data.transportDistanceKm.toLocaleString('vi-VN')} km` : 'Chưa có tuyến đường'}</strong></span></div>
+      <div><span className="transport-icon"><Timer size={18}/></span><span><small>Thời gian vận chuyển thực tế</small><strong>{data.transportDurationMinutes !== null ? `${data.transportDurationMinutes} phút` : 'Chờ đủ mốc giao nhận'}</strong></span></div>
     </div>}
     <MealJourneyProgress data={data} mode={school.mode} role={role} schoolId={school.id} serviceDate={serviceDate} mealType={mealType} onReadyPhotoClick={onReadyPhotoClick}/>
   </section>
