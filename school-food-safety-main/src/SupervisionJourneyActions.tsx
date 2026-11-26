@@ -326,7 +326,7 @@ export default function SupervisionJourneyActions({ school, date, mealType, data
       </div>
     })()}
     {editing && <div className="supervision-edit-backdrop" role="presentation" onMouseDown={event => {if(event.target===event.currentTarget)setEditing(null)}}>
-      <section role="dialog" aria-modal="true" aria-labelledby="edit-stage-title" className="supervision-edit-dialog">
+      <section role="dialog" aria-modal="true" aria-labelledby="edit-stage-title" className={`supervision-edit-dialog${isDispatchReport(editing) ? " supervision-dispatch-dialog" : ""}` }>
         <div className="dialog-head"><h2 id="edit-stage-title">{isArrivalReceipt(editing) ? (editing.action==='arrival_resolve'?'Phiếu kiểm tra lại giao nhận':'Phiếu xác nhận món đã giao đến') : editing.action === 'report' ? 'Cập nhật mốc vận hành' : editing.action === 'reopen' ? 'Mở điều chỉnh mốc vận hành' : 'Xác nhận mốc vận hành'}</h2><button className="icon-button" type="button" aria-label="Đóng" onClick={() => setEditing(null)}><X size={20}/></button></div>
         <p className="supervision-edit-context">{school.name} · {date} · {mealLabel} · <strong>{stageNames[editing.stage]}</strong></p>
         <form className="supervision-edit-form" onSubmit={save}>
