@@ -21,6 +21,18 @@ export class UsersController {
     return this.users.getMyKitchen(user);
   }
 
+  @Get('kitchen-shift/:date/:role')
+  @Roles('CENTRAL_KITCHEN')
+  readKitchenShift(@CurrentUser() user:AuthUser,@Param('date') date:string,@Param('role') role:string) {
+    return this.users.readKitchenShiftTasks(user,date,role);
+  }
+
+  @Patch('kitchen-shift/:date/:role/:taskId')
+  @Roles('CENTRAL_KITCHEN')
+  updateKitchenShift(@CurrentUser() user:AuthUser,@Param('date') date:string,@Param('role') role:string,@Param('taskId') taskId:string,@Body() body:{completed?:boolean}) {
+    return this.users.updateKitchenShiftTask(user,date,role,taskId,body);
+  }
+
   @Get('central-kitchens')
   @Roles('SUPER_ADMIN', 'UBND_ADMIN')
   listCentralKitchens(@CurrentUser() user: AuthUser) {
