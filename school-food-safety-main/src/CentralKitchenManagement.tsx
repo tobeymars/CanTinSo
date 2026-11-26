@@ -3,6 +3,7 @@ import { getStoredUser } from "./lib/authApi";
 import { Factory, KeyRound, Plus, RefreshCw, Search, ShieldCheck, UserRound, UserRoundX } from "lucide-react";
 import {
   createCentralKitchen,
+  assignCentralKitchenSchools,
   getCentralKitchens,
   getManagedSchools,
   resetManagedUserPassword,
@@ -33,6 +34,8 @@ export default function CentralKitchenManagement() {
   const [error, setError] = useState("");
   const [passwordUser, setPasswordUser] = useState<{id:string;email:string} | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [assigningKitchen, setAssigningKitchen] = useState<CentralKitchen | null>(null);
+  const [extraSchoolIds, setExtraSchoolIds] = useState<string[]>([]);
 
   async function load() {
     setLoading(true); setError("");
@@ -77,6 +80,20 @@ export default function CentralKitchenManagement() {
     finally { setBusy(false); }
   }
 
+  async function submitAssignments(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!assigningKitchen || !extraSchoolIds.length) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await assignCentralKitchenSchools(assigningKitchen.id, extraSchoolIds);
+      setAssigningKitchen(null); setExtraSchoolIds([]);
+      setNotice("Đã bổ sung trường phục vụ cho bếp trung tâm hiện tại.");
+      await load();
+    } catch(e) {
+      setError(e instanceof Error ? e.message : "Không phân công được trường.");
+    } finally { setBusy(false); }
+  }
+
   async function toggleUser(user: {id:string;email:string;isActive:boolean}) {
     setBusy(true); setError(""); setNotice("");
     try {
@@ -116,7 +133,7 @@ export default function CentralKitchenManagement() {
       <thead><tr><th>Bếp trung tâm</th><th>Trường được phục vụ</th><th>Tài khoản quản trị</th><th>Trạng thái</th></tr></thead>
       <tbody>{filtered.map(k=><tr key={k.id}>
         <td><strong>{k.name}</strong><small>{k.code} · {k.contactName}{k.phone ? ` · ${k.phone}` : ""}</small></td>
-        <td><strong>{k.schools.length} trường</strong><small>{k.schools.map(x=>x.school.name).join(", ")}</small></td>
+        <td><strong>{k.schools.length} trường</strong><small>{k.schools.map(x=>x.school.name).join(", ")}</small><button type="button" className="um-secondary" style={{marginTop:8,display:"inline-flex",alignItems:"center",gap:6}} disabled={busy||!k.isActive} onClick={()=>{setAssigningKitchen(k);setExtraSchoolIds([]);setError("");}}><Plus size={14}/> Phân công trường</button></td>
         <td>{k.users.map(u=><div key={u.id} className="um-central-user"><strong>{u.fullName}</strong><small>{u.email} · {u.isActive ? "Đang hoạt động" : "Đã khóa"}</small><div className="um-actions">
           <button title="Đặt lại mật khẩu" onClick={()=>{setPasswordUser({id:u.id,email:u.email});setNewPassword("");}}><KeyRound size={15}/></button>
           <button title={u.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"} disabled={busy} onClick={()=>void toggleUser(u)}>{u.isActive?<UserRoundX size={15}/>:<UserRound size={15}/>}</button>
@@ -146,6 +163,28 @@ export default function CentralKitchenManagement() {
         <label>Mật khẩu ban đầu<input required type="password" minLength={8} maxLength={100} value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><small>Tối thiểu 8 ký tự.</small></label>
         {error && <div className="um-error" role="alert">{error}</div>}
         <div className="um-modal-actions"><button type="button" className="um-secondary" onClick={()=>setShowForm(false)}>Hủy</button><button className="um-primary" disabled={busy||!form.schoolIds.length}>{busy?"Đang tạo...":"Tạo bếp và tài khoản"}</button></div>
+      </form>
+    </div>}
+    {assigningKitchen && <div className="um-modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)setAssigningKitchen(null);}}>
+      <form className="um-modal um-central-modal" onSubmit={submitAssignments}>
+        <div className="um-modal-head"><h3>Phân công thêm trường</h3><button type="button" onClick={()=>setAssigningKitchen(null)} aria-label="Đóng">×</button></div>
+        <p>Bếp trung tâm: <strong>{assigningKitchen.name}</strong></p>
+        <p>Đang phục vụ: <strong>{assigningKitchen.schools.map(item=>item.school.name).join(", ")}</strong></p>
+        <p className="muted">Chọn các trường cùng phường chưa được phân công cho bếp khác. Trường đã phục vụ vẫn được giữ nguyên.</p>
+        <div className="um-school-checks">
+          {schools.map(school=>{
+            const current=assigningKitchen.schools.some(item=>item.school.id===school.id);
+            const other=assignedSchoolIds.has(school.id)&&!current;
+            return <label key={school.id}>
+              <input type="checkbox" checked={current||extraSchoolIds.includes(school.id)} disabled={current||other||busy}
+                onChange={()=>setExtraSchoolIds(previous=>previous.includes(school.id)?previous.filter(id=>id!==school.id):[...previous,school.id])}/>
+              <span>{school.name}{current?" · Đang phục vụ":other?" · Đã phân công bếp khác":""}</span>
+            </label>;
+          })}
+        </div>
+        {!schools.some(school=>!assignedSchoolIds.has(school.id))&&<p className="muted">Không còn trường chưa phân công trong danh sách quản lý.</p>}
+        {error&&<div className="um-error" role="alert">{error}</div>}
+        <div className="um-modal-actions"><button type="button" className="um-secondary" disabled={busy} onClick={()=>setAssigningKitchen(null)}>Hủy</button><button type="submit" className="um-primary" disabled={busy||extraSchoolIds.length===0}>{busy?"Đang lưu...":`Phân công thêm ${extraSchoolIds.length} trường`}</button></div>
       </form>
     </div>}
     {passwordUser && <div className="um-modal-backdrop"><form className="um-modal" onSubmit={resetPassword}>
