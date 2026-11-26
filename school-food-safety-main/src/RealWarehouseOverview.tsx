@@ -9,8 +9,8 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
 }){
  const now=today(),soon=new Date(now+'T00:00:00Z');soon.setUTCDate(soon.getUTCDate()+7)
  const week=soon.toISOString().slice(0,10)
- const expired=lots.filter(lot=>lot.expiryDate&&lot.expiryDate.slice(0,10)<now)
- const expiring=lots.filter(lot=>lot.expiryDate&&lot.expiryDate.slice(0,10)>=now&&lot.expiryDate.slice(0,10)<=week)
+ const expired=lots.filter(lot=>lot.remainingQty>0&&lot.expiryDate&&lot.expiryDate.slice(0,10)<now)
+ const expiring=lots.filter(lot=>lot.remainingQty>0&&lot.expiryDate&&lot.expiryDate.slice(0,10)>=now&&lot.expiryDate.slice(0,10)<=week)
  const available=lots.filter(lot=>lot.status==='AVAILABLE'&&lot.remainingQty>0&&!expired.includes(lot))
  const receiptEvents=movements.filter(event=>event.eventType==='RECEIVED')
  const issueEvents=movements.filter(event=>event.eventType==='ISSUED')
