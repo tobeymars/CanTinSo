@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getKitchenShiftTasks, updateKitchenShiftTask } from './lib/kitchenShiftApi'
 import { fetchMyKitchenContext } from './lib/myKitchenApi'
 import { loadMealPlanWorkspace } from './lib/mealPlanApi'
 import { listKitchenLegal } from './lib/kitchenLegalApi'
@@ -38,6 +39,7 @@ function readCompleted(role:CentralKitchenRole,date:string,kitchenId:string):str
 
 export default function CentralKitchenRoleDashboard({role,date}:{role:CentralKitchenRole;date:string}){
   const view=roleViews[role]
+  const queryClient=useQueryClient()
   const Icon=view.icon
   const user=getStoredUser()
   const real=user?.role==='CENTRAL_KITCHEN'&&!!user.kitchenId
@@ -45,8 +47,12 @@ export default function CentralKitchenRoleDashboard({role,date}:{role:CentralKit
   const plansQuery=useQuery({queryKey:['dashboard-meal-plans',user?.kitchenId],queryFn:loadMealPlanWorkspace,enabled:real})
   const legalQuery=useQuery({queryKey:['dashboard-legal',user?.kitchenId],queryFn:listKitchenLegal,enabled:real})
   const kitchenId=user?.kitchenId??'demo'
-  const [completed,setCompleted]=useState<string[]>(()=>readCompleted(role,date,kitchenId))
-  useEffect(()=>setCompleted(readCompleted(role,date,kitchenId)),[role,date,kitchenId])
+  const [localCompleted,setLocalCompleted]=useState<string[]>(()=>readCompleted(role,date,kitchenId))
+  const [saving,setSaving]=useState<string|null>(null)
+  const [taskError,setTaskError]=useState('')
+  const shiftQuery=useQuery({queryKey:['kitchen-shift',kitchenId,date,role],queryFn:()=>getKitchenShiftTasks(date,role),enabled:real})
+  const completed=real?(shiftQuery.data??[]).filter(item=>item.completed).map(item=>item.taskId):localCompleted
+  useEffect(()=>{setLocalCompleted(readCompleted(role,date,kitchenId));setTaskError('')},[role,date,kitchenId])
   const assignedSchools=kitchenQuery.data?.kitchen.schools??[]
   const schoolIds=new Set(assignedSchools.map(item=>item.school.id))
   const plans=(plansQuery.data?.plans??[]).filter(plan=>schoolIds.has(plan.schoolId)&&plan.serviceDate.slice(0,10)===date)
@@ -74,17 +80,27 @@ export default function CentralKitchenRoleDashboard({role,date}:{role:CentralKit
   }):view.metrics
   const progress=Math.round(completed.length/view.tasks.length*100)
   const today=new Date(`${date}T12:00:00`).toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})
-  const toggle=(id:string)=>{
+  const toggle=async(id:string)=>{
+    if(real){
+      if(saving||shiftQuery.isPending||shiftQuery.isError)return
+      setSaving(id);setTaskError('')
+      try{
+        await updateKitchenShiftTask(date,role,id,!completed.includes(id))
+        await queryClient.invalidateQueries({queryKey:['kitchen-shift',kitchenId,date,role]})
+      }catch(error){setTaskError(error instanceof Error?error.message:'Không thể lưu checklist.')}
+      finally{setSaving(null)}
+      return
+    }
     const next=completed.includes(id)?completed.filter(item=>item!==id):[...completed,id]
-    setCompleted(next)
+    setLocalCompleted(next)
     localStorage.setItem(`kitchen-tasks-${kitchenId}-${role}-${date}`,JSON.stringify(next))
   }
   const status=useMemo(()=>completed.length===view.tasks.length?'Đã hoàn thành checklist':completed.length?'Đang thực hiện':'Chưa bắt đầu',[completed.length,view.tasks.length])
   return <div className="kitchen-role-dashboard">
     <section className="card kitchen-role-hero"><div className="kitchen-role-icon"><Icon size={27}/></div><div><span>{view.kicker}</span><h2>{view.title}</h2><p>{real?view.description.replace('Bếp trung tâm An Tâm',kitchenQuery.data?.kitchen.name??'bếp được phân công'):view.description}</p></div><div className="kitchen-role-identity"><small>VAI TRÒ ĐANG XEM</small><strong>{centralKitchenRoleLabels[role]}</strong><em>{real?'Dữ liệu hệ thống':'Frontend DEMO'} · {today}</em></div></section>
     <div className="kitchen-role-metrics">{metrics.map(metric=><article className="card" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.note}</small></article>)}</div>
-    <div className="kitchen-role-grid"><section className="card kitchen-task-card"><header><div><span className="section-kicker">CÔNG VIỆC TRONG CA</span><h2>Checklist ưu tiên</h2></div><div className="task-progress"><strong>{completed.length}/{view.tasks.length}</strong><span>{status}</span></div></header><div className="task-progress-track" aria-label={`Tiến độ ${progress}%`}><i style={{width:`${progress}%`}}/></div><div className="kitchen-task-list">{view.tasks.map(task=><button className={completed.includes(task.id)?'completed':''} onClick={()=>toggle(task.id)} key={task.id} aria-pressed={completed.includes(task.id)}><span className="task-check">{completed.includes(task.id)?<Check size={16}/>:<Clock3 size={15}/>}</span><time>{task.time}</time><div><strong>{task.title}</strong><p>{task.detail}</p></div></button>)}</div><p className="kitchen-task-note"><ShieldCheck size={15}/>Checklist cá nhân lưu trên trình duyệt này; không xác nhận thay hồ sơ nghiệp vụ.</p></section>
-      <aside className="card kitchen-role-actions"><div className="kitchen-role-action-heading"><Sparkles size={20}/><div><span className="section-kicker">LỐI TẮT THEO VAI TRÒ</span><h2>Tiếp tục công việc</h2></div></div><Link className="primary" to={view.primary.path}>{view.primary.label}<ArrowRight size={16}/></Link><Link className="outline" to={view.secondary.path}>{view.secondary.label}<ArrowRight size={16}/></Link><div className="shift-summary"><CalendarClock size={18}/><div><small>CA ĐANG ÁP DỤNG</small><strong>{role==='packing'||role==='dispatcher'?'Ca hành chính · 07:00–15:00':'Ca sáng · 05:30–13:30'}</strong><span>{real?(kitchenQuery.data?.kitchen.name??'Đang tải thông tin bếp')+' · Lịch ca tham khảo': 'Bếp trung tâm An Tâm · Dữ liệu DEMO'}</span></div></div></aside>
+    <div className="kitchen-role-grid"><section className="card kitchen-task-card"><header><div><span className="section-kicker">CÔNG VIỆC TRONG CA</span><h2>Checklist ưu tiên</h2></div><div className="task-progress"><strong>{completed.length}/{view.tasks.length}</strong><span>{status}</span></div></header><div className="task-progress-track" aria-label={`Tiến độ ${progress}%`}><i style={{width:`${progress}%`}}/></div><div className="kitchen-task-list">{view.tasks.map(task=><button className={completed.includes(task.id)?'completed':''} onClick={()=>{void toggle(task.id)}} disabled={!!saving||(real&&(shiftQuery.isPending||shiftQuery.isError))} key={task.id} aria-pressed={completed.includes(task.id)}><span className="task-check">{completed.includes(task.id)?<Check size={16}/>:<Clock3 size={15}/>}</span><time>{real?'—':task.time}</time><div><strong>{task.title}</strong><p>{task.detail}</p></div></button>)}</div>{real&&shiftQuery.isPending&&<p className="muted">Đang tải checklist trong ca…</p>}{real&&shiftQuery.isError&&<p role="alert">Không tải được checklist. Vui lòng thử tải lại trang.</p>}{taskError&&<p role="alert">{taskError}</p>}<p className="kitchen-task-note"><ShieldCheck size={15}/>{real?'Checklist được lưu theo bếp, ngày và vai trò trên hệ thống; không thay thế hồ sơ nghiệp vụ.':'Checklist DEMO chỉ lưu trên trình duyệt; không thay thế hồ sơ nghiệp vụ.'}</p></section>
+      <aside className="card kitchen-role-actions"><div className="kitchen-role-action-heading"><Sparkles size={20}/><div><span className="section-kicker">LỐI TẮT THEO VAI TRÒ</span><h2>Tiếp tục công việc</h2></div></div><Link className="primary" to={view.primary.path}>{view.primary.label}<ArrowRight size={16}/></Link><Link className="outline" to={view.secondary.path}>{view.secondary.label}<ArrowRight size={16}/></Link><div className="shift-summary"><CalendarClock size={18}/><div><small>CA ĐANG ÁP DỤNG</small><strong>{real?'Chưa có lịch ca được ghi nhận':role==='packing'||role==='dispatcher'?'Ca hành chính · 07:00–15:00':'Ca sáng · 05:30–13:30'}</strong><span>{real?(kitchenQuery.data?.kitchen.name??'Đang tải thông tin bếp')+' · Dữ liệu hệ thống': 'Bếp trung tâm An Tâm · Dữ liệu DEMO'}</span></div></div></aside>
     </div>
   </div>
 }
