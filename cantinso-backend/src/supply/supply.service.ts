@@ -30,11 +30,11 @@ export class SupplyService {
     if (this.isOperator(user)) {
       if (!user.kitchenId || user.kitchenId!==kitchenId) throw new ForbiddenException('Không thuộc bếp này.');
     } else if (user.role==='SCHOOL_ADMIN') {
-      if (!user.schoolId) throw new ForbiddenException();
-      if (kitchen.schoolId!==user.schoolId) {
-        const a=await this.prisma.kitchenSchoolAssignment.findFirst({where:{kitchenId,schoolId:user.schoolId,isActive:true,OR:[{endsAt:null},{endsAt:{gte:new Date()}}]}});
-        if (!a) throw new ForbiddenException('Bếp không phục vụ trường này.');
-      }
+      // School administrators may view ONLY the inventory of an on-site kitchen
+      // owned by their school. A central kitchen's service assignment grants
+      // meal supervision rights, never access to its raw inventory or suppliers.
+      if (!user.schoolId || kitchen.type!=='SCHOOL' || kitchen.schoolId!==user.schoolId)
+        throw new ForbiddenException('BGH chỉ được xem kho của bếp tại chính trường mình, không được truy cập kho bếp trung tâm.');
     } else if(user.role==='UBND_ADMIN') {
       if (!user.wardId || kitchen.wardId!==user.wardId) throw new ForbiddenException('Không thuộc địa bàn quản lý.');
     } else throw new ForbiddenException();
@@ -46,7 +46,7 @@ export class SupplyService {
       return this.prisma.kitchen.findMany({where:{id:user.kitchenId,isActive:true},select:{id:true,name:true,type:true}});
     }
     if (user.role==='SCHOOL_ADMIN' && user.schoolId) return this.prisma.kitchen.findMany({
-      where:{isActive:true,OR:[{schoolId:user.schoolId},{schools:{some:{schoolId:user.schoolId,isActive:true,OR:[{endsAt:null},{endsAt:{gte:new Date()}}]}}}]},
+      where:{isActive:true,type:'SCHOOL',schoolId:user.schoolId},
       select:{id:true,name:true,type:true},
     });
     if (user.role==='UBND_ADMIN' && user.wardId) return this.prisma.kitchen.findMany({
