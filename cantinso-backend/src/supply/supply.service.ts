@@ -300,6 +300,85 @@ export class SupplyService {
       throw error;
     }
   }
+  /** Phiếu xử lý nguyên liệu quá hạn: tạo nháp không trừ tồn, hoàn tất mới ghi sổ. */
+  async disposalList(user:AuthUser,kitchenId:string){
+    await this.permitted(user,kitchenId);
+    const rows=await this.prisma.inventoryDisposal.findMany({
+      where:{kitchenId},include:{lot:{select:{lotCode:true,ingredient:{select:{name:true}}}}},
+      orderBy:{createdAt:'desc'},take:300,
+    });
+    return rows.map(row=>({...row,quantity:Number(row.quantity)}));
+  }
+  async createDisposal(user:AuthUser,kitchenId:string,lotId:string,body:any){
+    await this.permitted(user,kitchenId,true);
+    if(!uuid(lotId))throw new BadRequestException('Mã lô không hợp lệ.');
+    const number=str(body?.number,'Số phiếu xử lý',60);
+    const reason=str(body?.reason,'Lý do xử lý',600);
+    const method=str(body?.method,'Phương án xử lý',400);
+    const evidenceReference=str(body?.evidenceReference,'Số biên bản/chứng từ chứng minh',240);
+    const handlerName=str(body?.handlerName,'Người phụ trách xử lý',120);
+    if(reason.length<10||method.length<8||evidenceReference.length<3||handlerName.length<2)
+      throw new BadRequestException('Cần ghi rõ lý do, phương án xử lý, tham chiếu chứng từ và người phụ trách.');
+    const quantity=Number(body?.quantity);
+    if(typeof body?.quantity!=='number'||!Number.isFinite(quantity)||quantity<=0||quantity>1000000||
+      Math.round(quantity*1000)!==quantity*1000)
+      throw new BadRequestException('Số lượng xử lý phải lớn hơn 0 và tối đa 3 chữ số thập phân.');
+    return this.prisma.$transaction(async tx=>{
+      const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},
+        select:{id:true,unit:true,remainingQty:true,expiryDate:true,status:true}});
+      if(!lot)throw new NotFoundException('Không thấy lô thuộc bếp.');
+      const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+      if(!lot.expiryDate||lot.expiryDate.toISOString().slice(0,10)>=today)
+        throw new ConflictException('Quy trình này chỉ dành cho lô đã quá hạn. Lô còn hạn cần xử lý theo nghiệp vụ khác.');
+      if(lot.status!=='QUARANTINED'&&lot.status!=='EXPIRED')
+        throw new ConflictException('Phải cách ly lô hết hạn trước khi lập phiếu xử lý.');
+      if(Number(lot.remainingQty)<quantity)
+        throw new ConflictException('Số lượng xử lý vượt tồn thực tế.');
+      const pending=await tx.inventoryDisposal.aggregate({where:{lotId,status:'DRAFT'},_sum:{quantity:true}});
+      if(Number(pending._sum.quantity??0)+quantity>Number(lot.remainingQty))
+        throw new ConflictException('Tổng số lượng các phiếu xử lý nháp vượt tồn lô.');
+      return tx.inventoryDisposal.create({data:{
+        kitchenId,lotId,number,quantity:new Prisma.Decimal(quantity),unit:lot.unit,
+        reason,method,evidenceReference,handlerName,createdById:user.sub,status:'DRAFT',
+      }});
+    });
+  }
+  async completeDisposal(user:AuthUser,kitchenId:string,disposalId:string){
+    await this.permitted(user,kitchenId,true);
+    if(!uuid(disposalId))throw new BadRequestException('Mã phiếu xử lý không hợp lệ.');
+    return this.prisma.$transaction(async tx=>{
+      const document=await tx.inventoryDisposal.findFirst({where:{id:disposalId,kitchenId,status:'DRAFT'}});
+      if(!document)throw new ConflictException('Phiếu không tồn tại, đã hoàn tất hoặc không thuộc bếp.');
+      const lot=await tx.inventoryLot.findFirst({where:{id:document.lotId,kitchenId},
+        select:{id:true,status:true,remainingQty:true,expiryDate:true}});
+      if(!lot || !['QUARANTINED','EXPIRED'].includes(lot.status))
+        throw new ConflictException('Lô không còn ở trạng thái cách ly.');
+      if(Number(lot.remainingQty)<Number(document.quantity))
+        throw new ConflictException('Không đủ tồn để hoàn tất xử lý.');
+      const changed=await tx.inventoryLot.updateMany({
+        where:{id:lot.id,kitchenId,status:lot.status,remainingQty:{gte:document.quantity}},
+        data:{remainingQty:{decrement:document.quantity},
+          ...(Number(lot.remainingQty)===Number(document.quantity)?{status:'DEPLETED' as const}:{})},
+      });
+      if(changed.count!==1)throw new ConflictException('Tồn lô vừa thay đổi. Vui lòng tải lại.');
+      const posted=await tx.inventoryDisposal.updateMany({
+        where:{id:disposalId,kitchenId,status:'DRAFT'},
+        data:{status:'COMPLETED',completedAt:new Date(),completedById:user.sub},
+      });
+      if(posted.count!==1)throw new ConflictException('Phiếu đã được xử lý ở phiên khác.');
+      await tx.traceEvent.create({data:{
+        lotId:lot.id,eventType:'REJECTED',actorId:user.sub,
+        description:'Đã xử lý nguyên liệu quá hạn theo phiếu '+document.number,
+        metadata:{action:'EXPIRED_LOT_DISPOSAL',disposalId:document.id,
+          number:document.number,quantity:Number(document.quantity),unit:document.unit,
+          reason:document.reason,method:document.method,
+          evidenceReference:document.evidenceReference,handlerName:document.handlerName},
+      }});
+      return {id:document.id,lotId:lot.id,quantity:Number(document.quantity),
+        remainingQty:Number(lot.remainingQty)-Number(document.quantity),status:'COMPLETED'};
+    });
+  }
+
   async lotStatus(user:AuthUser,kitchenId:string,lotId:string,body:any){
     await this.permitted(user,kitchenId,true);
     if(!uuid(lotId))throw new BadRequestException('Mã lô không hợp lệ.');
