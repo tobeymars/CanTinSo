@@ -33,7 +33,7 @@ export function validateDispatchStageReport(
     seen.add(item.dishId);
     if(item.status!=='PASS'&&item.status!=='ISSUE')throw new BadRequestException('Kết quả đối chiếu món không hợp lệ.');
     if(!quantity(item.servings))throw new BadRequestException('Số suất từng món phải là số nguyên không âm.');
-    return {dishId:item.dishId,name:byId.get(item.dishId)!,status:item.status,servings:item.servings};
+    return {dishId:item.dishId,name:byId.get(item.dishId)!,status:item.status as 'PASS'|'ISSUE',servings:item.servings};
   });
   if(typeof body.photo!=='string'||!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(body.photo)||body.photo.length>1100000)
     throw new BadRequestException('Cần ảnh thực tế khi xuất bếp (JPEG/PNG/WebP, tối đa 750 KB).');
