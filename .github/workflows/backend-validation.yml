@@ -60,6 +60,8 @@ jobs:
         run: npm run test:supervision-serving
       - name: Validate kitchen stage ownership
         run: npm run test:supervision-stages
+      - name: Validate dispatch handover forms
+        run: npm run test:supervision-dispatch
       - name: Validate approved meal-plan warehouse forecasts
         run: npm run test:stock-forecast
       - name: Validate school versus central kitchen inventory boundaries
