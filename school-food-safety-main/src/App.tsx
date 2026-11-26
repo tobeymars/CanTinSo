@@ -82,6 +82,7 @@ import { isServerSupervisionScope, readServerSupervision, readSupervisionContext
 import { SUPERVISION_JOURNEY_EVENT, stagesForSchool, stageNames } from "./lib/supervisionJourney";
 import type { SupervisionMealType } from "./lib/supervisionStatus";
 import { compactDateLabel, weekDates, weekdayLabel } from "./lib/dates";
+import { calculateTransportMinutes } from "./lib/transportMetrics";
 import IngredientTraceDialog from "./IngredientTraceDialog";
 import type { IngredientPortion } from "./lib/data";
 import { BOARDING_MENU_STORAGE_KEY, PARENT_MEAL_CHOICES_KEY, PARENT_MEAL_CHOICES_EVENT } from "./lib/boardingMenu";
@@ -740,11 +741,22 @@ function SupervisionMealContent({
     status,label:stageNames[status as keyof typeof stageNames] ?? status,time:item.time??'',actor:item.actorRole==='SCHOOL_ADMIN'?'BGH':'Bếp',confirmed:!!item.confirmed,
     photos:item.photos??[],hasReportedPhotos:(item.photos?.length??0)>0,
   }));
+  // Thời gian thực từ giờ xuất bếp và giờ tiếp nhận của đúng trường/ngày/bữa.
+  // Không lấy thời điểm Ra món hay Sẵn sàng phục vụ để tính vận chuyển.
+  const transportDurationMinutes = serverMode && effectiveSchool.mode === 'CENTRAL_KITCHEN'
+    ? calculateTransportMinutes(
+        date,
+        serverQuery.data?.stages.DISPATCHED?.dispatch?.dispatchTime,
+        serverQuery.data?.stages.ARRIVED?.arrival?.arrivalTime,
+        serverQuery.data?.stages.DISPATCHED?.confirmed,
+        serverQuery.data?.stages.ARRIVED?.confirmed,
+      )
+    : null;
   const effectiveData:DayData = serverMode ? {
     ...data,servings:contextQuery.data?.menu?.servings??0,
     dishes:contextQuery.data?.menu?.dishes.map(item=>item.name)??[],
     dishDetails:[],events:realEvents,kitchen:contextQuery.data?.kitchen?.name??'Chưa phân công bếp',
-    photo:'',publicInspection:null,suppliers:0,transportDistanceKm:null,transportDurationMinutes:null,mealUseByAt:null,
+    photo:'',publicInspection:null,suppliers:0,transportDistanceKm:null,transportDurationMinutes,mealUseByAt:null,
   } : data;
   const visibleStages = stagesForSchool(effectiveSchool.mode, role);
   const visibleEvents = effectiveData.events.filter(event => visibleStages.some(stage => stage === event.status));
