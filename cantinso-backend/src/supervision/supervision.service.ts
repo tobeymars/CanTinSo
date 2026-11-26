@@ -10,6 +10,7 @@ import { validateDispatchStageReport } from './dispatch-stage-form';
 import { validateArrivalReceipt, arrivalAllowsService } from './arrival-receipt';
 import { validateServingStageReport } from './serving-stage-form';
 import { canKitchenRecordStage, stageOrderFor } from './stage-responsibility';
+import { estimatedDrivingDistanceKm } from './transport-route';
 
 const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sample'];
 const stages = stageOrderFor('CENTRAL');
@@ -46,7 +47,7 @@ export class SupervisionService {
   }
   async context(user: AuthUser, schoolId: string, date: string, mealType: string) {
     const scope = await this.scope(user, schoolId, date, mealType);
-    const [plan, lots, kitchen, legalDocuments, issues] = await Promise.all([
+    const [plan, lots, kitchen, legalDocuments, issues, school] = await Promise.all([
       this.prisma.mealPlan.findUnique({
         where: {schoolId_serviceDate_mealType: {schoolId:scope.schoolId,serviceDate:scope.serviceDate,mealType:scope.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
         include: {
@@ -73,18 +74,22 @@ export class SupervisionService {
         orderBy:{receivedAt:'desc'},
         take:200,
       }),
-      this.prisma.kitchen.findUnique({where:{id:scope.kitchenId},select:{id:true,name:true,type:true}}),
+      this.prisma.kitchen.findUnique({where:{id:scope.kitchenId},select:{id:true,name:true,type:true,address:true}}),
       this.prisma.kitchenLegalDocument.findMany({where:{kitchenId:scope.kitchenId},select:{id:true,title:true,status:true,expiresAt:true},orderBy:{updatedAt:'desc'}}),
       this.prisma.traceEvent.findMany({where:{eventType:'ISSUED' as const,lot:{kitchenId:scope.kitchenId},AND:[
           {metadata:{path:['schoolId'],equals:scope.schoolId}},
           {metadata:{path:['serviceDate'],equals:date}},
           {metadata:{path:['mealType'],equals:mealType}},
         ]},select:{lotId:true,metadata:true}}),
+      this.prisma.school.findUnique({where:{id:scope.schoolId},select:{address:true}}),
     ]);
+    const transportDistanceKm = kitchen?.type === 'CENTRAL'
+      ? await estimatedDrivingDistanceKm(kitchen.address,school?.address)
+      : null;
     const issued = new Map<string,number>();
     for(const row of issues){const amount=Number(asObject(row.metadata).quantity);if(Number.isFinite(amount)&&amount>0)issued.set(row.lotId,(issued.get(row.lotId)??0)+amount);}
     return {
-      schoolId:scope.schoolId,serviceDate:date,mealType,kitchen,
+      schoolId:scope.schoolId,serviceDate:date,mealType,kitchen,transportDistanceKm,
       legalDocuments:legalDocuments.map(doc=>({...doc,expiresAt:doc.expiresAt?.toISOString().slice(0,10)??null})),
       menu:plan?.revisions[0] ? {id:plan.id,servings:plan.revisions[0].ageGroups.reduce((total,item)=>total+item.plannedServings,0),status:plan.revisions[0].status,
         dishes:plan.revisions[0]?.items.map(item=>({id:item.id,name:item.dishVersion.dish.name})) ?? []} : null,
