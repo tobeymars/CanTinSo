@@ -1,0 +1,19 @@
+.public-inspection-workspace{min-width:0}
+.public-inspection-workspace .inspection-action-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 20px 16px;padding:13px 15px;background:var(--surface-alt);border:1px solid var(--border);border-radius:12px}
+.inspection-action-row p{color:var(--muted);font-size:12px;line-height:1.6;margin:0;min-width:0}
+.inspection-action-row button{display:inline-flex;gap:7px;align-items:center;flex-shrink:0}
+.inspection-record-list{display:grid;gap:14px;margin-bottom:12px}
+.inspection-real-record{margin-bottom:0}
+.inspection-draft-mark{display:inline-flex;gap:6px;align-items:center;font-size:11px;font-weight:750;color:var(--muted)}
+.inspection-publish-button{display:inline-flex;align-items:center;gap:8px;margin-top:15px;padding:10px 14px;border-radius:9px}
+.inspection-notice,.inspection-error,.inspection-loading{margin:8px 20px 15px;font-size:13px;line-height:1.6}
+.inspection-notice{color:var(--status-valid)}.inspection-error{color:var(--danger)}
+.inspection-editor{display:grid;gap:12px;margin:0 20px 16px;padding:20px;border:1px solid var(--border);border-radius:14px;background:var(--surface-alt)}
+.inspection-editor-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.inspection-editor-title button{display:grid;place-items:center;padding:7px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.inspection-editor label{display:grid;gap:6px;font-size:12px;font-weight:700;color:var(--text);min-width:0}
+.inspection-editor input,.inspection-editor textarea,.inspection-editor select{width:100%;min-width:0;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:13px}
+.inspection-editor textarea{resize:vertical;line-height:1.6}
+.inspection-editor-help{font-size:12px;color:var(--muted);line-height:1.6}
+.inspection-editor>.primary{justify-self:start}
+@media(max-width:680px){.public-inspection-workspace .inspection-action-row{flex-direction:column;align-items:stretch;margin:0 14px 14px}.inspection-action-row button{justify-content:center}.inspection-editor{margin:0 14px 14px;padding:14px}.inspection-notice,.inspection-error,.inspection-loading{margin-left:14px;margin-right:14px}}
