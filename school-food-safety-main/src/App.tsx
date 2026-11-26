@@ -75,6 +75,7 @@ import ClickSpark from "./components/react-bits/ClickSpark";
 import { MealJourneyPanel, MealJourneyProgress } from "./MealJourney";
 import KitchenLegalDocuments from "./KitchenLegalDocuments";
 import SupervisionStatusPanel from "./SupervisionStatusPanel";
+import PublicInspectionWorkspace from "./PublicInspectionWorkspace";
 import SupervisionMealApproval from "./SupervisionMealApproval";
 import SupervisionJourneyActions from "./SupervisionJourneyActions";
 import SupervisionDateNotice, {todayInVietnam} from "./SupervisionDateNotice";
@@ -794,7 +795,7 @@ function SupervisionMealContent({
             })
           }
         />
-        <PublicInspectionCard inspection={effectiveData.publicInspection} mealType={mealType} />
+        {serverMode ? <PublicInspectionWorkspace scope={scope} /> : <PublicInspectionCard inspection={effectiveData.publicInspection} mealType={mealType} />}
       </div>
       {photoPreview && (
         <Dialog title={photoPreview.title} close={() => setPhotoPreview(null)}>
