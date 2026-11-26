@@ -873,3 +873,17 @@ form .feedback-photo-picker.disabled{cursor:not-allowed;opacity:.6}
   min-width:0;max-width:100%;box-sizing:border-box;
 }
 .supervision-intake-modal .sif-intake-checks .sif-choice legend{max-width:100%;line-height:1.5;white-space:normal}
+
+/* Structured dispatch report: readable long-form modal with clear hierarchy. */
+.supervision-dispatch-dialog{width:min(94vw,880px);max-height:min(94vh,930px);padding:26px 30px;scrollbar-gutter:stable}
+.supervision-dispatch-dialog .supervision-edit-form{gap:20px}
+.supervision-dispatch-dialog .arrival-section{margin:0;min-width:0;border:1px solid #dbe5f0;background:#fbfdff;border-radius:13px;padding:18px 19px;display:grid;gap:15px}
+.supervision-dispatch-dialog .arrival-section legend{font-weight:800;color:#173962;padding:0 10px}
+.supervision-dispatch-dialog .arrival-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.supervision-dispatch-dialog .arrival-grid>*,.supervision-dispatch-dialog .arrival-section label{min-width:0}
+.supervision-dispatch-dialog .arrival-section input,.supervision-dispatch-dialog .arrival-section select,.supervision-dispatch-dialog .arrival-section textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%}
+.supervision-dispatch-dialog .arrival-dish{border:1px solid #e0e7f1;background:#fff;border-radius:12px;padding:15px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr) minmax(0,1.3fr);gap:12px;align-items:end}
+.supervision-dispatch-dialog .arrival-dish>strong{align-self:center;overflow-wrap:anywhere}
+.supervision-dispatch-dialog .arrival-review-photo{max-width:100%;max-height:240px;object-fit:contain;border-radius:11px;border:1px solid #e0e7f1}
+.supervision-dispatch-dialog .supervision-edit-buttons{position:sticky;bottom:-26px;z-index:2;background:#fff;padding:14px 0 4px;border-top:1px solid #e7edf5}
+@media(max-width:680px){.supervision-dispatch-dialog{width:min(100%,96vw);padding:18px 14px}.supervision-dispatch-dialog .arrival-grid,.supervision-dispatch-dialog .arrival-dish{grid-template-columns:minmax(0,1fr)}.supervision-dispatch-dialog .arrival-section{padding:14px}.supervision-dispatch-dialog .supervision-edit-buttons{bottom:-18px}}
