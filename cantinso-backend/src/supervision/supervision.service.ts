@@ -6,6 +6,7 @@ import { AuthUser } from '../common/current-user.decorator';
 import { validateSupervisionWriteDate } from './supervision-date-policy';
 import { validateFoodSafetyForm } from './food-safety-forms';
 import { verifySamplesBeforeDispatch } from './dispatch-sample-policy';
+import { validateDispatchStageReport } from './dispatch-stage-form';
 import { validateArrivalReceipt, arrivalAllowsService } from './arrival-receipt';
 import { validateServingStageReport } from './serving-stage-form';
 import { canKitchenRecordStage, stageOrderFor } from './stage-responsibility';
@@ -344,9 +345,24 @@ export class SupervisionService {
         if (!canKitchenRecordStage(user.role,user.kitchenId,s.kitchenId,
           kitchenKind==='CENTRAL'?'CENTRAL':'SCHOOL',itemId))
           throw new ForbiddenException('Chỉ bếp trực tiếp chế biến được ghi nhận Ra món, Sẵn sàng phục vụ và Xuất bếp.');
-        if (itemId === 'DISPATCHED') verifySamplesBeforeDispatch(
-          checks.food_sample, checks.processing, new Date(entry.at),
-        );
+        let dispatchReport;
+        if (itemId === 'DISPATCHED') {
+          const plan=await tx.mealPlan.findUnique({
+            where:{schoolId_serviceDate_mealType:{schoolId:s.schoolId,serviceDate:s.serviceDate,mealType:s.mealType as 'BREAKFAST'|'LUNCH'|'SNACK'}},
+            include:{revisions:{where:{status:'APPROVED'},orderBy:{revisionNo:'desc'},take:1,
+              include:{items:{where:{isDefault:true},include:{dishVersion:{include:{dish:true}}}},ageGroups:{select:{plannedServings:true}}}}},
+          });
+          const revision=plan?.revisions[0];
+          dispatchReport=validateDispatchStageReport(body,
+            revision?.items.map(row=>({id:row.id,name:row.dishVersion.dish.name}))??[],
+            revision?.ageGroups.reduce((total,row)=>total+row.plannedServings,0)??0);
+          if(dispatchReport.hasIssue)
+            throw new ConflictException('Phiếu xuất bếp có chênh lệch/bất thường. Cần xử lý và kiểm tra lại trước khi xuất thực tế.');
+          const [hh,mm]=dispatchReport.dispatchTime.split(':').map(Number);
+          const dispatchAt=new Date(s.serviceDate);
+          dispatchAt.setUTCHours(hh-7,mm,0,0);
+          verifySamplesBeforeDispatch(checks.food_sample,checks.processing,dispatchAt);
+        }
         // For centrally delivered meals the school confirms arrival first;
         // the producing kitchen then records portioning and readiness.
         // School users never get producer permissions from schoolId alone.
@@ -383,11 +399,11 @@ export class SupervisionService {
           }
         }
         if (itemId === 'READY' && (typeof body.photo !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(body.photo) || body.photo.length>1100000)) throw new BadRequestException('Cần ảnh thực tế hợp lệ tối đa 750 KB.');
-        const needsAttention=itemId==='PLATED' && servingReport?.hasIssue===true;
-        journey[itemId] = {...entry,status:itemId,time:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),
+        const needsAttention=(itemId==='PLATED' && servingReport?.hasIssue===true) || (itemId==='DISPATCHED' && dispatchReport?.hasIssue===true);
+        journey[itemId] = {...entry,status:itemId,time:itemId==='DISPATCHED' ? dispatchReport!.dispatchTime : new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}),
           confirmed:!needsAttention,confirmedAt:!needsAttention?entry.at:undefined,confirmedBy:!needsAttention?user.sub:undefined,
           confirmedByRole:!needsAttention?user.role:undefined,needsAttention,
-          photos:itemId==='READY'?[body.photo]:[],...(servingReport?{serving:servingReport}:{}),
+          photos:['READY','DISPATCHED'].includes(itemId)?[body.photo]:[],...(servingReport?{serving:servingReport}:{}),...(dispatchReport?{dispatch:dispatchReport}:{}),
           history:[...(previousStage?.history??[]),...(previousStage?[{...previousStage,history:undefined}]:[])]};
       } else if (action === 'stage_arrival_confirm' || action === 'stage_arrival_resolve') {
         // School administration confirms FINISHED DISHES delivered from the central kitchen.
