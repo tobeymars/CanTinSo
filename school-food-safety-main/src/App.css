@@ -923,3 +923,13 @@ form .feedback-photo-picker.disabled{cursor:not-allowed;opacity:.6}
  .kitchen-school-hero .kitchen-school-assignment .apple-select.hero .apple-select-trigger{font-size:17px;max-width:100%}
  .kitchen-school-hero .hero-address{margin-top:16px}
 }
+
+
+/* Tóm tắt thực đơn & hồ sơ tại màn hình kiểm thực: rõ nhãn, tự xuống dòng. */
+.supervision-context-summary{display:flex;align-items:baseline;flex-wrap:wrap;column-gap:9px;row-gap:5px;margin:9px 0;color:var(--muted);font-size:13px;line-height:1.65;min-width:0;overflow-wrap:anywhere}
+.supervision-context-summary strong{color:var(--text);font-weight:750}
+.supervision-context-divider{color:var(--muted);opacity:.65}
+.supervision-context-link{display:inline-flex;align-items:center;color:var(--primary);font-weight:750;text-decoration:underline;text-underline-offset:3px}
+.supervision-context-link:hover{text-decoration-thickness:2px}
+.supervision-context-link:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:2px}
+@media(max-width:650px){.supervision-context-summary{font-size:12px;column-gap:7px}.supervision-context-divider{display:none}.supervision-context-summary>span:not(.supervision-context-divider){flex-basis:100%}}
