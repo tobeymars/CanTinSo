@@ -61,6 +61,7 @@ import type { DayData, PublicInspection, School } from "./lib/data";
 import { centralKitchenRouteAccess, useUI } from "./lib/store";
 import { getManagedSchools, getMySchoolOverview, getMyAssignedSchool } from "./lib/usersApi";
 import { getStoredUser } from "./lib/authApi";
+import { getSupplyKitchens } from "./lib/supplyApi";
 import { fetchMyKitchenContext } from "./lib/myKitchenApi";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
@@ -1022,6 +1023,8 @@ function Shell() {
     }
   }, [isAuthenticatedWorkspace, date, setDate]);
   const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
+  const schoolWarehouseQuery=useQuery({queryKey:["school-owned-warehouse"],queryFn:getSupplyKitchens,enabled:isRealSchoolAdmin});
+  const schoolHasOwnKitchen=!!schoolWarehouseQuery.data?.some(k=>k.type==="SCHOOL");
   const isRealCentralKitchen = storedUser?.role === "CENTRAL_KITCHEN" && !!storedUser?.kitchenId;
   const isRealOnSiteKitchen = storedUser?.role === "SCHOOL_KITCHEN" && !!storedUser?.kitchenId;
   const isRealKitchenAccount = (storedUser?.role === "CENTRAL_KITCHEN" || storedUser?.role === "SCHOOL_KITCHEN") && !!storedUser?.kitchenId;
@@ -1148,6 +1151,7 @@ function Shell() {
   const parentReadyPhoto = parentReadyEvent?.confirmed ? parentReadyEvent.photos[0] : undefined;
   const isWardAdminAccount = getStoredUser()?.role === "UBND_ADMIN";
   const adminNav = adminNavigation.filter((item) => {
+    if (isRealSchoolAdmin && !schoolHasOwnKitchen && (item.path === "/quan-ly-kho" || item.path === "/nha-cung-cap")) return false;
     if (item.path === "/duyet-mon" && role !== "school_board") return false;
     if (item.path === "/quan-ly-hoc-sinh" && role !== "school_board") return false;
     if (item.path === "/quan-ly-tai-khoan" && role !== "school_board") return false;
