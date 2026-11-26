@@ -327,7 +327,10 @@ export class SupplyService {
       const lot=await tx.inventoryLot.findFirst({where:{id:lotId,kitchenId},
         select:{id:true,unit:true,remainingQty:true,expiryDate:true,status:true}});
       if(!lot)throw new NotFoundException('Không thấy lô thuộc bếp.');
-      const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+      const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'})
+        .formatToParts(new Date());
+      const datePart=(name:string)=>parts.find(part=>part.type===name)?.value??'';
+      const today=[datePart('year'),datePart('month'),datePart('day')].join('-');
       if(!lot.expiryDate||lot.expiryDate.toISOString().slice(0,10)>=today)
         throw new ConflictException('Quy trình này chỉ dành cho lô đã quá hạn. Lô còn hạn cần xử lý theo nghiệp vụ khác.');
       if(lot.status!=='QUARANTINED'&&lot.status!=='EXPIRED')
