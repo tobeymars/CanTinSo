@@ -1090,7 +1090,9 @@ function Shell() {
     availableSchools[0] ??
     (isWardWorkspace || isRealSchoolAdmin || isSchoolKitchenReceiver || isRealOnSiteKitchen
       ? { id: "", name: schoolQuery.isError ? "Không tải được trường của tài khoản" : "Đang tải trường được gán…", address: "", mode: "ON_SITE" as const }
-      : demoSchools[0]!);
+      : isRealCentralKitchen
+        ? { id: "", name: realKitchenQuery.isError ? "Không tải được trường được phân công" : "Chưa có trường được phân công", address: "", mode: "CENTRAL_KITCHEN" as const }
+        : demoSchools[0]!);
   // Bản công khai của phụ huynh là nguồn đọc chuẩn cho cả năm vai trò, bao gồm quy tắc chỉ hiện ảnh đã duyệt.
   const query = useQuery({
     queryKey: ["day", school.id, date, role === "parent" ? "parent" : role === "culture_social_office" ? "supervisor" : "shared"],
@@ -1463,9 +1465,30 @@ function Shell() {
                   <span><ShieldCheck size={14} /> Trường được phân công</span>
                 </div>
               ) : isRealKitchenAccount ? (
-                <div className="school-picker school-picker-locked">
-                  <strong>{realKitchenQuery.data?.kitchen.name ?? (realKitchenQuery.isLoading ? "Đang tải thông tin bếp…" : "Không tải được thông tin bếp")}</strong>
-                  <span><ShieldCheck size={14} /> Bếp theo tài khoản đăng nhập</span>
+                <div className="school-picker">
+                  <div className="school-picker-locked" style={{ marginBottom: isRealCentralKitchen ? 12 : 0 }}>
+                    <strong>{realKitchenQuery.data?.kitchen.name ?? (realKitchenQuery.isLoading ? "Đang tải thông tin bếp…" : "Không tải được thông tin bếp")}</strong>
+                    <span><ShieldCheck size={14} /> Bếp theo tài khoản đăng nhập</span>
+                  </div>
+                  {isRealCentralKitchen && (
+                    centralKitchenSchools.length > 0 ? (
+                      <Select
+                        label="Trường đang phục vụ"
+                        variant="hero"
+                        value={school.id}
+                        onValueChange={setSchool}
+                        options={centralKitchenSchools.map((item) => ({
+                          value: item.id,
+                          label: item.name,
+                          description: "Trường thuộc phân công của bếp trung tâm",
+                        }))}
+                      />
+                    ) : (
+                      <p role="status" style={{ margin: 0 }}>
+                        {realKitchenQuery.isLoading ? "Đang tải danh sách trường phục vụ…" : realKitchenQuery.isError ? "Không tải được danh sách trường. Vui lòng thử lại." : "Bếp chưa có trường đang được phân công phục vụ."}
+                      </p>
+                    )
+                  )}
                 </div>
               ) : (
                 <div className="school-picker">
