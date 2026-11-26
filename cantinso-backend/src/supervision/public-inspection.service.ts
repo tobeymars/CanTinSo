@@ -62,7 +62,7 @@ export class PublicInspectionService {
     if(Number.isNaN(inspectedAt.getTime())||inspectedAt.toISOString().slice(0,10)!==inspectedAtRaw||inspectedAt.getTime()>Date.now())
       throw new BadRequestException('Ngày kiểm tra không hợp lệ hoặc nằm trong tương lai.');
     const findingCount=body.findingCount;
-    if(!Number.isSafeInteger(findingCount)||Number(findingCount)<0||Number(findingCount)>10000)
+    if(typeof findingCount!=='number'||!Number.isSafeInteger(findingCount)||findingCount<0||findingCount>10000)
       throw new BadRequestException('Số nội dung cần theo dõi không hợp lệ.');
     const outcome=body.outcome;
     if(outcome!=='follow_up_required'&&outcome!=='no_follow_up')throw new BadRequestException('Kết quả kiểm tra không hợp lệ.');
