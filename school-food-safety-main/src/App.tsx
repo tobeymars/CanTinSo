@@ -65,7 +65,7 @@ import { getSupplyKitchens } from "./lib/supplyApi";
 import { fetchMyKitchenContext } from "./lib/myKitchenApi";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
-import AuthGate from "./AuthGate";
+import AuthGate, { AuthSessionProfile } from "./AuthGate";
 import UserManagement from "./UserManagement";
 import MobileNavigation from "./MobileNavigation";
 import Select from "./components/ui/Select";
@@ -1315,22 +1315,12 @@ function Shell() {
             Trung tâm hỗ trợ
             <ArrowRight size={15} />
           </button>
-          {isRealSchoolAdmin ? (
-            <div className="profile" aria-label="Tài khoản Ban Giám hiệu">
-              <span className="avatar">BGH</span>
-              <span>
-                Ban Giám hiệu
-                <small>Tài khoản hệ thống</small>
-              </span>
-              <ShieldCheck size={17} />
-            </div>
+          {isAuthenticatedWorkspace ? (
+            <AuthSessionProfile />
           ) : (
             <button className="profile" onClick={() => setModal("login")}>
               <span className="avatar">PH</span>
-              <span>
-                {displayRole}
-                <small>Chuyển không gian DEMO</small>
-              </span>
+              <span>{displayRole}<small>Chuyển không gian DEMO</small></span>
               <LogIn size={17} />
             </button>
           )}
