@@ -1,11 +1,12 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/current-user.decorator';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type Outcome = 'follow_up_required' | 'no_follow_up';
 @Injectable()
 export class PublicInspectionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,private readonly notifications:NotificationsService) {}
 
   private async scope(user: AuthUser, schoolId: string, date: string, mealType: string) {
     if (!/^[0-9a-f-]{36}$/i.test(schoolId) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !['BREAKFAST','LUNCH','SNACK'].includes(mealType))
@@ -86,6 +87,13 @@ export class PublicInspectionService {
       data:{status:'PUBLISHED',publishedAt:new Date(),publishedById:user.sub},
     });
     if(!updated.count)throw new ConflictException('Hồ sơ không tồn tại trong phạm vi hoặc đã công khai.');
-    return this.prisma.publicInspectionRecord.findUniqueOrThrow({where:{id}});
+    const record=await this.prisma.publicInspectionRecord.findUniqueOrThrow({where:{id}});
+    await this.notifications.forSchool('public-inspection:'+id,schoolId,'PUBLIC_INSPECTION',
+      'Đã công khai kết quả kiểm tra','UBND đã công khai hồ sơ kiểm tra theo biên bản '+record.recordNumber,
+      '/giam-sat',user.sub,'SCHOOL_ADMIN');
+    await this.notifications.forSchool('public-inspection:'+id,schoolId,'PUBLIC_INSPECTION',
+      'Đã công khai kết quả kiểm tra','UBND đã công khai hồ sơ kiểm tra theo biên bản '+record.recordNumber,
+      '/giam-sat',user.sub,'CENTRAL_KITCHEN');
+    return record;
   }
 }
