@@ -1,1 +1,29 @@
-.login-loading{min-height:100vh;display:grid;place-items:center;background:#f5f8fc;color:#52647e;font-size:13px;font-weight:650}.auth-session-bar{position:fixed;z-index:120;top:10px;right:14px;display:flex;align-items:center;gap:10px;padding:6px 8px 6px 13px;border:1px solid #dce5f0;border-radius:999px;background:#ffffffed;box-shadow:0 4px 18px #17376914;color:#31445e;font-size:11px}.auth-session-bar span{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.auth-session-bar button{padding:6px 10px;border-radius:999px;background:#edf3fb;color:#1458b3;font-size:10px;font-weight:800}.auth-session-bar button:hover{background:#dceaff}
+.login-loading{min-height:100vh;display:grid;place-items:center;background:#f5f8fc;color:#52647e;font-size:13px;font-weight:650}
+
+/* Account and logout belong to the navigation footer, never float over a page. */
+.auth-sidebar-profile{
+  display:flex;align-items:center;gap:9px;width:100%;min-width:0;
+  padding:15px 4px 17px;border-top:1px solid var(--border,rgba(255,255,255,.18));
+  color:inherit;
+}
+.auth-sidebar-avatar{
+  display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;
+  border-radius:11px;background:var(--surface-alt,rgba(255,255,255,.15));
+  color:var(--primary,#fff);font-size:14px;font-weight:800;
+}
+.auth-sidebar-user{display:flex;flex:1 1 auto;flex-direction:column;gap:3px;min-width:0}
+.auth-sidebar-user strong{
+  display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;font-size:12px;font-weight:750;line-height:1.4;
+}
+.auth-sidebar-user small{color:var(--muted,currentColor);opacity:.8;font-size:10px;line-height:1.3}
+.auth-sidebar-logout{
+  flex:0 0 auto;min-height:33px;padding:6px 8px;border-radius:9px;
+  border:1px solid var(--border,rgba(255,255,255,.22));
+  background:var(--surface-alt,rgba(255,255,255,.1));
+  color:inherit;font-size:11px;font-weight:750;line-height:1.2;
+  cursor:pointer;
+}
+.auth-sidebar-logout:hover{background:var(--primary,#1a59b6);color:#fff}
+.auth-sidebar-logout:focus-visible{outline:2px solid #86baff;outline-offset:2px}
+@media(max-width:720px){.auth-sidebar-profile{padding:14px 4px 18px}}
