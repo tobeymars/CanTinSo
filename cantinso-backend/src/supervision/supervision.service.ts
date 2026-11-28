@@ -11,6 +11,7 @@ import { validateArrivalReceipt, arrivalAllowsService } from './arrival-receipt'
 import { validateServingStageReport } from './serving-stage-form';
 import { canKitchenRecordStage, stageOrderFor } from './stage-responsibility';
 import { estimatedDrivingDistanceKm } from './transport-route';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const checkIds = ['ingredient_receipt', 'processing', 'before_serving', 'food_sample'];
 const stages = stageOrderFor('CENTRAL');
@@ -23,7 +24,7 @@ const canonical = (value: unknown): string => JSON.stringify(value, (_key, entry
 
 @Injectable()
 export class SupervisionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,private readonly notifications:NotificationsService) {}
   private async scope(user: AuthUser, schoolId: string, date: string, mealType: string) {
     if (!/^[0-9a-f-]{36}$/i.test(schoolId) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !['BREAKFAST','LUNCH','SNACK'].includes(mealType))
       throw new BadRequestException('Trường, ngày hoặc bữa không hợp lệ.');
@@ -159,7 +160,7 @@ export class SupervisionService {
     const sampleLifecycle=['sample_dispose','sample_hold'].includes(action);
     const lateReason = sampleLifecycle ? '' : validateSupervisionWriteDate(date,body);
     try {
-      return await this.prisma.$transaction(async tx => {
+      const result=await this.prisma.$transaction(async tx => {
       await tx.supervisionMeal.upsert({where:this.key(s),create:{...s,checks:{},stages:{},approvals:[]},update:{}});
       const current = await tx.supervisionMeal.findUniqueOrThrow({where:this.key(s)});
       const checks = asObject(current.checks), journey = asObject(current.stages), approvals = asArray(current.approvals);
@@ -501,6 +502,17 @@ export class SupervisionService {
       await tx.supervisionEvent.create({data:{id:eventId,mealId:updated.id,actorId:user.sub,actorRole:user.role,action,itemId:typeof itemId==='string'?itemId:'meal',payload:{note,...((['stage_arrival_confirm','stage_arrival_resolve'].includes(action) || (action==='stage_confirm' && itemId==='ARRIVED'))?{receivedServings:body.receivedServings,result:body.result,arrivalTime:body.arrivalTime,deliveryPerson:body.deliveryPerson,receiptChecked:true}:{}),...(action==='stage_report' && ['PLATED','READY'].includes(itemId)?{actualServings:journey[itemId]?.serving?.actualServings,occurredAt:journey[itemId]?.serving?.occurredAt}:{}),...(lateReason?{lateReason}:{})}}});
       return {success:true,id:eventId};
       },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
+      if(action==='stage_report'&&itemId==='DISPATCHED'){
+        await this.notifications.forSchool('dispatch:'+result.id,s.schoolId,'DISPATCHED',
+          'Suất ăn đã xuất bếp','Bếp đã ghi nhận xuất suất ăn đến trường. Vui lòng theo dõi giao nhận.',
+          '/giam-sat',user.sub,'SCHOOL_ADMIN');
+      }
+      if(['stage_arrival_confirm','stage_arrival_resolve'].includes(action)){
+        await this.notifications.forSchool('arrival:'+result.id,s.schoolId,'ARRIVED',
+          'Trường đã tiếp nhận suất ăn','Ban Giám hiệu đã ghi nhận mốc Đến trường.',
+          '/giam-sat',user.sub,'CENTRAL_KITCHEN');
+      }
+      return result;
     } catch(error) {
       if(error instanceof Prisma.PrismaClientKnownRequestError && ['P2034','P2002'].includes(error.code))
         throw new ConflictException('Hồ sơ vừa được cập nhật bởi tài khoản khác. Vui lòng tải lại trang để thao tác trên dữ liệu mới nhất.');
