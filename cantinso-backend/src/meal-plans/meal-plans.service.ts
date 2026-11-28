@@ -177,7 +177,7 @@ export class MealPlansService {
       await tx.mealPlanApprovalEvent.create({ data: { revisionId, eventType: 'SUBMITTED', actorId: user.sub, actorRole: user.role as any } });
       return tx.mealPlanRevision.findUnique({ where: { id: revisionId }, include: this.revisionInclude() });
     });
-    await this.notifications.forSchool('meal-plan-submitted:'+revisionId,revision.mealPlan.schoolId,
+    await this.notifications.forSchool('meal-plan-submitted:'+revisionId+':'+(result?.submittedAt?.getTime()??0),revision.mealPlan.schoolId,
       'MENU_SUBMITTED','Thực đơn đang chờ duyệt','Bếp đã gửi thực đơn cần Ban Giám hiệu phê duyệt.',
       '/thuc-don',user.sub,'SCHOOL_ADMIN');
     return result;
@@ -198,7 +198,7 @@ export class MealPlansService {
       await tx.mealPlanApprovalEvent.create({ data: { revisionId, eventType, actorId: user.sub, actorRole: user.role as any, note: note?.trim() || null } });
       return tx.mealPlanRevision.findUnique({ where: { id: revisionId }, include: this.revisionInclude() });
     });
-    await this.notifications.forSchool('meal-plan-decision:'+revisionId+':'+decision,
+    await this.notifications.forSchool('meal-plan-decision:'+revisionId+':'+decision+':'+(result?.decidedAt?.getTime()??0),
       revision.mealPlan.schoolId,'MENU_'+decision,
       decision==='APPROVED'?'Thực đơn đã được duyệt':'Thực đơn cần chỉnh sửa',
       decision==='APPROVED'?'Ban Giám hiệu đã duyệt thực đơn của trường.':'Ban Giám hiệu đã trả thực đơn để bếp chỉnh sửa.',
