@@ -6,7 +6,7 @@ import type { SupplyFinance } from './lib/supplyApi'
 import './SupplierManagement.css'
 
 const cash=(v:number)=>v.toLocaleString('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0})
-const unitCost=(v:number)=>v.toLocaleString('vi-VN',{maximumFractionDigits:6})+'đ'
+const unitCost=(v:number)=>v.toLocaleString('vi-VN',{maximumFractionDigits:6})+' đ'
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
 const downloadCsv=(filename:string,rows:string[][])=>{
   const content='\uFEFF'+rows.map(row=>row.map(cell=>'"'+cell.replaceAll('"','""')+'"').join(',')).join('\r\n');
@@ -41,7 +41,7 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
       setReceiptId('');setReference('');setAmount('');setNote('');setPaymentFormOpen(false)
     },'Đã ghi nhận phiếu thanh toán và cập nhật công nợ.')
   }
-  return <div className="supply-finance">
+  return <div className="supply-finance supply-finance-redesign">
     <div className="supply-supplier-finance-actions">
       {canEdit&&<button type="button" className={paymentFormOpen?'outline':'primary'}
         onClick={()=>setPaymentFormOpen(open=>!open)}>
@@ -65,7 +65,7 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
         <label>Tìm mã hoặc tên <input value={filter} onChange={event=>setFilter(event.target.value)} placeholder="Tìm nhà cung cấp"/></label>
         <label className="management-check"><input type="checkbox" checked={debtOnly} onChange={event=>setDebtOnly(event.target.checked)}/>Còn công nợ</label>
       </div>
-      <div className="supply-table-scroll"><table className="management-table supply-table"><thead><tr><th>Mã</th><th>Tên</th><th>Tổng mua</th><th>Đã trả</th><th>Còn phải trả</th><th>Phiếu nhập</th></tr></thead><tbody>
+      <div className="supply-table-scroll supply-finance-scroll"><table className="management-table supply-table supply-finance-suppliers-table"><thead><tr><th>Mã</th><th>Tên</th><th>Tổng mua</th><th>Đã trả</th><th>Còn phải trả</th><th>Phiếu nhập</th></tr></thead><tbody>
         {filtered.map(row=><tr key={row.id}><td>{row.code}</td><td>{row.name}</td><td>{cash(row.totalPurchase)}</td><td>{cash(row.paid)}</td><td className={row.debt>0?'management-debt':''}>{cash(row.debt)}</td><td>{row.receipts}</td></tr>)}
       </tbody></table></div>
       {!filtered.length&&<p className="muted">Không có nhà cung cấp phù hợp.</p>}
@@ -73,7 +73,7 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
     <section className="card management-table-card supply-panel supply-finance-panel">
       <header className="card-header"><div><div className="section-kicker">CHỨNG TỪ MUA HÀNG</div><h3>Phiếu nhập và thanh toán</h3></div>
         <div style={{display:'flex',gap:8}}><button type="button" className={tab==='receipts'?'primary':'outline'} onClick={()=>setTab('receipts')}>Phiếu nhập ({finance.receipts.length})</button><button type="button" className={tab==='payments'?'primary':'outline'} onClick={()=>setTab('payments')}>Thanh toán ({finance.payments.length})</button></div></header>
-      {tab==='receipts'&&<div className="supply-table-scroll"><table className="management-table supply-table"><thead><tr><th>Số phiếu</th><th>Ngày</th><th>Nhà cung cấp</th><th>Tổng tiền</th><th>Đã trả</th><th>Còn nợ</th><th>Chi tiết</th></tr></thead><tbody>
+      {tab==='receipts'&&<div className="supply-table-scroll supply-finance-scroll"><table className="management-table supply-table supply-finance-receipts-table"><thead><tr><th>Số phiếu</th><th>Ngày</th><th>Nhà cung cấp</th><th>Tổng tiền</th><th>Đã trả</th><th>Còn nợ</th><th>Chi tiết</th></tr></thead><tbody>
         {finance.receipts.map(row=><tr key={row.id}><td><strong>{row.number}</strong><small style={{display:'block'}}>{row.invoiceNumber||'Chưa có số hóa đơn'}</small></td><td>{new Date(row.createdAt).toLocaleDateString('vi-VN')}</td><td>{row.supplier.name}</td><td>{cash(row.total)}</td><td>{cash(row.paid)}</td><td>{cash(row.debt)}</td><td><button type="button" className="outline" onClick={()=>setExpanded(current=>current===row.id?null:row.id)}>{expanded===row.id?'Ẩn':'Xem'}</button></td></tr>)}
       </tbody></table></div>}
       {tab==='receipts'&&expanded&&finance.receipts.some(row=>row.id===expanded)&&(()=>{
@@ -94,7 +94,7 @@ export default function RealSupplierFinance({kitchenId,finance,canEdit,busy,exec
           <div className="supply-receipt-detail__total"><span>Tổng tiền phiếu</span><strong>{cash(receipt.total)}</strong></div>
         </div>
       })()}
-      {tab==='payments'&&<div className="supply-table-scroll"><table className="management-table supply-table"><thead><tr><th>Ngày trả</th><th>Mã phiếu chi</th><th>Nhà cung cấp</th><th>Phiếu nhập</th><th>Hình thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
+      {tab==='payments'&&<div className="supply-table-scroll supply-finance-scroll"><table className="management-table supply-table supply-finance-payments-table"><thead><tr><th>Ngày trả</th><th>Mã phiếu chi</th><th>Nhà cung cấp</th><th>Phiếu nhập</th><th>Hình thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
         {finance.payments.map(row=><tr key={row.id}><td>{new Date(row.paidAt).toLocaleDateString('vi-VN')}</td><td>{row.reference}</td><td>{row.supplier.name}</td><td>{row.receipt.number}</td><td>{row.method==='BANK_TRANSFER'?'Chuyển khoản':row.method==='CASH'?'Tiền mặt':'Khác'}</td><td>{cash(row.amount)}</td><td>{row.reversedAt?'Đã hủy · '+new Date(row.reversedAt).toLocaleDateString('vi-VN'):'Đã ghi nhận'}</td><td>
           {canEdit&&!row.reversedAt&&<button type="button" className="outline" disabled={busy} onClick={()=>{setReversingId(row.id);setReversalReason('')}}>Hủy bút toán</button>}
           {row.reversedAt&&<small>{row.reversalReason}</small>}
