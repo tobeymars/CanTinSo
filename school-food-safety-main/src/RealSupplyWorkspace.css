@@ -399,3 +399,142 @@
 .supply-plan-shortage{display:block;color:#a32f2f;font-weight:700;font-size:11px}
 .supply-plan-link{background:#eef6ff;border:1px solid #cfe1f8;padding:11px 13px;border-radius:9px;color:#23456a;font-size:12px;line-height:1.6}
 @media(max-width:700px){.supply-production-plan{padding:13px}.supply-production-plan>.supply-section-heading>button{width:100%}}
+
+
+/* Công nợ & thanh toán: bảng đủ chiều rộng, không bẻ ngày và số tiền. */
+.supply-receipt-modal.supply-finance-modal{
+  width:min(1180px,calc(100vw - 44px));
+  max-width:calc(100vw - 44px);
+  max-height:min(94dvh,1100px);
+}
+.supply-finance-modal .supply-receipt-modal__heading{
+  padding:24px 30px 20px;
+  background:#fff;
+}
+.supply-finance-modal .supply-receipt-modal__content{
+  padding:24px 30px 32px;
+}
+.supply-finance-modal .supply-finance-redesign{gap:20px}
+.supply-finance-modal .supply-supplier-finance-actions{
+  display:flex;justify-content:flex-end;align-items:center;gap:12px;
+}
+.supply-finance-modal .supply-finance-kpis{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:12px!important;
+}
+.supply-finance-modal .supply-finance-kpis article{
+  min-height:130px;padding:17px!important;gap:7px!important;
+}
+.supply-finance-modal .supply-finance-kpis article>strong{
+  font-size:clamp(18px,1.75vw,25px)!important;
+  font-variant-numeric:tabular-nums;
+}
+.supply-finance-modal .supply-finance-panel{
+  min-width:0;padding:20px!important;gap:16px;
+  border:1px solid #dce5ef;border-radius:17px;box-shadow:none;
+}
+.supply-finance-modal .supply-finance-panel>.card-header{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.supply-finance-modal .supply-finance-panel>.card-header h3{
+  font-size:17px;letter-spacing:-.02em;
+}
+.supply-finance-modal .supply-finance-panel>.card-header>div:last-child{
+  margin-left:auto;min-width:0;
+}
+.supply-finance-modal .supply-filterbar{
+  align-items:center!important;gap:16px!important;
+}
+.supply-finance-modal .supply-filterbar>label:not(.management-check){
+  flex:1 1 280px;max-width:520px;
+}
+.supply-finance-modal .supply-filterbar .management-check{
+  min-height:42px;padding:0 4px!important;white-space:nowrap;
+}
+.supply-finance-modal .supply-finance-scroll{
+  width:100%;max-width:100%;min-width:0;
+  overflow-x:auto!important;overscroll-behavior-x:contain;
+}
+.supply-finance-modal .supply-finance-scroll .supply-table{
+  table-layout:auto!important;
+  width:100%!important;
+  min-width:940px!important;
+  border-collapse:separate;
+  border-spacing:0;
+}
+.supply-finance-modal .supply-finance-scroll :is(td,th){
+  padding:13px 15px!important;
+  vertical-align:middle!important;
+  line-height:1.55!important;
+  overflow-wrap:normal!important;
+  word-break:normal!important;
+}
+.supply-finance-modal .supply-finance-scroll th{
+  font-size:12px;font-weight:750;
+  white-space:nowrap!important;
+}
+.supply-finance-modal .supply-finance-scroll td{
+  font-size:13px;
+}
+.supply-finance-modal .supply-finance-scroll tbody tr:hover{
+  background:#f8fbff;
+}
+.supply-finance-modal .supply-finance-scroll :is(td,th):first-child{
+  min-width:132px;
+}
+.supply-finance-modal .supply-finance-suppliers-table :is(td,th):nth-child(2){
+  min-width:210px;
+}
+.supply-finance-modal .supply-finance-receipts-table :is(td,th):nth-child(2),
+.supply-finance-modal .supply-finance-payments-table :is(td,th):first-child{
+  min-width:112px;white-space:nowrap!important;
+}
+.supply-finance-modal .supply-finance-receipts-table :is(td,th):nth-child(3),
+.supply-finance-modal .supply-finance-payments-table :is(td,th):nth-child(3){
+  min-width:180px;
+}
+.supply-finance-modal .supply-finance-scroll :is(td,th):where(:nth-child(4),:nth-child(5),:nth-child(6)){
+  font-variant-numeric:tabular-nums;
+}
+.supply-finance-modal .supply-finance-receipts-table td:nth-child(4),
+.supply-finance-modal .supply-finance-receipts-table td:nth-child(5),
+.supply-finance-modal .supply-finance-receipts-table td:nth-child(6),
+.supply-finance-modal .supply-finance-suppliers-table td:nth-child(3),
+.supply-finance-modal .supply-finance-suppliers-table td:nth-child(4),
+.supply-finance-modal .supply-finance-suppliers-table td:nth-child(5),
+.supply-finance-modal .supply-finance-payments-table td:nth-child(6){
+  white-space:nowrap!important;text-align:right;
+}
+.supply-finance-modal .supply-finance-receipts-table td:nth-child(7),
+.supply-finance-modal .supply-finance-receipts-table th:nth-child(7){
+  min-width:94px!important;
+}
+.supply-finance-modal .supply-finance-receipts-table td:last-child{
+  min-width:94px!important;
+}
+.supply-finance-modal .supply-finance-receipts-table td:last-child .outline{
+  min-width:65px;white-space:nowrap!important;
+}
+.supply-finance-modal .supply-finance-scroll td small{
+  margin-top:4px;color:#697d98;font-size:11px;line-height:1.5;
+}
+.supply-finance-modal .supply-receipt-detail{
+  padding:19px;margin-top:2px;
+}
+@media(max-width:950px){
+ .supply-receipt-modal.supply-finance-modal{width:calc(100vw - 28px);max-width:calc(100vw - 28px)}
+ .supply-finance-modal .supply-finance-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:650px){
+ .supply-receipt-modal.supply-finance-modal{width:calc(100vw - 12px);max-width:calc(100vw - 12px);max-height:97dvh;border-radius:13px}
+ .supply-finance-modal .supply-receipt-modal__heading{padding:18px 17px 15px}
+ .supply-finance-modal .supply-receipt-modal__content{padding:17px 14px 23px}
+ .supply-finance-modal .supply-finance-panel{padding:14px!important;border-radius:13px}
+ .supply-finance-modal .supply-finance-kpis article{min-height:118px;padding:12px!important}
+ .supply-finance-modal .supply-finance-kpis article>strong{font-size:17px!important}
+ .supply-finance-modal .supply-filterbar>label:not(.management-check){max-width:none;flex:1 1 100%}
+ .supply-finance-modal .supply-finance-panel>.card-header>div:last-child{margin-left:0}
+}
+@media(max-width:370px){
+ .supply-finance-modal .supply-finance-kpis{grid-template-columns:1fr!important}
+}
