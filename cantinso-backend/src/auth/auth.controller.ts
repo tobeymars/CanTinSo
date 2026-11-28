@@ -21,6 +21,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
-    return user;
+    // Return the same public user shape as POST /auth/login.
+    // JWT's "sub" is the internal subject, never the client-facing "id".
+    return this.auth.profile(user.sub);
   }
 }
