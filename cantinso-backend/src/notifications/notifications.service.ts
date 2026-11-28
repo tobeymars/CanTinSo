@@ -51,6 +51,7 @@ export class NotificationsService {
     }catch(e){this.logger.error('Unable to record business notifications',e);}
   }
   async forSchool(eventKey:string,schoolId:string,kind:string,title:string,body:string,targetPath:string,excludeId:string,recipientRole:'SCHOOL_ADMIN'|'CENTRAL_KITCHEN'|'SCHOOL_KITCHEN'='SCHOOL_ADMIN'){
+    try {
     const school=await this.prisma.school.findUnique({where:{id:schoolId},select:{id:true}});
     if(!school)return;
     let ids:string[]=[];
@@ -72,5 +73,8 @@ export class NotificationsService {
     }
     await this.send(ids.map(recipientId=>({recipientId,eventKey:eventKey+':'+recipientId,
       kind,title,body,targetPath,schoolId})));
+    } catch(error) {
+      this.logger.error('Could not determine notification recipients',error);
+    }
   }
 }
