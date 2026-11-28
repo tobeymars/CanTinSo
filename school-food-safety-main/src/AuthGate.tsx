@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import LoginPage from "./LoginPage";
 import "./AuthGate.css";
@@ -19,6 +19,24 @@ function applyWorkspace(user: AuthUser, setRole: (role: ActiveViewRole) => void)
   if (!workspace) return false;
   setRole(workspace);
   return true;
+}
+
+type SessionContextValue = { user: AuthUser; signOut: () => void };
+const SessionContext = createContext<SessionContextValue | null>(null);
+
+/** Authenticated account actions rendered inside the main sidebar, not floating over pages. */
+export function AuthSessionProfile() {
+  const session = useContext(SessionContext);
+  if (!session) return null;
+  const {user,signOut} = session;
+  return <div className="auth-sidebar-profile" aria-label="Tài khoản đang đăng nhập">
+    <span className="auth-sidebar-avatar" aria-hidden="true">{(user.fullName || user.email).trim().slice(0,1).toLocaleUpperCase('vi')}</span>
+    <span className="auth-sidebar-user" title={user.fullName || user.email}>
+      <strong>{user.fullName || user.email}</strong>
+      <small>Tài khoản hệ thống</small>
+    </span>
+    <button type="button" className="auth-sidebar-logout" onClick={signOut} title="Đăng xuất khỏi tài khoản">Đăng xuất</button>
+  </div>;
 }
 
 export default function AuthGate({ children }: { children: ReactNode }) {
@@ -59,12 +77,8 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     );
   }
   return (
-    <>
-      <div className="auth-session-bar">
-        <span>{user.fullName || user.email}</span>
-        <button type="button" onClick={() => { clearSession(); setUser(null); }}>Đăng xuất</button>
-      </div>
+    <SessionContext.Provider value={{user,signOut:()=>{clearSession();setUser(null);}}}>
       {children}
-    </>
+    </SessionContext.Provider>
   );
 }
