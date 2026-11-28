@@ -67,7 +67,6 @@ export function NotificationsPanel({onClose}:{onClose:()=>void}){
    {query.isError&&<div className="app-notification-empty"><p>Không thể tải thông báo từ máy chủ.</p><button type="button" className="outline" onClick={()=>void query.refetch()}>Thử lại</button></div>}
    {!query.isLoading&&!query.isError&&!items.length&&<div className="app-notification-empty">
      <Bell size={32}/><h3>{onlyUnread?'Không có thông báo chưa đọc':'Chưa có thông báo'}</h3>
-     <p>Các hoạt động được ghi nhận sẽ xuất hiện tại đây theo quyền tài khoản.</p>
    </div>}
    {!!items.length&&<div className="app-notification-list">{items.map(item=><button type="button" key={item.id}
      className={'app-notification-item'+(!item.readAt?' unread':'')} disabled={!!busy} onClick={()=>void open(item)}>
@@ -76,6 +75,5 @@ export function NotificationsPanel({onClose}:{onClose:()=>void}){
        <small>{new Date(item.createdAt).toLocaleString('vi-VN',{dateStyle:'short',timeStyle:'short'})}</small></span>
      {!item.readAt&&<span className="app-notification-dot" aria-label="Chưa đọc"/>}
    </button>)}</div>}
-   <p className="app-notification-footnote">Thông báo được lưu trên hệ thống và chỉ hiển thị cho tài khoản được phân quyền.</p>
  </div>;
 }
