@@ -27,6 +27,11 @@ export default function RealBoardingMenuManager({selectedDate,onSelectDate,readO
  const [schoolId,setSchoolId]=useState(user?.schoolId??''),[ageId,setAgeId]=useState(''),[week,setWeek]=useState(monday(selectedDate)),[servings,setServings]=useState<Record<string,string>>({}),[chosen,setChosen]=useState<Record<string,string[]>>({}),[notes,setNotes]=useState<Record<string,string>>({}),[picker,setPicker]=useState<string|null>(null),[dishQuery,setDishQuery]=useState('');
  const refresh=async()=>{setLoading(true);setError('');try{const d=await loadMealPlanWorkspace();setGroups(d.ageGroups);setPlans(d.plans);setSchools(d.schools);setDishes(d.dishes);if(!schoolId){if(user?.schoolId)setSchoolId(user.schoolId);else if(d.schools[0])setSchoolId(d.schools[0].id)}if(!ageId&&d.ageGroups[0])setAgeId(d.ageGroups[0].id)}catch(e){setError(e instanceof Error?e.message:'Không tải được dữ liệu thực đơn.')}finally{setLoading(false)}};
  useEffect(()=>{void refresh()},[]);
+ useEffect(()=>{
+   const onBusinessUpdate=()=>{void refresh()};
+   window.addEventListener('cantinso:business-updated',onBusinessUpdate);
+   return ()=>window.removeEventListener('cantinso:business-updated',onBusinessUpdate);
+ },[schoolId,ageId]);
  const days=useMemo(()=>Array.from({length:7},(_,i)=>add(week,i)),[week]);
  // A day/meal can have several age-specific revisions. Select the newest revision
  // for the chosen age group rather than blindly taking the plan's newest revision.
