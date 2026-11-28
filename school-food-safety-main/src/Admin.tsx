@@ -121,7 +121,7 @@ export default function AdminPanel({school}:{school:School}){
     ? <span className="sync-status pending">Đang tải trạng thái…</span>
     : menuStateQuery.isError
       ? <span className="sync-status missing">Không tải được trạng thái</span>
-      : menuStates.map(meal=><span key={meal.type} className={`sync-status ${meal.tone}`} title={`${meal.label}: ${meal.type}`}>{meal.label}: {meal.statusLabel}</span>)
+      : menuStates.map(meal=><span key={meal.type} className={`sync-status ${meal.tone}`} title={`${meal.label} ngày ${new Date(date+'T12:00:00').toLocaleDateString('vi-VN')}: ${meal.statusLabel}`}>{meal.label}: {meal.statusLabel}</span>)
   : <span className={`sync-status ${syncState(selected).tone}`}>{syncState(selected).label}</span>}</div></div>
  {path==='/thuc-don'&&menuBoundary&&<BoardingMenuManager key={`${school.id}-${date}-${role}`} school={school} selectedDate={date} managementScope={menuManagementScope} readOnly={role==='school_board' && getStoredUser()?.role==='SCHOOL_ADMIN' ? false : !canEditMenu} publicView={role==='culture_social_office'} onSelectDate={realMenuAccount ? value=>useUI.getState().setDate(value) : role==='culture_social_office' ? value=>useUI.getState().setDate(value) : undefined}/>}
  {sharedBoundary&&<div className="monitoring-boundary standalone shared-area-boundary">{path==='/nguon-goc'?<Leaf size={19}/>:<ShieldCheck size={19}/>}<div><strong>{sharedBoundary.title}</strong><p>{sharedBoundary.text}</p></div>{sharedBoundary.action&&<Link className="outline" to={sharedBoundary.action.path}>{sharedBoundary.action.label}<ArrowRight size={15}/></Link>}</div>}
