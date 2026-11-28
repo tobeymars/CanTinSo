@@ -16,6 +16,8 @@ import WarehouseManagement from './WarehouseManagement'
 import PortionQrPanel from './PortionQrPanel'
 import RealDishQrPanel from './RealDishQrPanel'
 import { getStoredUser } from './lib/authApi'
+import { listMealPlansForStatus } from './lib/mealPlanApi'
+import type { MealPlanRow } from './lib/mealPlanApi'
 import type { Status } from '../packages/domain/policy'
 import BoardingMenuManager from './BoardingMenuManager'
 import { boardingMenuRepository, gradeForSchool } from './lib/boardingMenu'
@@ -65,6 +67,20 @@ const syncState=(meal:LocalMeal)=>meal.events.some(event=>event.status==='PLATED
  : meal.dishes.length
   ? {label:'Chờ bữa ăn thực tế',tone:'pending'}
   : {label:'Thiếu thực đơn',tone:'missing'}
+const menuMeals=[{type:'BREAKFAST',label:'Sáng'},{type:'LUNCH',label:'Trưa'},{type:'SNACK',label:'Xế'}] as const
+function planState(plan:MealPlanRow|undefined):{label:string;tone:string}{
+ if(!plan)return {label:'Chưa có thực đơn',tone:'missing'}
+ const current=[...plan.revisions].sort((a,b)=>b.revisionNo-a.revisionNo)[0]
+ if(!current)return {label:'Chưa có thực đơn',tone:'missing'}
+ switch(current.status){
+  case 'APPROVED':return {label:'Đã duyệt',tone:'synced'}
+  case 'SUBMITTED':return {label:'Chờ duyệt',tone:'pending'}
+  case 'RETURNED':case 'REJECTED':return {label:'Cần chỉnh sửa',tone:'missing'}
+  case 'DRAFT':return {label:'Bản nháp',tone:'pending'}
+  case 'SUPERSEDED':return {label:'Đã thay thế',tone:'pending'}
+  default:return {label:'Chưa có thực đơn',tone:'missing'}
+ }
+}
 function AdminModal({children,close}:{children:ReactNode;close:()=>void}){const ref=useRef<HTMLDialogElement>(null);useEffect(()=>{ref.current?.showModal()},[]);return <dialog aria-label="Thông tin minh họa" className="admin-modal" ref={ref} onCancel={close} onClick={e=>{if(e.target===e.currentTarget)close()}}>{children}</dialog>}
 export default function AdminPanel({school}:{school:School}){
  const {role,date,kitchenRole}=useUI();const cache=useQueryClient();const requestedPath=useLocation().pathname;const deniedKitchenPath=role==='central_kitchen'&&!centralKitchenRouteAccess[kitchenRole].includes(requestedPath);const path=deniedKitchenPath?'/_forbidden':requestedPath
@@ -76,6 +92,18 @@ export default function AdminPanel({school}:{school:School}){
  const filtered=scoped.filter(m=>schools.find(s=>s.id===m.schoolId)?.name.toLowerCase().includes(search.toLowerCase())&&(status==='all'||m.status===status))
  const canEditMenu=role==='central_kitchen'||role==='school_kitchen'
  const menuManagementScope=role==='central_kitchen'?'CENTRAL_KITCHEN':role==='school_kitchen'?'ON_SITE':'ALL'
+ const realMenuAccount=!!getStoredUser()&&['CENTRAL_KITCHEN','SCHOOL_KITCHEN','SCHOOL_ADMIN','UBND_ADMIN'].includes(getStoredUser()!.role)
+ const menuStateQuery=useQuery({
+  queryKey:['meal-plan-status-banner',getStoredUser()?.id,school.id,date],
+  queryFn:listMealPlansForStatus,
+  enabled:path==='/thuc-don'&&realMenuAccount&&!!school.id,
+  refetchInterval:15000,
+  staleTime:3000,
+ })
+ const menuStates=menuMeals.map(meal=>{
+  const plan=menuStateQuery.data?.find(p=>p.schoolId===school.id&&p.serviceDate.slice(0,10)===date&&p.mealType===meal.type)
+  return {...meal,statusLabel:planState(plan).label,tone:planState(plan).tone}
+ })
  const menuBoundary=role==='parent'?null:menuBoundaries[role]
  const sharedBoundary=role==='parent'?null:path==='/nguon-goc'?traceBoundaries[role]:path==='/giam-sat'?supervisionBoundaries[role]:null
  const exportReport=()=>{const rows=[['BẢN DEMO — DỮ LIỆU MINH HỌA'],['Trường','Ngày','Số suất dự kiến','Trạng thái bữa ăn','Đối chiếu thực đơn'],...filtered.map(m=>[schools.find(s=>s.id===m.schoolId)!.name,m.date,String(m.servings),statusNames[m.status]!,syncState(m).label])];const csv='\uFEFF'+rows.map(row=>row.map(value=>'"'+value.replaceAll('"','""')+'"').join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=`bao-cao-DEMO-${date}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNotice('Đã xuất báo cáo CSV minh họa theo bộ lọc hiện tại.')}
@@ -86,7 +114,13 @@ export default function AdminPanel({school}:{school:School}){
  {path==='/quan-ly-hoc-sinh'&&role==='school_board'&&<StudentManagement/>}
  {path==='/quan-ly-hoc-sinh'&&role!=='school_board'&&<section className="card management-access-denied"><AlertCircle/><h2>Không có quyền truy cập</h2><p>Chức năng quản lý học sinh chỉ dành cho Ban Giám hiệu.</p></section>}
  {(overview||path==='/bao-cao')&&<><div className="admin-stats">{[{icon:SchoolIcon,value:scoped.length,label:'Trường trong chế độ xem'},{icon:Utensils,value:scoped.reduce((n,m)=>n+(Number.isFinite(m.servings)?m.servings:0),0),label:'Suất ăn dự kiến'},{icon:Clock3,value:scoped.filter(m=>m.status!=='READY').length,label:'Bữa ăn đang triển khai'},{icon:Users,value:feedback.data?.length??0,label:'Ý kiến đã lưu trên máy'}].map(k=><div className="card admin-stat" key={k.label}><k.icon size={21}/><strong><CountUp to={k.value} duration={0.65}/></strong><span>{k.label}</span></div>)}</div><section className="card"><div className="card-header"><div><div className="section-kicker">{role==='culture_social_office'?'GIÁM SÁT BỮA ĂN THEO TỪNG TRƯỜNG':'ĐỒNG HÀNH CÙNG CÁC NHÀ TRƯỜNG'}</div><h2>{role==='school_board'?'Hoạt động trường hôm nay':role==='culture_social_office'?'Thực đơn & bữa ăn toàn địa bàn':'Tổng quan cung cấp suất ăn'}</h2>{role==='culture_social_office'&&<p className="muted">Đối chiếu thực đơn do trường lập với tiến trình bữa ăn được báo cáo; Phòng VH–XH chỉ theo dõi, không cập nhật định lượng.</p>}</div><div className="admin-overview-actions">{overview&&<Link className={role==='culture_social_office'?'outline':'primary'} to="/giam-sat"><Activity size={16}/>{progressActionLabel(role)}</Link>}<button className="outline" onClick={exportReport}><ArrowDownToLine size={16}/>Xuất CSV</button></div></div><div className="table-filters"><label className="table-search"><Search size={16}/><input aria-label="Tìm trường trong danh sách" placeholder="Tìm trường học…" value={search} onChange={e=>setSearch(e.target.value)}/></label><Select label="Lọc trạng thái suất ăn" value={status} onValueChange={setStatus} options={[{value:'all',label:'Tất cả trạng thái'},...Object.entries(statusNames).map(([value,label])=>({value,label}))]}/></div><div className="table-scroll"><table><thead><tr><th>Trường học</th><th>Hình thức</th><th>Số suất</th><th>Trạng thái bữa ăn</th><th>Đối chiếu thực đơn</th><th>Chi tiết</th></tr></thead><tbody>{filtered.map(m=>{const synchronization=syncState(m);return <tr key={m.schoolId}><td><strong>{schools.find(s=>s.id===m.schoolId)!.name}</strong><small>{date}</small></td><td>{schools.find(s=>s.id===m.schoolId)!.mode==='ON_SITE'?'Nấu tại trường':'Bếp trung tâm'}</td><td>{m.servings}</td><td><span className="admin-status">{statusNames[m.status]}</span></td><td><span className={`sync-status ${synchronization.tone}`}>{synchronization.label}</span></td><td><button className="icon-button" aria-label={`Xem ${schools.find(s=>s.id===m.schoolId)!.name}`} onClick={()=>{useUI.getState().setSchool(m.schoolId);setDialog('overview-detail')}}><ArrowRight size={17}/></button></td></tr>})}</tbody></table>{!filtered.length&&<div className="empty-state"><Search/><h3>Không có kết quả phù hợp</h3><p>Thử thay đổi từ khóa hoặc bộ lọc trạng thái.</p></div>}</div><div className="table-note"><AlertCircle size={15}/>{role==='culture_social_office'?'Dữ liệu được tổng hợp từ thực đơn và nhật ký bữa ăn của từng trường trong phạm vi địa bàn. Trạng thái đối chiếu không phải kết luận an toàn thực phẩm.':'Các chỉ số tính từ dữ liệu DEMO đang có trên trình duyệt.'}</div></section><div className="admin-info-grid"><section className="card admin-note"><FileCheck2 size={25}/><h3>Hồ sơ rõ ràng, thông tin minh bạch</h3><p>Giấy tờ được ghi nhận riêng với trạng thái xác minh. Bản frontend không đánh giá giá trị pháp lý của hồ sơ.</p></section><section className="card admin-note"><Truck size={25}/><h3>Đúng tiến trình từng bữa ăn</h3><p>Luồng nấu tại trường và bếp trung tâm được tách riêng. Chỉ mốc Sẵn sàng phục vụ cần ảnh thực tế; mọi mốc đều lưu người báo cáo và thời gian.</p></section></div></>}
- {path==='/thuc-don'&&menuBoundary&&<div className="monitoring-boundary standalone"><Eye size={19}/><div><strong>{menuBoundary.title}</strong><p>{menuBoundary.text}</p></div><div className="boundary-actions"><span className={`sync-status ${syncState(selected).tone}`}>{syncState(selected).label}</span></div></div>}
+ {path==='/thuc-don'&&menuBoundary&&<div className="monitoring-boundary standalone"><Eye size={19}/><div><strong>{menuBoundary.title}</strong><p>{menuBoundary.text}</p></div><div className="boundary-actions">{realMenuAccount
+  ? menuStateQuery.isPending
+    ? <span className="sync-status pending">Đang tải trạng thái…</span>
+    : menuStateQuery.isError
+      ? <span className="sync-status missing">Không tải được trạng thái</span>
+      : menuStates.map(meal=><span key={meal.type} className={`sync-status ${meal.tone}`} title={`${meal.label}: ${meal.type}`}>{meal.label}: {meal.statusLabel}</span>)
+  : <span className={`sync-status ${syncState(selected).tone}`}>{syncState(selected).label}</span>}</div></div>
  {path==='/thuc-don'&&menuBoundary&&<BoardingMenuManager key={`${school.id}-${date}-${role}`} school={school} selectedDate={date} managementScope={menuManagementScope} readOnly={role==='school_board' && getStoredUser()?.role==='SCHOOL_ADMIN' ? false : !canEditMenu} publicView={role==='culture_social_office'} onSelectDate={role==='culture_social_office' ? value=>useUI.getState().setDate(value) : undefined}/>}
  {sharedBoundary&&<div className="monitoring-boundary standalone shared-area-boundary">{path==='/nguon-goc'?<Leaf size={19}/>:<ShieldCheck size={19}/>}<div><strong>{sharedBoundary.title}</strong><p>{sharedBoundary.text}</p></div>{sharedBoundary.action&&<Link className="outline" to={sharedBoundary.action.path}>{sharedBoundary.action.label}<ArrowRight size={15}/></Link>}</div>}
  {path==='/ho-so'&&<section className="card"><div className="card-header"><div><div className="section-kicker">THÔNG TIN VÀ ĐIỀU KIỆN CƠ SỞ</div><h2>Hồ sơ & giấy tờ</h2></div>{role!=='culture_social_office'&&<button className="primary" onClick={()=>{setError('');setPendingFile('');setDialog('document')}}><Upload size={16}/>Thêm giấy tờ</button>}</div>{!documents.length?<div className="empty-state"><FileCheck2 size={40}/><h3>Chưa có hồ sơ được thêm</h3><p>Thêm thông tin giấy tờ để xem trải nghiệm quản lý. File chỉ được đọc tên trên thiết bị, không tải lên máy chủ.</p></div>:<div className="source-list">{documents.map(d=><button key={d.id} onClick={()=>setDialog(`doc-${d.id}`)}><FileCheck2 size={24}/><div><strong>{d.name}</strong><p>{d.subject} · {d.filename}</p></div><span className="admin-status">{d.status}</span></button>)}</div>}<div className="table-note">Hồ sơ thêm vào không tự động trở thành hồ sơ được xác minh.</div></section>}
