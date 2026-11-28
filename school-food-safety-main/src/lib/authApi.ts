@@ -22,16 +22,35 @@ export function getAccessToken(): string | null {
   return sessionStorage.getItem(TOKEN_KEY);
 }
 
+function normalizedUser(raw: unknown): AuthUser | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const account = raw as Record<string, unknown>;
+  // Older /auth/me versions return JWT "sub" instead of "id".
+  const id = typeof account.id === 'string' ? account.id
+    : typeof account.sub === 'string' ? account.sub : '';
+  if (!id || typeof account.email !== 'string' || typeof account.role !== 'string') return null;
+  return {
+    id,
+    email: account.email,
+    fullName: typeof account.fullName === 'string' ? account.fullName : account.email,
+    role: account.role,
+    schoolId: typeof account.schoolId === 'string' ? account.schoolId : null,
+    kitchenId: typeof account.kitchenId === 'string' ? account.kitchenId : null,
+  };
+}
+
 export function getStoredUser(): AuthUser | null {
   const value = sessionStorage.getItem(USER_KEY);
   if (!value) return null;
-  try { return JSON.parse(value) as AuthUser; } catch { return null; }
+  try { return normalizedUser(JSON.parse(value)); } catch { return null; }
 }
 
 export function saveSession(result: AuthResponse): AuthUser {
   sessionStorage.setItem(TOKEN_KEY, result.accessToken);
-  sessionStorage.setItem(USER_KEY, JSON.stringify(result.user));
-  return result.user;
+  const user = normalizedUser(result.user);
+  if (!user) throw new Error("Máy chủ trả về thông tin tài khoản không hợp lệ.");
+  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+  return user;
 }
 
 export function clearSession(): void {
@@ -68,7 +87,8 @@ export async function validateSession(): Promise<AuthUser> {
     clearSession();
     throw new Error(await readError(response));
   }
-  const user = await response.json() as AuthUser;
+  const user = normalizedUser(await response.json());
+  if (!user) throw new Error("Máy chủ trả về thông tin phiên đăng nhập không hợp lệ.");
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   return user;
 }
