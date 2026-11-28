@@ -702,7 +702,7 @@ export class DishesService {
       decision==='APPROVED'?'Món ăn đã được duyệt':'Món ăn cần chỉnh sửa',
       decision==='APPROVED'?'Ban Giám hiệu đã duyệt công thức '+result.dishVersion.dish.name+'.':
         'Ban Giám hiệu đã trả lại công thức '+result.dishVersion.dish.name+'.',
-      '/tao-mon-dinh-duong',user.sub,'CENTRAL_KITCHEN');
+      '/tao-mon',user.sub,'CENTRAL_KITCHEN');
     return result;
   }
 }
