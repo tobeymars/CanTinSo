@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { MealPlanApprovalEventType, MealPlanRevisionStatus, Prisma } from '@prisma/client';
 import { AuthUser } from '../common/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type PlanInput = {
   schoolId: string; serviceDate: string; mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
@@ -12,7 +13,7 @@ type PlanInput = {
 
 @Injectable()
 export class MealPlansService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,private readonly notifications:NotificationsService) {}
 
   async listAgeGroups() {
     const groups = [
@@ -169,13 +170,17 @@ export class MealPlansService {
     const revision = await this.prisma.mealPlanRevision.findFirst({ where: { id: revisionId, mealPlan: { kitchenId } }, include: { mealPlan: true } });
     if (!revision) throw new NotFoundException('Không tìm thấy bản thực đơn trong phạm vi bếp.');
     if (!['DRAFT', 'RETURNED'].includes(revision.status)) throw new BadRequestException('Chỉ bản nháp hoặc bản được trả lại mới được gửi duyệt.');
-    return this.prisma.$transaction(async tx => {
+    const result=await this.prisma.$transaction(async tx => {
       const changed = await tx.mealPlanRevision.updateMany({ where: { id: revisionId, status: revision.status }, data: { status: 'SUBMITTED', submittedAt: new Date(), decidedAt: null, decidedById: null, decisionNote: null } });
       if (changed.count !== 1) throw new BadRequestException('Bản thực đơn vừa được cập nhật ở thao tác khác.');
       await tx.mealPlan.update({ where: { id: revision.mealPlanId }, data: { status: 'SUBMITTED' } });
       await tx.mealPlanApprovalEvent.create({ data: { revisionId, eventType: 'SUBMITTED', actorId: user.sub, actorRole: user.role as any } });
       return tx.mealPlanRevision.findUnique({ where: { id: revisionId }, include: this.revisionInclude() });
     });
+    await this.notifications.forSchool('meal-plan-submitted:'+revisionId,revision.mealPlan.schoolId,
+      'MENU_SUBMITTED','Thực đơn đang chờ duyệt','Bếp đã gửi thực đơn cần Ban Giám hiệu phê duyệt.',
+      '/thuc-don',user.sub,'SCHOOL_ADMIN');
+    return result;
   }
 
   async decide(user: AuthUser, revisionId: string, decision: 'APPROVED' | 'RETURNED', note?: string) {
@@ -186,12 +191,18 @@ export class MealPlansService {
     if (revision.status !== MealPlanRevisionStatus.SUBMITTED) throw new BadRequestException('Bản thực đơn không ở trạng thái chờ duyệt.');
     const status = decision === 'APPROVED' ? MealPlanRevisionStatus.APPROVED : MealPlanRevisionStatus.RETURNED;
     const eventType = decision === 'APPROVED' ? MealPlanApprovalEventType.APPROVED : MealPlanApprovalEventType.RETURNED;
-    return this.prisma.$transaction(async tx => {
+    const result=await this.prisma.$transaction(async tx => {
       const changed = await tx.mealPlanRevision.updateMany({ where: { id: revisionId, status: 'SUBMITTED' }, data: { status, decidedAt: new Date(), decidedById: user.sub, decisionNote: note?.trim() || null } });
       if (changed.count !== 1) throw new BadRequestException('Bản thực đơn vừa được xử lý bởi thao tác khác.');
       await tx.mealPlan.update({ where: { id: revision.mealPlanId }, data: { status: decision } });
       await tx.mealPlanApprovalEvent.create({ data: { revisionId, eventType, actorId: user.sub, actorRole: user.role as any, note: note?.trim() || null } });
       return tx.mealPlanRevision.findUnique({ where: { id: revisionId }, include: this.revisionInclude() });
     });
+    await this.notifications.forSchool('meal-plan-decision:'+revisionId+':'+decision,
+      revision.mealPlan.schoolId,'MENU_'+decision,
+      decision==='APPROVED'?'Thực đơn đã được duyệt':'Thực đơn cần chỉnh sửa',
+      decision==='APPROVED'?'Ban Giám hiệu đã duyệt thực đơn của trường.':'Ban Giám hiệu đã trả thực đơn để bếp chỉnh sửa.',
+      '/thuc-don',user.sub,'CENTRAL_KITCHEN');
+    return result;
   }
 }
