@@ -16,7 +16,7 @@ export function NotificationBell({onOpen}:{onOpen:()=>void}){
   useEffect(()=>{
     if(!enabled)return;
     const controller=new AbortController();
-    void streamNotifications(()=>{void qc.invalidateQueries({queryKey:inboxKey(id)})},controller.signal);
+    void streamNotifications(()=>{void qc.invalidateQueries({queryKey:inboxKey(id)}); window.dispatchEvent(new CustomEvent('cantinso:business-updated')); void qc.invalidateQueries({queryKey:['meal-plan-status-banner']});},controller.signal);
     return ()=>controller.abort();
   },[enabled,id,qc]);
   const count=query.data?.unread??0;
