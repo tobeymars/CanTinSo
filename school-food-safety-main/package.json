@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run packages",
+    "test:units": "vitest run packages/unit-conversion.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

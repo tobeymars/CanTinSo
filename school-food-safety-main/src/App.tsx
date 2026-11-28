@@ -59,9 +59,14 @@ import type { LucideIcon } from "lucide-react";
 import { demoData, demo, demoMealViewer, schools as demoSchools } from "./lib/data";
 import type { DayData, PublicInspection, School } from "./lib/data";
 import { centralKitchenRouteAccess, useUI } from "./lib/store";
+import { getManagedSchools, getMySchoolOverview, getMyAssignedSchool } from "./lib/usersApi";
+import { getStoredUser } from "./lib/authApi";
+import { getSupplyKitchens } from "./lib/supplyApi";
+import { fetchMyKitchenContext } from "./lib/myKitchenApi";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
-import AuthGate from "./AuthGate";
+import AuthGate, { AuthSessionProfile } from "./AuthGate";
+import { NotificationBell, NotificationsPanel } from "./NotificationsCenter";
 import UserManagement from "./UserManagement";
 import MobileNavigation from "./MobileNavigation";
 import Select from "./components/ui/Select";
@@ -71,11 +76,15 @@ import ClickSpark from "./components/react-bits/ClickSpark";
 import { MealJourneyPanel, MealJourneyProgress } from "./MealJourney";
 import KitchenLegalDocuments from "./KitchenLegalDocuments";
 import SupervisionStatusPanel from "./SupervisionStatusPanel";
+import PublicInspectionWorkspace from "./PublicInspectionWorkspace";
 import SupervisionMealApproval from "./SupervisionMealApproval";
 import SupervisionJourneyActions from "./SupervisionJourneyActions";
-import { SUPERVISION_JOURNEY_EVENT, stagesForSchool } from "./lib/supervisionJourney";
+import SupervisionDateNotice, {todayInVietnam} from "./SupervisionDateNotice";
+import { isServerSupervisionScope, readServerSupervision, readSupervisionContext } from "./lib/supervisionApi";
+import { SUPERVISION_JOURNEY_EVENT, stagesForSchool, stageNames } from "./lib/supervisionJourney";
 import type { SupervisionMealType } from "./lib/supervisionStatus";
 import { compactDateLabel, weekDates, weekdayLabel } from "./lib/dates";
+import { calculateTransportMinutes } from "./lib/transportMetrics";
 import IngredientTraceDialog from "./IngredientTraceDialog";
 import type { IngredientPortion } from "./lib/data";
 import { BOARDING_MENU_STORAGE_KEY, PARENT_MEAL_CHOICES_KEY, PARENT_MEAL_CHOICES_EVENT } from "./lib/boardingMenu";
@@ -86,9 +95,18 @@ import "./components/react-bits/integration.css";
 const AdminPanel = lazy(() => import("./Admin"));
 const CanteenGallery = lazy(() => import("./CanteenGallery"));
 const PortionTracePage = lazy(() => import("./PortionTracePage"));
+const RealDishQrTracePage = lazy(() => import("./RealDishQrTracePage"));
 const BoardingMenuManager = lazy(() => import("./BoardingMenuManager"));
+const RealBoardingMenuManager = lazy(() => import("./RealBoardingMenuManager"));
 const KitchenDishCatalog = lazy(() => import("./KitchenDishCatalog"));
+const DishApprovalInbox = lazy(() => import("./DishApprovalInbox"));
 const FeedbackForm = lazy(() => import("./FeedbackForm"));
+const CentralKitchenManagementPanel = lazy(() => import("./CentralKitchenManagement"));
+const KitchenManagementPanel = lazy(() => import("./KitchenManagement"));
+const SchoolDashboard = lazy(() => import("./SchoolDashboard"));
+const SchoolReceiverWorkspace = lazy(() => import("./SchoolReceiverWorkspace"));
+const WardApprovedDishes = lazy(() => import("./WardApprovedDishes"));
+const WardSchoolManagement = lazy(() => import("./WardSchoolManagement"));
 const roleLabels: Record<ViewRole, string> = {
   parent: "Phụ huynh",
   school_board: "Ban Giám hiệu",
@@ -109,6 +127,7 @@ const roleHomeHeadings: Record<Exclude<ViewRole, "parent">, string> = {
 const adminNavigation = [
   { path: "/", label: "Tổng quan điều hành", icon: House },
   { path: "/thuc-don", label: "Thực đơn & bữa ăn", icon: Utensils },
+  { path: "/duyet-mon", label: "Duyệt món từ bếp", icon: CookingPot },
   { path: "/giam-sat", label: "Giám sát & an toàn", icon: ShieldCheck },
   {
     path: "/ho-so-phap-ly",
@@ -369,7 +388,7 @@ function MealDayDetail({
   const readyEvent = data.events.find((event) => event.status === "READY");
   const readyPhoto = readyEvent?.confirmed ? readyEvent.photos[0] : undefined;
   useEffect(() => {
-    if (!demo || school.mode !== "CENTRAL_KITCHEN" || !data.dishes.length) return;
+    if (!demo || isServerSupervisionScope({schoolId:school.id,serviceDate:date,mealType}) || school.mode !== "CENTRAL_KITCHEN" || !data.dishes.length) return;
     try {
       portionQrDemo.seedPublishedDemo({
         scope: portionQrDemo.scopeForSchool({
@@ -715,29 +734,57 @@ function SupervisionMealContent({
     title: string;
     description: string;
   } | null>(null);
-  const visibleStages = stagesForSchool(school.mode, role);
-  const visibleEvents = data.events.filter(event => visibleStages.some(stage => stage === event.status));
-  const readyEvent = data.events.find((event) => event.status === "READY");
+  const scope = {schoolId:school.id,serviceDate:date,mealType};
+  const serverMode = isServerSupervisionScope(scope);
+  const contextQuery = useQuery({queryKey:['supervision-context',school.id,date,mealType],queryFn:()=>readSupervisionContext(scope),enabled:serverMode});
+  const serverQuery = useQuery({queryKey:['supervision-server',school.id,date,mealType],queryFn:()=>readServerSupervision(scope),enabled:serverMode});
+  const effectiveSchool:School = serverMode ? {...school,mode:contextQuery.data?.kitchen?.type === 'CENTRAL' ? 'CENTRAL_KITCHEN' : 'ON_SITE'} : school;
+  const realEvents = Object.entries(serverQuery.data?.stages ?? {}).map(([status,item])=>({
+    status,label:stageNames[status as keyof typeof stageNames] ?? status,time:item.time??'',actor:item.actorRole==='SCHOOL_ADMIN'?'BGH':'Bếp',confirmed:!!item.confirmed,
+    photos:item.photos??[],hasReportedPhotos:(item.photos?.length??0)>0,
+  }));
+  // Thời gian thực từ giờ xuất bếp và giờ tiếp nhận của đúng trường/ngày/bữa.
+  // Không lấy thời điểm Ra món hay Sẵn sàng phục vụ để tính vận chuyển.
+  const transportDurationMinutes = serverMode && effectiveSchool.mode === 'CENTRAL_KITCHEN'
+    ? calculateTransportMinutes(
+        date,
+        serverQuery.data?.stages.DISPATCHED?.dispatch?.dispatchTime,
+        serverQuery.data?.stages.ARRIVED?.arrival?.arrivalTime,
+        serverQuery.data?.stages.DISPATCHED?.confirmed,
+        serverQuery.data?.stages.ARRIVED?.confirmed,
+      )
+    : null;
+  const effectiveData:DayData = serverMode ? {
+    ...data,servings:contextQuery.data?.menu?.servings??0,
+    dishes:contextQuery.data?.menu?.dishes.map(item=>item.name)??[],
+    dishDetails:[],events:realEvents,kitchen:contextQuery.data?.kitchen?.name??'Chưa phân công bếp',
+    photo:'',publicInspection:null,suppliers:0,transportDistanceKm:contextQuery.data?.transportDistanceKm??null,transportDurationMinutes,mealUseByAt:null,
+  } : data;
+  const visibleStages = stagesForSchool(effectiveSchool.mode, role);
+  const visibleEvents = effectiveData.events.filter(event => visibleStages.some(stage => stage === event.status));
+  const readyEvent = effectiveData.events.find((event) => event.status === "READY");
   const publishedPhoto = readyEvent?.confirmed ? readyEvent.photos[0] : undefined;
   const placeholderPhoto = mealType === "BREAKFAST" ? breakfastDemo : mealType === "SNACK" ? snackDemo : readyServingDemo;
   const mealLabel = mealType === "BREAKFAST" ? "bữa sáng" : mealType === "LUNCH" ? "bữa trưa" : "bữa xế";
   return (
     <>
+      {serverMode && (contextQuery.isLoading || serverQuery.isLoading) && <p className="muted" role="status">Đang tải thực đơn, kho và nhật ký từ hệ thống…</p>}
+      {serverMode && (contextQuery.isError || serverQuery.isError) && <p className="error" role="alert">Không đọc được dữ liệu giám sát từ máy chủ. Không sử dụng dữ liệu DEMO để thay thế.</p>}
       <section className="supervision-meal-overview" aria-label={`Tổng quan giám sát ${mealLabel}`}>
-        <div><small>Suất dự kiến · {mealLabel}</small><strong>{data.servings.toLocaleString("vi-VN")}</strong></div>
-        <div><small>Món trong thực đơn</small><strong>{data.dishes.length.toLocaleString("vi-VN")}</strong></div>
+        <div><small>Suất dự kiến · {mealLabel}</small><strong>{effectiveData.servings.toLocaleString("vi-VN")}</strong></div>
+        <div><small>Món trong thực đơn</small><strong>{effectiveData.dishes.length.toLocaleString("vi-VN")}</strong></div>
         <div><small>Mốc vận hành xác nhận</small><strong>{visibleEvents.filter(event => event.confirmed).length}/{visibleEvents.length}</strong></div>
-        <div><small>Hồ sơ kiểm tra công khai</small><strong>{data.publicInspection ? "Có hồ sơ tham khảo" : "Chưa có hồ sơ theo bữa"}</strong></div>
+        <div><small>Hồ sơ kiểm tra công khai</small><strong>{effectiveData.publicInspection ? "Có hồ sơ tham khảo" : "Chưa có hồ sơ theo bữa"}</strong></div>
       </section>
-      <SupervisionStatusPanel school={school} date={date} mealType={mealType} role={role} />
-      <SupervisionJourneyActions school={school} date={date} mealType={mealType} data={data} role={role} />
-      <SupervisionMealApproval school={school} date={date} mealType={mealType} role={role} />
+      <SupervisionStatusPanel school={effectiveSchool} date={date} mealType={mealType} role={role} />
+      <SupervisionJourneyActions school={effectiveSchool} date={date} mealType={mealType} data={effectiveData} role={role} />
+      <SupervisionMealApproval school={effectiveSchool} date={date} mealType={mealType} role={role} />
       <div className="content-grid">
         <MealJourneyPanel
-          school={school}
+          school={effectiveSchool}
           serviceDate={date}
           mealType={mealType}
-          data={data}
+          data={effectiveData}
           role={role}
           onReadyPhotoClick={() =>
             setPhotoPreview({
@@ -749,7 +796,7 @@ function SupervisionMealContent({
             })
           }
         />
-        <PublicInspectionCard inspection={data.publicInspection} mealType={mealType} />
+        {serverMode ? <PublicInspectionWorkspace scope={scope} /> : <PublicInspectionCard inspection={effectiveData.publicInspection} mealType={mealType} />}
       </div>
       {photoPreview && (
         <Dialog title={photoPreview.title} close={() => setPhotoPreview(null)}>
@@ -763,6 +810,12 @@ function SupervisionMealContent({
       )}
     </>
   );
+}
+/** Empty authenticated day: server-backed supervision loads the actual meal and events.
+ * This placeholder deliberately has no demo dishes, photos or stage history. */
+function emptyRealSupervisionDay(serviceDate: string, mealType: SupervisionMealType): DayData {
+  return {serviceDate,mealType,servings:0,suppliers:0,dishes:[],dishDetails:[],events:[],kitchen:'',
+    photo:'',updatedAt:'',transportDistanceKm:null,transportDurationMinutes:null,publicInspection:null,mealUseByAt:null};
 }
 /** Phạm vi dữ liệu luôn là (trường, ngày, bữa), không phụ thuộc vai trò. */
 function SupervisionSection({
@@ -788,7 +841,7 @@ function SupervisionSection({
         <div>
           <span className="section-kicker">GIÁM SÁT AN TOÀN THEO TỪNG BỮA</span>
           <h2 id="supervision-meal-title">Giám sát & an toàn · {mealLabel}</h2>
-          <p>Nhật ký, ảnh đã duyệt, QR món ăn và hồ sơ kiểm tra riêng cho mỗi bữa. Mọi vai trò xem cùng nguồn dữ liệu công khai.</p>
+          <p><strong>Ngày phục vụ: {new Date(date+'T12:00:00').toLocaleDateString('vi-VN')}</strong> · Nhật ký, ảnh đã duyệt, QR món ăn và hồ sơ kiểm tra riêng cho mỗi bữa.</p>
         </div>
         <div className="supervision-meal-selector">
           <span className="supervision-meal-selector-label">CHỌN BỮA TRONG NGÀY</span>
@@ -799,9 +852,11 @@ function SupervisionSection({
               const dishNames = meal?.dishes.join(", ");
               const summary = dailyMenuError
                 ? "Chưa tải được thực đơn"
-                : dailyMenuLoading || !dailyMenu
-                  ? "Đang tải thực đơn…"
-                  : dishNames || "Chưa cập nhật món";
+                : isServerSupervisionScope({schoolId:school.id,serviceDate:date,mealType:option.value})
+                  ? "Xem thực đơn được duyệt"
+                  : dailyMenuLoading || !dailyMenu
+                    ? "Đang tải thực đơn…"
+                    : dishNames || "Chưa cập nhật món";
               return (
                 <button
                   type="button"
@@ -820,6 +875,7 @@ function SupervisionSection({
           </div>
         </div>
       </section>
+      <SupervisionDateNotice date={date} serverMode={isServerSupervisionScope({schoolId:school.id,serviceDate:date,mealType})}/>
       {error ? (
         <div className="error-panel" role="alert"><strong>Chưa tải được giám sát {mealLabel}</strong><p>Không sử dụng dữ liệu của bữa khác để thay thế.</p><button type="button" className="outline" onClick={onRetry}>Thử lại</button></div>
       ) : loading || !data ? (
@@ -971,22 +1027,92 @@ function Shell() {
     };
   }, [queryClient]);
   const week = weekDates(date);
+  const isWardWorkspace = role === "culture_social_office";
+  const storedUser = getStoredUser();
+  const isAuthenticatedWorkspace = !!storedUser;
+  // The bundled demo starts on 17/10/2026; real accounts must not inherit that historical date.
+  useEffect(() => {
+    if (isAuthenticatedWorkspace && date === "2026-10-17") {
+      setDate(todayInVietnam());
+    }
+  }, [isAuthenticatedWorkspace, date, setDate]);
+  const isRealSchoolAdmin = storedUser?.role === "SCHOOL_ADMIN";
+  const schoolWarehouseQuery=useQuery({queryKey:["school-owned-warehouse"],queryFn:getSupplyKitchens,enabled:isRealSchoolAdmin});
+  const schoolHasOwnKitchen=!!schoolWarehouseQuery.data?.some(k=>k.type==="SCHOOL");
+  const isRealCentralKitchen = storedUser?.role === "CENTRAL_KITCHEN" && !!storedUser?.kitchenId;
+  const isRealOnSiteKitchen = storedUser?.role === "SCHOOL_KITCHEN" && !!storedUser?.kitchenId;
+  const isRealKitchenAccount = (storedUser?.role === "CENTRAL_KITCHEN" || storedUser?.role === "SCHOOL_KITCHEN") && !!storedUser?.kitchenId;
+  const realKitchenQuery = useQuery({ queryKey: ["my-kitchen-context"], queryFn: fetchMyKitchenContext, enabled: isRealKitchenAccount });
+  // SCHOOL_KITCHEN without kitchenId is school-side meal receiving staff, not a kitchen operator.
+  const isSchoolKitchenReceiver = storedUser?.role === "SCHOOL_KITCHEN" && !storedUser.kitchenId;
   const schoolQuery = useQuery({
-    queryKey: ["schools"],
-    queryFn: demoData.schools,
+    queryKey: ["schools", isWardWorkspace ? "ward-scoped" : isRealSchoolAdmin ? "school-account" : isSchoolKitchenReceiver ? "receiver-account" : isRealOnSiteKitchen ? "on-site-kitchen-account" : "demo", isRealSchoolAdmin ? date : ""],
+    queryFn: async (): Promise<School[]> => {
+      if (isWardWorkspace) {
+        // UBND_ADMIN chỉ nhận danh sách trường thuộc wardId của tài khoản.
+        const rows = await getManagedSchools();
+        return rows.map((item) => ({
+          id: item.id,
+          name: item.name,
+          address: item.address ?? item.ward?.name ?? "Chưa cập nhật địa chỉ",
+          mode: "ON_SITE",
+        }));
+      }
+      if (isSchoolKitchenReceiver || isRealOnSiteKitchen) {
+        // Tài khoản bếp tại trường chỉ xem trường được gán trong JWT, không dùng trường mẫu.
+        const assigned = await getMyAssignedSchool();
+        return [{id: assigned.id,name: assigned.name,address: assigned.address ?? assigned.ward?.name ?? "Chưa cập nhật địa chỉ",mode: isRealOnSiteKitchen ? "ON_SITE" : "CENTRAL_KITCHEN"}];
+      }
+      if (isRealSchoolAdmin) {
+        // BGH không dùng danh sách trường mẫu; backend tự giới hạn theo schoolId của JWT.
+        const overview = await getMySchoolOverview(date);
+        return [{
+          id: overview.school.id,
+          name: overview.school.name,
+          address: overview.school.ward?.name ?? "Chưa xác định phường",
+          mode: "ON_SITE",
+        }];
+      }
+      return demoData.schools();
+    },
   });
-  const allSchools = schoolQuery.data ?? demoSchools;
-  const availableSchools = allSchools;
+  const centralKitchenSchools: School[] = (realKitchenQuery.data?.kitchen.schools ?? []).map((item) => ({
+    id: item.school.id,
+    name: item.school.name,
+    address: "Trường được phân công phục vụ",
+    mode: "CENTRAL_KITCHEN",
+  }));
+  const availableSchools = isWardWorkspace || isRealSchoolAdmin || isSchoolKitchenReceiver || isRealOnSiteKitchen
+    ? (schoolQuery.data ?? [])
+    : isRealCentralKitchen
+      ? centralKitchenSchools
+      : (schoolQuery.data ?? demoSchools);
+  useEffect(() => {
+    if (isRealCentralKitchen) {
+      if (realKitchenQuery.isSuccess && !centralKitchenSchools.some((item) => item.id === schoolId) && centralKitchenSchools[0]) {
+        setSchool(centralKitchenSchools[0].id);
+      }
+      return;
+    }
+    if ((!isWardWorkspace && !isRealSchoolAdmin && !isSchoolKitchenReceiver && !isRealOnSiteKitchen) || !schoolQuery.data) return;
+    if (!schoolQuery.data.some((item) => item.id === schoolId)) {
+      if (schoolQuery.data[0]) setSchool(schoolQuery.data[0].id);
+    }
+  }, [isWardWorkspace, isRealSchoolAdmin, isSchoolKitchenReceiver, isRealOnSiteKitchen, isRealCentralKitchen, schoolQuery.data, realKitchenQuery.isSuccess, centralKitchenSchools, schoolId, setSchool]);
   const school =
     availableSchools.find((s) => s.id === schoolId) ??
     availableSchools[0] ??
-    demoSchools[0]!;
+    (isWardWorkspace || isRealSchoolAdmin || isSchoolKitchenReceiver || isRealOnSiteKitchen
+      ? { id: "", name: schoolQuery.isError ? "Không tải được trường của tài khoản" : "Đang tải trường được gán…", address: "", mode: "ON_SITE" as const }
+      : isRealCentralKitchen
+        ? { id: "", name: realKitchenQuery.isError ? "Không tải được trường được phân công" : "Chưa có trường được phân công", address: "", mode: "CENTRAL_KITCHEN" as const }
+        : demoSchools[0]!);
   // Bản công khai của phụ huynh là nguồn đọc chuẩn cho cả năm vai trò, bao gồm quy tắc chỉ hiện ảnh đã duyệt.
   const query = useQuery({
     queryKey: ["day", school.id, date, role === "parent" ? "parent" : role === "culture_social_office" ? "supervisor" : "shared"],
     queryFn: () => demoData.day(school, date,
       role === "parent" || role === "culture_social_office" ? demoMealViewer(role, school) : undefined),
-    enabled: !!schoolQuery.data,
+    enabled: !!school.id && !!schoolQuery.data && !isRealSchoolAdmin && !isSchoolKitchenReceiver,
   });
   const parentMealQuery = useQuery({
     queryKey: ["parent-meal-day", school.id, date, parentMealType],
@@ -1002,13 +1128,13 @@ function Shell() {
     queryFn: () => demoData.day(school, date, undefined, supervisionMealType),
     enabled:
       location.pathname === "/giam-sat" &&
-      !!schoolQuery.data,
+      !!schoolQuery.data && !isSchoolKitchenReceiver && !isRealOnSiteKitchen && !isRealCentralKitchen,
   });
   const supervisionDailyMenuQuery = useQuery({
     queryKey: ["supervision-daily-menu", school.id, date],
     queryFn: () => Promise.all(parentMealOptions.map(option =>
       demoData.day(school, date, demoMealViewer("parent", school), option.value))),
-    enabled: location.pathname === "/giam-sat" && !!schoolQuery.data,
+    enabled: location.pathname === "/giam-sat" && !!schoolQuery.data && !isSchoolKitchenReceiver && !isRealOnSiteKitchen && !isRealCentralKitchen,
   });
   /** Vai trò tác nghiệp và phụ huynh dùng chung cấu trúc bảng; chế độ công khai chỉ đọc dữ liệu được phép hiển thị. */
   const sharedAdminArea =
@@ -1039,7 +1165,10 @@ function Shell() {
     parentMealType === "LUNCH" ? data : parentMealQuery.data;
   const parentReadyEvent = parentMealData?.events.find(event => event.status === "READY");
   const parentReadyPhoto = parentReadyEvent?.confirmed ? parentReadyEvent.photos[0] : undefined;
+  const isWardAdminAccount = getStoredUser()?.role === "UBND_ADMIN";
   const adminNav = adminNavigation.filter((item) => {
+    if (isRealSchoolAdmin && !schoolHasOwnKitchen && (item.path === "/quan-ly-kho" || item.path === "/nha-cung-cap")) return false;
+    if (item.path === "/duyet-mon" && role !== "school_board") return false;
     if (item.path === "/quan-ly-hoc-sinh" && role !== "school_board") return false;
     if (item.path === "/quan-ly-tai-khoan" && role !== "school_board") return false;
     if (role !== "central_kitchen") return true;
@@ -1051,7 +1180,9 @@ function Shell() {
     role === "parent"
       ? navigation
       : role === "culture_social_office"
-        ? adminNav
+        ? [...adminNav, ...(role === "culture_social_office" ? [{ path: "/mon-da-duyet", label: "Món ăn trường đã duyệt", icon: ShieldCheck }, ...(isWardAdminAccount ? [{ path: "/quan-ly-truong", label: "Quản lý trường học", icon: SchoolIcon }, { path: "/quan-ly-bep-trung-tam", label: "Quản lý bếp trung tâm", icon: CookingPot }] : [])] : [])]
+        : role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN"
+          ? [...adminNav, { path: "/quan-ly-bep", label: "Quản lý bếp", icon: CookingPot }]
         : role === "school_kitchen"
           ? [...adminNav.slice(0, 2), { path: "/tao-mon", label: "Tạo món & dinh dưỡng", icon: CookingPot }, ...adminNav.slice(2)]
           : role === "central_kitchen" && centralKitchenRouteAccess[kitchenRole].includes("/tao-mon")
@@ -1101,7 +1232,7 @@ function Shell() {
           </div>
         }
       >
-        <PortionTracePage token={portionToken} />
+        {/^[A-Za-z0-9_-]{32}$/.test(portionToken) ? <RealDishQrTracePage token={portionToken} /> : <PortionTracePage token={portionToken} />}
       </Suspense>
     );
   // Không cho mở màn hình đã bị loại bỏ bằng URL nhập trực tiếp.
@@ -1141,7 +1272,7 @@ function Shell() {
             <small>
               {role === "parent"
                 ? "Đồng hành cùng nhà trường"
-                : "Không gian làm việc DEMO"}
+                : isRealSchoolAdmin ? "Quản lý trường được phân công" : isAuthenticatedWorkspace ? "Không gian quản lý" : "Không gian làm việc DEMO"}
             </small>
           </div>
           <span className="small-dot" />
@@ -1185,14 +1316,15 @@ function Shell() {
             Trung tâm hỗ trợ
             <ArrowRight size={15} />
           </button>
-          <button className="profile" onClick={() => setModal("login")}>
-            <span className="avatar">PH</span>
-            <span>
-              {displayRole}
-              <small>Chuyển không gian DEMO</small>
-            </span>
-            <LogIn size={17} />
-          </button>
+          {isAuthenticatedWorkspace ? (
+            <AuthSessionProfile />
+          ) : (
+            <button className="profile" onClick={() => setModal("login")}>
+              <span className="avatar">PH</span>
+              <span>{displayRole}<small>Chuyển không gian DEMO</small></span>
+              <LogIn size={17} />
+            </button>
+          )}
         </div>
       </aside>
       <div className="main-wrap">
@@ -1223,7 +1355,7 @@ function Shell() {
             </div>
           </div>
           <div className="top-actions">
-            {demo && <span className="demo-pill">BẢN DEMO</span>}
+            {demo && !isAuthenticatedWorkspace && <span className="demo-pill">BẢN DEMO</span>}
             <button
               aria-label="Tìm kiếm trường"
               className="icon-button"
@@ -1238,14 +1370,9 @@ function Shell() {
             >
               {dark ? <Sun size={19} /> : <Moon size={19} />}
             </button>
-            <button
-              className="icon-button notification-button"
-              aria-label="Thông báo"
-              onClick={() => setModal("notifications")}
-            >
-              <Bell size={19} />
-              <i />
-            </button>
+            {isAuthenticatedWorkspace
+              ? <NotificationBell onOpen={() => setModal("notifications")} />
+              : <button className="icon-button notification-button" aria-label="Thông báo" onClick={() => setModal("notifications")}><Bell size={19}/></button>}
             <span className="top-divider" />
             <button
               className="avatar small"
@@ -1297,7 +1424,7 @@ function Shell() {
               <h1>{location.pathname === "/" ? homeHeading : current.label}</h1>
               <p>
                 {role !== "parent"
-                  ? "Theo dõi, phối hợp và quản lý hoạt động bữa ăn trong không gian minh họa."
+                  ? (isRealSchoolAdmin || isSchoolKitchenReceiver ? "Theo dõi dữ liệu bữa ăn và tiếp nhận thực tế của trường được gán." : "Theo dõi, phối hợp và quản lý hoạt động bữa ăn trong không gian minh họa.")
                   : location.pathname === "/"
                     ? "Cùng nhà trường chăm chút từng bữa ăn, đồng hành cùng con khôn lớn."
                     : "Thông tin minh bạch, cập nhật từ nhà trường và đơn vị phụ trách."}
@@ -1317,7 +1444,7 @@ function Shell() {
             </button>
           </div>
           <SpotlightCard
-            className="school-hero"
+            className={`school-hero${isRealKitchenAccount ? " kitchen-school-hero" : ""}`}
             spotlightColor="#e4bc70"
             intensity={0.3}
             spotlightSize={300}
@@ -1329,30 +1456,68 @@ function Shell() {
             <div className="hero-content">
               <span className="hero-eyebrow">
                 <SchoolIcon size={15} />{" "}
-                {role === "parent"
-                  ? "NGÔI TRƯỜNG CỦA CON"
-                  : role === "culture_social_office"
-                    ? "TRƯỜNG ĐANG THEO DÕI"
-                    : "PHẠM VI NHÀ TRƯỜNG"}
+                {role === "parent" ? "NGÔI TRƯỜNG CỦA CON" : role === "culture_social_office" ? "TRƯỜNG ĐANG THEO DÕI" : isRealKitchenAccount ? "PHẠM VI BẾP ĐƯỢC PHÂN CÔNG" : "PHẠM VI NHÀ TRƯỜNG"}
               </span>
-              <div className="school-picker">
-                <Select
-                  label="Chọn trường"
-                  variant="hero"
-                  value={school.id}
-                  onValueChange={setSchool}
-                  options={availableSchools.map((s) => ({
-                    value: s.id,
-                    label: s.name,
-                    description: s.address,
-                  }))}
-                />
-              </div>
-              <p className="hero-address">{school.address}</p>
+              {isRealSchoolAdmin || isSchoolKitchenReceiver ? (
+                <div className="school-picker school-picker-locked">
+                  <strong>{school.name}</strong>
+                  <span><ShieldCheck size={14} /> Trường được phân công</span>
+                </div>
+              ) : isRealKitchenAccount ? (
+                <div className="kitchen-school-context">
+                  <div className="kitchen-school-identity">
+                    <span className="kitchen-school-caption">BẾP ĐANG ĐĂNG NHẬP</span>
+                    <strong className="kitchen-school-name">{realKitchenQuery.data?.kitchen.name ?? (realKitchenQuery.isLoading ? "Đang tải thông tin bếp…" : "Không tải được thông tin bếp")}</strong>
+                    <span className="kitchen-school-verified"><ShieldCheck size={15} /> Bếp theo tài khoản đăng nhập</span>
+                  </div>
+                  {isRealCentralKitchen && (
+                    <div className="kitchen-school-assignment">
+                      <span className="kitchen-school-caption">TRƯỜNG ĐANG PHỤC VỤ</span>
+                      {centralKitchenSchools.length > 0 ? (
+                        <>
+                          <Select
+                            label="Chọn trường đang phục vụ"
+                            className="kitchen-school-select"
+                            variant="hero"
+                            value={school.id}
+                            onValueChange={setSchool}
+                            options={centralKitchenSchools.map((item) => ({
+                              value: item.id,
+                              label: item.name,
+                              description: "Trường thuộc phân công của bếp trung tâm",
+                            }))}
+                            searchable={centralKitchenSchools.length > 5}
+                          />
+                          <span className="kitchen-school-hint">{centralKitchenSchools.length} trường được phân công · Nhấn để chuyển trường</span>
+                        </>
+                      ) : (
+                        <p className="kitchen-school-empty" role="status">
+                          {realKitchenQuery.isLoading ? "Đang tải danh sách trường phục vụ…" : realKitchenQuery.isError ? "Không tải được danh sách trường. Vui lòng thử lại." : "Bếp chưa có trường đang được phân công phục vụ."}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="school-picker">
+                  <Select
+                    label="Chọn trường"
+                    variant="hero"
+                    value={school.id}
+                    onValueChange={setSchool}
+                    options={availableSchools.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                      description: s.address,
+                    }))}
+                  />
+                </div>
+              )}
+              <p className="hero-address">{isRealKitchenAccount ? (realKitchenQuery.data?.kitchen.address ?? "Đơn vị bếp được phân công") : school.address}</p>
               <div className="hero-bottom">
                 <span>
                   <span className="live-dot" />
-                  {demo ? "Dữ liệu minh họa" : "Thông tin công khai"}
+                  {isRealSchoolAdmin || isRealKitchenAccount || isSchoolKitchenReceiver ? "Dữ liệu hệ thống" : demo ? "Dữ liệu minh họa" : "Thông tin công khai"}
                 </span>
                 <span className="hero-separator" />
                 <span>
@@ -1378,7 +1543,7 @@ function Shell() {
               </span>
             </div>
           </SpotlightCard>
-          {role === "culture_social_office" && (
+          {role === "culture_social_office" && !isWardAdminAccount && (
             <div className="ward-readonly-banner" role="status">
               <ShieldCheck size={20} />
               <div>
@@ -1393,7 +1558,8 @@ function Shell() {
           )}
           {role !== "parent" ? (
             <>
-              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan"].includes(location.pathname) && (
+              {!["/giam-sat", "/ho-so-phap-ly", "/tao-mon", "/quan-ly-tai-khoan", "/quan-ly-bep-trung-tam", "/quan-ly-truong", "/quan-ly-bep", "/mon-da-duyet"].includes(location.pathname) && !(isSchoolKitchenReceiver && location.pathname === "/thuc-don") &&
+                !(role === "culture_social_office" && location.pathname === "/thuc-don") && (
                 <Suspense
                   fallback={
                     <div className="loading-grid">
@@ -1401,10 +1567,41 @@ function Shell() {
                     </div>
                   }
                 >
-                  <AdminPanel school={school} />
+                  {isRealSchoolAdmin && location.pathname === "/" ? (
+                    <SchoolDashboard date={date} />
+                  ) : isSchoolKitchenReceiver && location.pathname === "/" ? (
+                    <SchoolReceiverWorkspace schoolId={school.id} schoolName={school.name} date={date} view="overview" />
+                  ) : (
+                    <AdminPanel school={school} />
+                  )}
                 </Suspense>
               )}
               {location.pathname === "/quan-ly-tai-khoan" && role === "school_board" && <UserManagement />}
+              {location.pathname === "/duyet-mon" && role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN" && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <DishApprovalInbox />
+                </Suspense>
+              )}
+              {location.pathname === "/quan-ly-bep" && role === "school_board" && getStoredUser()?.role === "SCHOOL_ADMIN" && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <KitchenManagementPanel />
+                </Suspense>
+              )}
+              {location.pathname === "/quan-ly-truong" && isWardAdminAccount && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <WardSchoolManagement />
+                </Suspense>
+              )}
+              {location.pathname === "/quan-ly-bep-trung-tam" && isWardAdminAccount && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <CentralKitchenManagementPanel />
+                </Suspense>
+              )}
+              {location.pathname === "/mon-da-duyet" && role === "culture_social_office" && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <WardApprovedDishes />
+                </Suspense>
+              )}
               {sharedAdminArea && (
                 <div className="section-toolbar shared-admin-toolbar">
                   <div className="segmented">
@@ -1435,13 +1632,24 @@ function Shell() {
                   </div>
                   <span className="updated">
                     <span />{" "}
-                    {demo
+                    {isAuthenticatedWorkspace ? "Dữ liệu hệ thống · Theo phạm vi tài khoản" : demo
                       ? "Dữ liệu minh họa · Theo phạm vi vai trò"
                       : "Dữ liệu theo phạm vi được cấp"}
                   </span>
                 </div>
               )}
-              {sharedAdminArea && (schoolQuery.isError || query.isError) ? (
+              {role === "culture_social_office" && location.pathname === "/thuc-don" && (
+                <Suspense fallback={<div className="loading-grid"><div className="skeleton" /></div>}>
+                  <BoardingMenuManager
+                    key={`ward-calendar-${school.id}-${week[0]}`}
+                    school={school}
+                    selectedDate={date}
+                    managementScope="ALL"
+                    readOnly
+                  />
+                </Suspense>
+              )}
+              {sharedAdminArea && (schoolQuery.isError || (!isSchoolKitchenReceiver && query.isError)) ? (
                 <div className="error-panel" role="alert">
                   <strong>Chưa tải được thông tin</strong>
                   <p>{(schoolQuery.error ?? query.error)?.message}</p>
@@ -1457,20 +1665,25 @@ function Shell() {
                 </div>
               ) : (
                 <>
+                 {isSchoolKitchenReceiver && location.pathname === "/thuc-don" && (
+                    <Suspense fallback={<div className="loading-grid"><div className="skeleton"/></div>}>
+                      <RealBoardingMenuManager selectedDate={date} readOnly />
+                    </Suspense>
+                  )}
                   {location.pathname === "/giam-sat" && (
                     <SupervisionSection
                       school={school}
                       date={date}
-                      data={supervisionData}
+                      data={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? emptyRealSupervisionDay(date,supervisionMealType) : supervisionData}
                       dailyMenu={supervisionDailyMenuQuery.data}
-                      dailyMenuLoading={supervisionDailyMenuQuery.isLoading}
-                      dailyMenuError={supervisionDailyMenuQuery.isError}
+                      dailyMenuLoading={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? false : supervisionDailyMenuQuery.isLoading}
+                      dailyMenuError={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? false : supervisionDailyMenuQuery.isError}
                       mealType={supervisionMealType}
                       role={role}
                       onMealTypeChange={setSupervisionMealType}
-                      loading={supervisionMealQuery.isLoading}
-                      error={supervisionMealQuery.isError}
-                      onRetry={() => { void supervisionMealQuery.refetch(); }}
+                      loading={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? !school.id : supervisionMealQuery.isLoading}
+                      error={(isSchoolKitchenReceiver || isRealOnSiteKitchen || isRealCentralKitchen) ? false : supervisionMealQuery.isError}
+                      onRetry={() => { if (isSchoolKitchenReceiver || isRealOnSiteKitchen) void schoolQuery.refetch(); else if (isRealCentralKitchen) void realKitchenQuery.refetch(); else void supervisionMealQuery.refetch(); }}
                     />
                   )}
                   {location.pathname === "/ho-so-phap-ly" && (
@@ -1857,7 +2070,7 @@ function Shell() {
               <Sprout size={15} /> Vì những bữa ăn trọn vẹn của con.
             </span>
             <span>
-              {demo ? "DEMO · Dữ liệu và ảnh minh họa" : "Bữa ăn học đường"}
+              {demo && !isAuthenticatedWorkspace ? "DEMO · Dữ liệu và ảnh minh họa" : "Bữa ăn học đường"}
               <i />{" "}
               <button onClick={() => setModal("privacy")}>
                 Quyền riêng tư
@@ -1897,6 +2110,7 @@ function Shell() {
             />
           </label>
           <p className="muted">{dateLabel(date)}</p>
+          <button className="outline full" type="button" onClick={() => setDate(todayInVietnam())}>Chọn hôm nay</button>
           <button className="primary full" onClick={() => setModal(null)}>
             Xem bữa ăn
           </button>
@@ -1914,7 +2128,7 @@ function Shell() {
             />
           </label>
           <div className="search-results">
-            {(schoolQuery.data ?? (demo ? demoSchools : []))
+            {availableSchools
               .filter((s) =>
                 s.name
                   .toLocaleLowerCase("vi")
@@ -2089,15 +2303,9 @@ function Shell() {
             close={() => setModal(null)}
           >
             {modal === "notifications" ? (
-              <div className="empty-state">
-                <Bell size={35} />
-                <h3>Chưa có thông báo</h3>
-                <p>
-                  {demo
-                    ? "Bản demo không gửi hoặc nhận thông báo thật."
-                    : "Đăng nhập để nhận thông báo thuộc phạm vi của bạn."}
-                </p>
-              </div>
+              isAuthenticatedWorkspace
+                ? <NotificationsPanel onClose={() => setModal(null)} />
+                : <div className="empty-state"><Bell size={35}/><h3>Chưa có thông báo</h3><p>Bản demo không gửi hoặc nhận thông báo thật.</p></div>
             ) : modal === "privacy" ? (
               <div className="prose">
                 <p>

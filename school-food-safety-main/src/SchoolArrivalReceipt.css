@@ -1,0 +1,65 @@
+/* Detailed school-delivery receipt. Scoped to the existing supervision modal. */
+.supervision-edit-form .arrival-section{border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0;display:grid;gap:14px;background:var(--surface)}
+.supervision-edit-form .arrival-section legend{padding:0 8px;font-size:13px;font-weight:800;color:var(--text)}
+.supervision-edit-form .arrival-section label{margin:0;min-width:0;display:grid;gap:7px}
+.supervision-edit-form .arrival-section select{width:100%;border:1px solid var(--border);border-radius:9px;padding:12px;background:var(--surface);color:var(--text);font-size:13px;min-height:43px}
+.supervision-edit-form .arrival-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:center}
+.supervision-edit-form .arrival-grid>div{border-radius:9px;background:var(--surface-alt);padding:12px;min-height:60px}
+.supervision-edit-form .arrival-grid small{font-size:11px;color:var(--muted);display:block}
+.supervision-edit-form .arrival-grid strong{display:block;font-size:14px;margin-top:5px;overflow-wrap:anywhere}
+.supervision-edit-form .arrival-help{font-size:12px;color:var(--muted);line-height:1.6}
+.supervision-edit-form .arrival-dish{display:grid;grid-template-columns:minmax(120px,1fr) minmax(150px,1fr) minmax(130px,.75fr);align-items:end;gap:10px;padding:10px 0;border-top:1px solid var(--border)}
+.supervision-edit-form .arrival-dish>strong{font-size:13px;line-height:1.5;align-self:center}
+.supervision-edit-form .arrival-warning{padding:12px;border-radius:9px;background:#fff1dd;color:#80501c;font-size:12px;line-height:1.6}
+.supervision-edit-form .arrival-attestation{display:flex!important;flex-direction:row!important;gap:10px!important;align-items:flex-start!important;padding:12px;background:var(--surface-alt);border-radius:9px;font-size:12px;line-height:1.6;cursor:pointer}
+.supervision-edit-form .arrival-attestation input[type=checkbox]{width:18px!important;height:18px!important;min-width:18px;margin:1px 0 0;padding:0;accent-color:var(--primary)}
+.supervision-edit-form .arrival-attestation span{flex:1}
+[data-theme=dark] .supervision-edit-form .arrival-warning{background:#49371e;color:#ffe0ab}
+@media(max-width:630px){.supervision-edit-form .arrival-grid{grid-template-columns:1fr}.supervision-edit-form .arrival-dish{grid-template-columns:1fr}.supervision-edit-form .arrival-dish>strong{padding-top:5px}}
+
+.arrival-saved{display:grid;gap:8px;padding:10px 0;font-size:12px;line-height:1.6;color:var(--muted)}
+.arrival-saved ul{padding-left:19px;display:grid;gap:4px}
+.arrival-saved-photo{max-height:160px;max-width:100%;object-fit:contain;border-radius:8px}
+
+/* Saved arrival receipt: isolated modal, no longer expands the timeline card. */
+.arrival-open-receipt{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;margin-top:10px;padding:8px 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface-alt);color:var(--primary);font-size:12px;font-weight:750;text-align:left;cursor:pointer}
+.arrival-open-receipt:hover{border-color:var(--primary)}
+.arrival-receipt-backdrop{z-index:1001}
+.arrival-receipt-modal{width:min(820px,calc(100vw - 28px));max-height:min(90dvh,900px);display:flex;flex-direction:column;overflow:hidden;background:var(--surface);color:var(--text);border-radius:17px;box-shadow:0 22px 80px #0b20404d;border:1px solid var(--border)}
+.arrival-receipt-header{display:flex;justify-content:space-between;gap:15px;padding:23px 27px 20px;border-bottom:1px solid var(--border);align-items:flex-start}
+.arrival-receipt-header h2{font-size:22px;line-height:1.4;margin:4px 0}
+.arrival-receipt-header p{font-size:12px;color:var(--muted);line-height:1.6}
+.arrival-receipt-body{overflow:auto;min-height:0;flex:1;padding:22px 27px;display:grid;gap:22px;align-content:start}
+.arrival-receipt-summary{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px}
+.arrival-receipt-summary>div{padding:16px;background:var(--surface-alt);border:1px solid var(--border);border-radius:12px;display:grid;gap:7px;align-content:start}
+.arrival-receipt-summary small{color:var(--muted);font-size:10px;font-weight:750;letter-spacing:.5px}
+.arrival-receipt-summary strong{font-size:18px;line-height:1.35}
+.arrival-receipt-summary .arrival-result-accepted{color:#167143}
+.arrival-receipt-summary .arrival-result-pending{color:#9c6717}
+.arrival-receipt-summary .arrival-result-rejected{color:#b42318}
+.arrival-receipt-section{min-width:0;display:grid;gap:12px}
+.arrival-receipt-section h3{font-size:14px;font-weight:800;padding-bottom:9px;border-bottom:1px solid var(--border)}
+.arrival-receipt-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;row-gap:14px}
+.arrival-receipt-facts>div{display:grid;gap:5px;min-width:0}
+.arrival-receipt-facts span{font-size:11px;color:var(--muted)}
+.arrival-receipt-facts strong{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.arrival-receipt-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+.arrival-receipt-table{border-collapse:collapse;width:100%;font-size:12px;text-align:left}
+.arrival-receipt-table th{background:var(--surface-alt);color:var(--muted);font-size:11px}
+.arrival-receipt-table th,.arrival-receipt-table td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.arrival-receipt-table tbody tr:last-child td{border-bottom:0}
+.arrival-receipt-note{background:var(--surface-alt);padding:14px;border-radius:10px;line-height:1.65;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.arrival-receipt-evidence{display:grid;gap:7px;max-width:480px}
+.arrival-receipt-evidence img{width:100%;max-height:310px;object-fit:contain;background:var(--surface-alt);border:1px solid var(--border);border-radius:11px}
+.arrival-receipt-evidence small{font-size:11px;color:var(--muted)}
+.arrival-receipt-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 27px;border-top:1px solid var(--border);background:var(--surface)}
+.arrival-receipt-footer span{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11px;line-height:1.5}
+@media(max-width:640px){.arrival-receipt-header,.arrival-receipt-body,.arrival-receipt-footer{padding:17px}.arrival-receipt-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.arrival-receipt-summary>div:first-child{grid-column:1/-1}.arrival-receipt-facts{grid-template-columns:1fr}.arrival-receipt-footer{flex-direction:column;align-items:stretch}.arrival-receipt-footer .primary{width:100%}}
+
+/* Review details for BGH before confirming plated / ready stages. */
+.arrival-confirm-review{display:grid;gap:12px;border:1px solid var(--border);background:var(--surface-alt);padding:15px;border-radius:12px;font-size:12px;line-height:1.6}
+.arrival-confirm-review>strong{font-size:14px}
+.arrival-confirm-review .arrival-receipt-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+.arrival-confirm-review ul{padding-left:18px;display:grid;gap:5px}
+.arrival-review-photo{width:100%;max-height:220px;object-fit:contain;border-radius:9px;border:1px solid var(--border)}
+@media(max-width:600px){.arrival-confirm-review .arrival-receipt-facts{grid-template-columns:1fr}}

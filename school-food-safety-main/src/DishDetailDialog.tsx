@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, ArrowRight, CalendarDays, CheckCircle2, ChevronRight, CircleHelp, ClipboardCheck, Clock3, CookingPot, FileCheck2, FileSearch, FileText, Info, Pencil, Scale, ShieldCheck, Truck, Utensils, UsersRound, X } from 'lucide-react'
 import CountUp from './components/react-bits/CountUp'
 import SpotlightCard from './components/react-bits/SpotlightCard'
 import type { MealEvent, PublicInspection, PublicTraceLot } from './lib/data'
 import type { BoardingDish, DishIngredientRecord, KitchenProfile } from './lib/boardingMenu'
 import { dishImage } from './lib/dishImages'
+import { analyzeOfficialRecipe } from './lib/officialFoodNutrition'
+import { defaultAgeBandForGrade } from './lib/schoolNutrition'
+import { previewDishNutrition } from './lib/dishNutritionApi'
+import { getStoredUser } from './lib/authApi'
+import type { BackendNutritionSnapshot } from './lib/dishNutritionApi'
 import IngredientTraceDialog from './IngredientTraceDialog'
 import './DishDetailDialog.css'
 
@@ -39,8 +44,35 @@ export default function DishDetailDialog({ dish, kitchen, linkedLots = [], opera
   const [tab, setTab] = useState<Tab>('portion')
   const [traceIndex, setTraceIndex] = useState(0)
   const [activeIngredient, setActiveIngredient] = useState<DishIngredientRecord | null>(null)
+  const [backendNutrition, setBackendNutrition] = useState<BackendNutritionSnapshot | null>(null)
+  const [nutritionApiError, setNutritionApiError] = useState('')
   useEffect(() => { const node = dialog.current; node?.showModal(); return () => { if (node?.open) node.close() } }, [])
   const records = ingredientsFor(dish)
+  const nutrition = analyzeOfficialRecipe(
+    records.map(item => ({ name: item.name, amount: item.amountPerServing ?? Number.NaN, unit: item.unit })),
+    dish.ageBand ?? defaultAgeBandForGrade(dish.gradeLevel),
+    dish.mealType,
+  )
+  const canUseBackendNutrition = ['CENTRAL_KITCHEN', 'SCHOOL_KITCHEN'].includes(getStoredUser()?.role ?? '')
+  const nutritionInput = useMemo(() => records
+    .filter(item => !!item.inventoryItemId && item.amountPerServing != null && Number.isFinite(item.amountPerServing) && item.amountPerServing > 0)
+    .map(item => ({ ingredientId: item.inventoryItemId!, ingredientName: item.name, quantity: item.amountPerServing!, unitCode: item.unit })), [dish])
+  useEffect(() => {
+    let active = true
+    setBackendNutrition(null)
+    setNutritionApiError('')
+    if (!nutritionInput.length || nutritionInput.length !== records.length || !canUseBackendNutrition) return () => { active = false }
+    previewDishNutrition(nutritionInput)
+      .then(result => { if (active) setBackendNutrition(result) })
+      .catch(error => { if (active) setNutritionApiError(error instanceof Error ? error.message : 'Không lấy được kết quả tính từ máy chủ.') })
+    return () => { active = false }
+  }, [nutritionInput, records.length])
+  const backendCoverage = backendNutrition
+    ? Math.round(backendNutrition.coverage.calculatedCount / Math.max(1, backendNutrition.coverage.ingredientCount) * 100)
+    : null
+  const displayCoverage = backendCoverage ?? nutrition.coverage
+  const displayNutrient = (value: number | null | undefined, fallback: number) =>
+    backendNutrition ? (value == null ? 'Chưa đủ dữ liệu' : fmt(value)) : fmt(fallback)
   const quantityCount = records.filter(item => item.amountPerServing != null).length
   const declaredSourceCount = records.filter(item => item.supplier.trim() && item.lotCode.trim()).length
   const safety = dish.safetyMonitoring
@@ -95,6 +127,21 @@ export default function DishDetailDialog({ dish, kitchen, linkedLots = [], opera
         {tab === 'portion' && <section className="dish-info-section" aria-labelledby="dish-portion-title">
           <div className="dish-info-section-head"><span className="dish-info-section-icon"><Scale size={19}/></span><div><h3 id="dish-portion-title">Bảng định lượng theo khẩu phần</h3><p>Khối lượng nguyên liệu dự kiến cho 1 học sinh và nhu cầu của toàn bộ suất ăn</p></div></div>
           <div className="dish-info-metrics"><div><span>Khối lượng món / suất</span><strong>{portionLabel}</strong></div><div><span>Nguyên liệu có định lượng</span><strong>{quantityCount}/{records.length}</strong></div></div>
+          <section className="dish-info-nutrition" aria-labelledby="dish-nutrition-title">
+            <header><div><span className="section-kicker">DINH DƯỠNG THAM KHẢO</span><h4 id="dish-nutrition-title">Ước tính thành phần dinh dưỡng / suất</h4><p>Đối chiếu đúng tên thực phẩm với dữ liệu Phụ lục 7 Quyết định 3958/QĐ-BYT.</p></div><span className={backendNutrition?.coverage.complete || (!backendNutrition && nutrition.isComplete) ? 'dish-info-nutrition-status complete' : 'dish-info-nutrition-status partial'}>{displayCoverage}% đối chiếu</span></header>
+            <div className="dish-info-nutrition-values">
+              <div className="energy"><small>Năng lượng</small><strong>{displayNutrient(backendNutrition?.totals.energyKcal, nutrition.energy)} <em>kcal</em></strong></div>
+              <div><small>Đạm</small><strong>{displayNutrient(backendNutrition?.totals.proteinG, nutrition.totals.protein)} <em>g</em></strong></div>
+              <div><small>Chất béo</small><strong>{displayNutrient(backendNutrition?.totals.fatG, nutrition.totals.fat)} <em>g</em></strong></div>
+              <div><small>Bột đường</small><strong>{displayNutrient(backendNutrition?.totals.carbohydrateG, nutrition.totals.carbohydrate)} <em>g</em></strong></div>
+              <div><small>Chất xơ</small><strong>{displayNutrient(backendNutrition?.totals.fiberG, nutrition.totals.fiber)} <em>g</em></strong></div>
+              <div><small>Canxi</small><strong>{displayNutrient(backendNutrition?.totals.calciumMg, nutrition.totals.calcium)} <em>mg</em></strong></div>
+              <div><small>Sắt</small><strong>{displayNutrient(backendNutrition?.totals.ironMg, nutrition.totals.iron)} <em>mg</em></strong></div>
+            </div>
+            {(backendNutrition ? backendNutrition.ingredients.filter(item => item.status === 'CALCULATED') : nutrition.matched).length > 0 && <div className="dish-info-nutrition-matched"><strong>Nguyên liệu đã đối chiếu ({backendNutrition ? backendNutrition.ingredients.filter(item => item.status === 'CALCULATED').length : nutrition.matched.length})</strong><ul>{backendNutrition ? backendNutrition.ingredients.filter(item => item.status === 'CALCULATED').map((item, index) => <li key={`${item.ingredientName}-${index}`}><span>{item.ingredientName}</span><span>{fmt(item.edibleWeightG ?? 0)} g phần ăn được · dòng {item.sourceRowNo ?? '—'}</span></li>) : nutrition.matched.map((item, index) => <li key={`${item.name}-${index}`}><span>{item.name}</span><span>{fmt(item.amount)} g · dòng {item.appendixRow}</span></li>)}</ul></div>}
+            {(backendNutrition ? backendNutrition.warnings : nutrition.missing).length > 0 && <div className="dish-info-nutrition-warning"><AlertCircle size={16}/><div><strong>Chưa tính đủ toàn bộ nguyên liệu</strong><ul>{(backendNutrition ? backendNutrition.warnings : nutrition.missing).map((item, index) => <li key={index}>{item}</li>)}</ul></div></div>}
+            <p className="dish-info-nutrition-note"><Info size={14}/>{backendNutrition ? `Đã tính từ API backend theo dữ liệu Phụ lục 7 trong cơ sở dữ liệu. Nguồn: ${backendNutrition.reference?.documentNo ?? 'Quyết định 3958/QĐ-BYT'}, ${backendNutrition.reference?.appendix ?? 'Phụ lục 7'}. ` : nutritionApiError ? `Chưa lấy được kết quả backend (${nutritionApiError}); đang hiển thị ước tính tĩnh trên giao diện. ` : !canUseBackendNutrition ? 'Chưa đăng nhập bằng tài khoản bếp; đang hiển thị ước tính tham khảo trên giao diện. ' : !nutritionInput.length ? 'Chưa có nguyên liệu đủ định lượng để gửi backend tính toán. ' : nutritionInput.length !== records.length ? 'Còn nguyên liệu thiếu định lượng; không gửi công thức chưa đầy đủ lên backend. ' : 'Đang lấy kết quả tính từ backend; tạm hiển thị ước tính giao diện. '}Không tự quy đổi ml thành g; chưa tính hao hụt, gia vị hoặc hệ số chế biến. Không coi dữ liệu thiếu là 0 và không dùng để kết luận dinh dưỡng của toàn bữa.</p>
+          </section>
           {records.length ? <div className="dish-info-table-scroll"><table className="dish-info-table"><thead><tr><th>Nguyên liệu</th><th>1 suất</th><th>{fmt(dish.expectedQuantity)} suất (dự kiến)</th></tr></thead><tbody>{records.map((item, index) => <tr key={`${item.name}-${index}`}><td><button type="button" className="dish-ingredient-link" onClick={() => setActiveIngredient(item)} title={`Xem nhà cung cấp và truy xuất nguồn gốc ${item.name}`}><FileSearch size={15}/>{item.name}<ChevronRight size={13}/></button></td><td>{item.amountPerServing != null ? `${fmt(item.amountPerServing)} ${item.unit}` : 'Chưa cập nhật'}</td><td>{item.amountPerServing != null ? `${fmt(item.amountPerServing * dish.expectedQuantity / 1000)} ${item.unit === 'g' ? 'kg' : 'lít'}` : '—'}</td></tr>)}</tbody></table></div> : <p className="dish-info-empty">Chưa có bảng nguyên liệu và định lượng.</p>}
           <p className="dish-info-hint"><Info size={14}/> Các số liệu là ước tính theo kế hoạch. Khối lượng món chín không nhất thiết bằng tổng khối lượng nguyên liệu đầu vào; chưa có định mức thì không tính tổng giả định.</p>
         </section>}

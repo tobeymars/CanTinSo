@@ -1,0 +1,59 @@
+.sif-form{display:grid;gap:16px;margin:8px 0;padding:16px;border:1px solid #d9e3ef;border-radius:14px;background:#f7faff;min-width:0}
+.sif-form>legend{font-weight:800;padding:0 9px;color:#233a59;font-size:14px}
+.sif-form>.muted{line-height:1.6}
+.sif-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;min-width:0}
+.sif-form label{display:grid;gap:7px;min-width:0;font-size:13px;font-weight:650;color:#243b58}
+.sif-form :is(input:not([type=radio]),select,textarea){width:100%;max-width:100%;min-width:0;box-sizing:border-box;border:1px solid #cbd9e8;border-radius:9px;background:#fff;padding:11px 12px;color:#132b46;line-height:1.45;font:inherit;font-size:14px}
+.sif-form input[type=radio]{width:17px;height:17px;accent-color:#245bc4;flex:none}
+.sif-form :is(input,select,textarea):focus-visible{outline:3px solid #99baf0;outline-offset:1px}
+.sif-dish{display:grid;gap:14px;padding:17px;border:1px solid #d7e2ee;border-radius:12px;background:#fff;min-width:0}
+.sif-dish header{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding-bottom:11px;border-bottom:1px solid #edf2f7}
+.sif-dish header strong{font-size:15px;line-height:1.5;overflow-wrap:anywhere}
+.sif-step{font-size:12px;font-weight:750;padding:5px 9px;background:#e8f0ff;border-radius:50px;color:#23539a}
+.sif-evaluations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sif-choice{min-width:0;padding:11px 12px;border:1px solid #dce6f0;border-radius:10px}
+.sif-choice legend{font-size:12px;font-weight:700;padding:0 4px;color:#2e4765}
+.sif-choice>div{display:flex;flex-wrap:wrap;gap:18px}
+.sif-choice label{display:inline-flex;align-items:center;gap:7px;font-weight:500;cursor:pointer}
+.sif-warning{padding:12px 14px;border:1px solid #f1c5a0;border-radius:10px;color:#85480a;background:#fff5eb;font-size:13px;line-height:1.6}
+.sif-guidance{padding:12px 14px;border:1px solid #cfdceb;border-radius:10px;background:#edf4ff;color:#284463;font-size:13px;line-height:1.6}
+.sif-readout{display:grid;gap:14px;margin:12px 0;min-width:0}
+.sif-readout>h3{font-size:15px}
+.sif-readout>p{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.sif-readout article{padding:14px;border:1px solid #dce5ef;border-radius:10px;background:#fff;min-width:0}
+.sif-readout article>strong{display:block;overflow-wrap:anywhere;margin-bottom:12px}
+.sif-readout dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
+.sif-readout dl>div{min-width:0}
+.sif-readout dt{color:#62748b;font-size:12px}
+.sif-readout dd{font-size:13px;font-weight:600;overflow-wrap:anywhere;margin:3px 0 0}
+@media(max-width:680px){.sif-form{padding:12px}.sif-dish{padding:12px}.sif-grid,.sif-evaluations,.sif-readout dl{grid-template-columns:1fr}}
+
+.sif-report-details{margin:10px 0;padding:10px 12px;border:1px solid #d6e2ef;border-radius:10px;background:#f8fbff;min-width:0}
+.sif-report-details summary{cursor:pointer;font-size:13px;font-weight:750;color:#2457a0;line-height:1.5}
+.sif-report-details ol{margin:10px 0 0;padding-left:20px;font-size:13px;line-height:1.7}
+.sif-lifecycle{display:grid;gap:14px;min-width:0;margin-top:16px;padding:clamp(13px,2vw,22px);border:1px solid #d7e2ee;border-radius:14px;background:#f8fbff}
+.sif-lifecycle header strong{font-size:16px}
+.sif-lifecycle header p{font-size:13px;line-height:1.6;color:#52657e;margin-top:5px}
+.sif-lifecycle-items{display:grid;gap:9px}
+.sif-lifecycle-items article{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:13px;border:1px solid #dce5ef;border-radius:10px;background:#fff}
+.sif-lifecycle-items article>div{display:grid;gap:5px;min-width:0}
+.sif-lifecycle-items strong{font-size:14px;overflow-wrap:anywhere}
+.sif-lifecycle-items small{font-size:12px;color:#52657e;line-height:1.6;overflow-wrap:anywhere}
+.sif-lifecycle-items article>div:last-child{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.sif-complete{color:#186b50;font-size:12px;font-weight:650;overflow-wrap:anywhere}
+.sif-lifecycle-form{display:grid;gap:12px;padding:14px;border:1px solid #cadbef;background:#fff;border-radius:12px}
+.sif-lifecycle-form label{display:grid;gap:6px;font-size:13px;font-weight:650;min-width:0}
+.sif-lifecycle-form :is(input:not([type=checkbox]),textarea){width:100%;min-width:0;box-sizing:border-box;border:1px solid #cbd7e6;border-radius:9px;padding:10px;font:inherit;color:#132b46}
+.sif-lifecycle-form .sif-checkbox{display:flex;align-items:flex-start;gap:10px;font-weight:550;line-height:1.5}
+.sif-checkbox input{flex:none;width:17px;height:17px;margin:3px 0 0}
+.sif-lifecycle-form>div:last-child{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+@media(max-width:640px){.sif-lifecycle-items article{align-items:stretch}.sif-lifecycle-items article>div:last-child{justify-content:flex-start}}
+
+.sif-intake-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-top:13px;padding:14px;background:#f7faff;border:1px solid #dde7f1;border-radius:12px;min-width:0}
+.sif-intake-checks__wide{grid-column:1/-1}
+.sif-intake-checks>label{min-width:0;font-size:13px;display:grid;gap:7px}
+.sif-intake-checks :is(input:not([type=radio]),textarea){width:100%;max-width:100%;min-width:0;box-sizing:border-box;border:1px solid #cbd9e8;border-radius:9px;padding:10px;font:inherit;font-size:14px;background:#fff}
+@media(max-width:680px){.sif-intake-checks{grid-template-columns:1fr}.sif-intake-checks__wide{grid-column:1}}
+
+.sif-skip{display:flex!important;align-items:flex-start;gap:10px;font-size:13px;line-height:1.6;border:1px solid #d1dfef;border-radius:11px;background:#f2f7ff;padding:13px}
+.sif-skip input{margin-top:3px;flex:none;width:17px;height:17px;accent-color:#245bc4}

@@ -26,6 +26,7 @@ export type DishIngredientRecord = {
   /** Mã nguyên liệu/lô thực sự đã chọn trong kho DEMO; không suy đoán từ tên. */
   inventoryItemId?: string
   name: string
+  ingredientCode?: string
   amountPerServing: number | null
   unit: 'g' | 'ml'
   supplier: string
@@ -83,6 +84,7 @@ export type KitchenDishProposal = {
   /** Nhóm lớp áp dụng; dữ liệu cũ chưa có trường này vẫn tải được. */
   ageBand?: SchoolAgeBand
   id: string
+  code?: string
   schoolId: string
   kitchenId: string
   createdBy: 'central_kitchen' | 'school_kitchen'
@@ -98,7 +100,7 @@ export type KitchenDishProposal = {
   safetyMonitoring: DishSafetyMonitoring
   createdAt: string
   updatedAt: string
-  demo: true
+  demo: boolean
 }
 export const KITCHEN_DISH_PROPOSALS_KEY = 'demo-kitchen-dish-proposals-v1'
 

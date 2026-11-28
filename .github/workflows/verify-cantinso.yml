@@ -1,0 +1,48 @@
+name: Verify CanTinSo build
+on:
+  push:
+    branches:
+      - feature/ubnd-ward-school-access
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cantinso-backend
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/cantinso?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cantinso-backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma validate
+      - run: npx prisma generate
+      - run: npm run test:units
+      - run: npm run test:supervision-dates
+      - run: npm run test:supervision-food
+      - run: npm run build
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: school-food-safety-main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: school-food-safety-main/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:units
