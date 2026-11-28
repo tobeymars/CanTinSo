@@ -36,20 +36,19 @@ export default function DishApprovalInbox() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [reasons, setReasons] = useState<Record<string, string>>({})
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError('') }
     try {
       const result = await api<Approval[]>('/dishes/pending-approvals')
       setItems(result)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không tải được danh sách món chờ duyệt.')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
   useEffect(() => { if (getStoredUser()?.role === 'SCHOOL_ADMIN') void load(); else { setLoading(false); setError('Chức năng này chỉ dành cho tài khoản Ban Giám hiệu.') } }, [load])
-  useEffect(() => { const refresh = () => { if (getStoredUser()?.role === 'SCHOOL_ADMIN') void load() }; window.addEventListener('cantinso:business-updated', refresh); return () => window.removeEventListener('cantinso:business-updated', refresh) }, [load])
+  useEffect(() => { const refresh = () => { if (getStoredUser()?.role === 'SCHOOL_ADMIN') void load(true) }; window.addEventListener('cantinso:business-updated', refresh); return () => window.removeEventListener('cantinso:business-updated', refresh) }, [load])
   const decide = async (item: Approval, decision: 'approve' | 'return') => {
     const reason = reasons[item.id]?.trim() ?? ''
     if (decision === 'return' && !reason) { setError('Vui lòng nhập lý do trả lại món để bếp biết nội dung cần chỉnh sửa.'); return }
