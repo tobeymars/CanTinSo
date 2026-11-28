@@ -5,6 +5,15 @@ import * as bcrypt from 'bcrypt';
 @Injectable()
 export class AuthService {
  constructor(private prisma: PrismaService, private jwt: JwtService) {}
+ async profile(id: string) {
+  const user=await this.prisma.user.findUnique({
+    where:{id},
+    select:{id:true,email:true,fullName:true,role:true,schoolId:true,kitchenId:true,wardId:true,isActive:true},
+  });
+  if(!user?.isActive)throw new UnauthorizedException('Tài khoản không hoạt động');
+  const {isActive,...profile}=user;
+  return profile;
+ }
  async login(email: string, password: string) {
   const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
   if (!user || !user.isActive || !(await bcrypt.compare(password, user.passwordHash))) throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
