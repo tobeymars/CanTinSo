@@ -12,13 +12,14 @@ import {
 } from '@prisma/client';
 import { AuthUser } from '../common/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateDishDto } from './dto/create-dish.dto';
 import { CreateDishVersionDto } from './dto/create-dish-version.dto';
 import { PreviewDishNutritionDto } from './dto/preview-dish-nutrition.dto';
 
 @Injectable()
 export class DishesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,private readonly notifications: NotificationsService) {}
 
   private requireKitchenUser(user: AuthUser): string {
     if (
@@ -547,7 +548,7 @@ export class DishesService {
       throw new ForbiddenException('Có trường không nằm trong phân công bếp còn hiệu lực.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result=await this.prisma.$transaction(async (tx) => {
       await tx.dishVersion.update({
         where: { id: versionId },
         data: { status: DishVersionStatus.SUBMITTED, submittedAt: now },
@@ -578,6 +579,12 @@ export class DishesService {
       }
       return approvals;
     });
+    for(const approval of result){
+      await this.notifications.forSchool('dish-submitted:'+approval.id,approval.schoolId,'DISH_SUBMITTED',
+        'Món ăn chờ duyệt','Bếp đã gửi công thức món ăn để Ban Giám hiệu xem xét.',
+        '/duyet-mon',user.sub,'SCHOOL_ADMIN');
+    }
+    return result;
   }
 
   async listWardApproved(user: AuthUser) {
@@ -656,7 +663,7 @@ export class DishesService {
       ? DishApprovalEventType.APPROVED
       : DishApprovalEventType.RETURNED;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result=await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.dishApproval.updateMany({
         where: { id: approvalId, schoolId, status: DishApprovalStatus.PENDING },
         data: {
@@ -690,5 +697,12 @@ export class DishesService {
       });
       return updated;
     });
+    await this.notifications.forSchool('dish-decision:'+approvalId+':'+decision,result.schoolId,
+      'DISH_'+decision,
+      decision==='APPROVED'?'Món ăn đã được duyệt':'Món ăn cần chỉnh sửa',
+      decision==='APPROVED'?'Ban Giám hiệu đã duyệt công thức '+result.dishVersion.dish.name+'.':
+        'Ban Giám hiệu đã trả lại công thức '+result.dishVersion.dish.name+'.',
+      '/tao-mon-dinh-duong',user.sub,'CENTRAL_KITCHEN');
+    return result;
   }
 }
