@@ -66,6 +66,7 @@ import { fetchMyKitchenContext } from "./lib/myKitchenApi";
 import type { ViewRole } from "./lib/store";
 import "./App.css";
 import AuthGate, { AuthSessionProfile } from "./AuthGate";
+import { NotificationBell, NotificationsPanel } from "./NotificationsCenter";
 import UserManagement from "./UserManagement";
 import MobileNavigation from "./MobileNavigation";
 import Select from "./components/ui/Select";
@@ -1369,14 +1370,9 @@ function Shell() {
             >
               {dark ? <Sun size={19} /> : <Moon size={19} />}
             </button>
-            <button
-              className="icon-button notification-button"
-              aria-label="Thông báo"
-              onClick={() => setModal("notifications")}
-            >
-              <Bell size={19} />
-              <i />
-            </button>
+            {isAuthenticatedWorkspace
+              ? <NotificationBell onOpen={() => setModal("notifications")} />
+              : <button className="icon-button notification-button" aria-label="Thông báo" onClick={() => setModal("notifications")}><Bell size={19}/></button>}
             <span className="top-divider" />
             <button
               className="avatar small"
@@ -2307,15 +2303,9 @@ function Shell() {
             close={() => setModal(null)}
           >
             {modal === "notifications" ? (
-              <div className="empty-state">
-                <Bell size={35} />
-                <h3>Chưa có thông báo</h3>
-                <p>
-                  {demo
-                    ? "Bản demo không gửi hoặc nhận thông báo thật."
-                    : "Đăng nhập để nhận thông báo thuộc phạm vi của bạn."}
-                </p>
-              </div>
+              isAuthenticatedWorkspace
+                ? <NotificationsPanel onClose={() => setModal(null)} />
+                : <div className="empty-state"><Bell size={35}/><h3>Chưa có thông báo</h3><p>Bản demo không gửi hoặc nhận thông báo thật.</p></div>
             ) : modal === "privacy" ? (
               <div className="prose">
                 <p>
