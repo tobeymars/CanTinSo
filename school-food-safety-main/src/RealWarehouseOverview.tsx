@@ -46,8 +46,20 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
   {Icon:Truck,title:'Phiếu nhập có giá',value:String(finance?.receipts.length??0),detail:'Phiếu nhập đã ghi nhận',target:'receipts' as const},
   {Icon:ClipboardList,title:'Nhật ký nhập / xuất',value:String(receiptEvents.length+issueEvents.length),detail:'200 sự kiện gần nhất',target:'trace' as const},
  ];
- const totals=new Map<string,{unit:string;name:string;quantity:number}>()
- for(const lot of lots){const key=lot.ingredientId+'|'+lot.unit;const current=totals.get(key);if(current)current.quantity+=lot.remainingQty;else totals.set(key,{name:lot.ingredient.name,unit:lot.unit,quantity:lot.remainingQty})}
+ const totals=new Map<string,{unit:string;name:string;quantity:number;available:number;unavailable:number;lotCount:number}>()
+ for(const lot of lots){
+   const key=lot.ingredientId+'|'+lot.unit
+   const current=totals.get(key)??{name:lot.ingredient.name,unit:lot.unit,quantity:0,available:0,unavailable:0,lotCount:0}
+   const quantity=Math.max(0,lot.remainingQty)
+   const canIssue=lot.status==='AVAILABLE'&&quantity>0&&(!lot.expiryDate||lot.expiryDate.slice(0,10)>=now)
+   current.quantity+=quantity
+   if(canIssue)current.available+=quantity
+   else current.unavailable+=quantity
+   current.lotCount++
+   totals.set(key,current)
+ }
+ const totalsRows=[...totals.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi'))
+ const quantityLabel=(value:number,unit:string)=>readableStockQuantity(value,unit)
  return <div className="supply-overview">
   <div className="warehouse-kpis supply-overview-kpis">
    {stats.map(({Icon,title,value,detail,target})=><button type="button" className="card supply-overview-kpi" key={title} onClick={()=>onOpen(target)}>
@@ -61,12 +73,22 @@ export default function RealWarehouseOverview({lots,movements,finance,minimums,o
     <button type="button" className="outline" onClick={()=>onOpen('stock')}>Kiểm tra tồn kho</button>
   </section>}
   {expired.length>0&&<section className="card supply-panel supply-warning-panel"><strong>Chú ý: Có {expired.length} lô quá hạn</strong><p className="muted">Không được xuất các lô quá hạn. Kiểm tra và xử lý theo quy trình cách ly.</p><button type="button" className="outline" onClick={()=>onOpen('lots')}>Xem lô cần xử lý</button></section>}
-  <section className="card supply-panel">
-   <header className="card-header"><div><div className="section-kicker">TỒN KHO THEO NGUYÊN LIỆU</div><h3>Danh sách tổng hợp</h3><p className="muted">Chỉ cộng số lượng cùng nguyên liệu và cùng đơn vị tính.</p></div></header>
-   <div className="supply-table-scroll"><table className="management-table supply-table"><thead><tr><th>Nguyên liệu</th><th>Đơn vị lưu kho</th><th>Tồn (hiển thị)</th></tr></thead><tbody>
-    {[...totals.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi')).map((row,index)=><tr key={index}><td>{row.name}</td><td>{row.unit}</td><td>{readableStockQuantity(row.quantity,row.unit)}</td></tr>)}
-   </tbody></table></div>
-   {!totals.size&&<p className="muted">Chưa có nguyên liệu nào được nhập vào bếp.</p>}
+  <section className="card supply-panel supply-ingredient-summary">
+   <header className="card-header"><div><div className="section-kicker">TỒN KHO THEO NGUYÊN LIỆU</div><h3>Tổng hợp tồn kho</h3><p className="muted">Số lượng theo từng nguyên liệu, chỉ cộng các lô cùng đơn vị. Hàng cách ly, quá hạn không tính vào lượng có thể xuất.</p></div>
+    <span className="supply-ingredient-summary__count">{totalsRows.length} nguyên liệu</span>
+   </header>
+   <div className="supply-table-scroll"><table className="management-table supply-table supply-ingredient-summary__table">
+    <thead><tr><th scope="col">Nguyên liệu</th><th scope="col">Đơn vị kho</th><th scope="col">Tổng tồn thực tế</th><th scope="col">Có thể xuất</th><th scope="col">Chưa thể xuất</th></tr></thead>
+    <tbody>{totalsRows.map(row=><tr key={row.name+'|'+row.unit}>
+      <td><strong className="supply-ingredient-summary__name">{row.name}</strong><small>{row.lotCount} lô hàng</small></td>
+      <td><span className="supply-ingredient-summary__unit">{row.unit}</span></td>
+      <td className="supply-ingredient-summary__number"><strong>{quantityLabel(row.quantity,row.unit)}</strong>{row.quantity===0&&<small>Đã hết tồn</small>}</td>
+      <td className="supply-ingredient-summary__number"><span className={row.available>0?'supply-ingredient-summary__available':''}>{quantityLabel(row.available,row.unit)}</span></td>
+      <td className="supply-ingredient-summary__number">{row.unavailable>0?<span className="supply-ingredient-summary__blocked">{quantityLabel(row.unavailable,row.unit)}</span>:<span className="supply-ingredient-summary__zero">—</span>}</td>
+    </tr>)}</tbody>
+   </table></div>
+   {!totalsRows.length&&<p className="muted">Chưa có nguyên liệu nào được nhập vào bếp.</p>}
+   {totalsRows.length>0&&<p className="supply-ingredient-summary__note">Tổng tồn là số lượng vật lý còn trong kho. “Chưa thể xuất” bao gồm hàng đang cách ly, tạm ngưng hoặc quá hạn; xem mục Lô hàng để biết nguyên nhân cụ thể.</p>}
   </section>
  </div>
 }
