@@ -25,10 +25,10 @@ export default function RealBoardingMenuManager({selectedDate,onSelectDate,readO
  const [historyPlan,setHistoryPlan]=useState<{id:string;date:string;meal:string;school:string}|null>(null),[historyRows,setHistoryRows]=useState<MealPlanRevisionHistory[]>([]),[historyLoading,setHistoryLoading]=useState(false),[historyError,setHistoryError]=useState('');
  const [groups,setGroups]=useState<MealAgeGroup[]>([]),[plans,setPlans]=useState<MealPlanRow[]>([]),[schools,setSchools]=useState<Array<{id:string;name:string}>>([]),[dishes,setDishes]=useState<ApprovedDishOption[]>([]);
  const [schoolId,setSchoolId]=useState(user?.schoolId??''),[ageId,setAgeId]=useState(''),[week,setWeek]=useState(monday(selectedDate)),[servings,setServings]=useState<Record<string,string>>({}),[chosen,setChosen]=useState<Record<string,string[]>>({}),[notes,setNotes]=useState<Record<string,string>>({}),[picker,setPicker]=useState<string|null>(null),[dishQuery,setDishQuery]=useState('');
- const refresh=async()=>{setLoading(true);setError('');try{const d=await loadMealPlanWorkspace();setGroups(d.ageGroups);setPlans(d.plans);setSchools(d.schools);setDishes(d.dishes);if(!schoolId){if(user?.schoolId)setSchoolId(user.schoolId);else if(d.schools[0])setSchoolId(d.schools[0].id)}if(!ageId&&d.ageGroups[0])setAgeId(d.ageGroups[0].id)}catch(e){setError(e instanceof Error?e.message:'Không tải được dữ liệu thực đơn.')}finally{setLoading(false)}};
+ const refresh=async(silent=false)=>{if(!silent){setLoading(true);setError('')}try{const d=await loadMealPlanWorkspace();setGroups(d.ageGroups);setPlans(d.plans);setSchools(d.schools);setDishes(d.dishes);if(!schoolId){if(user?.schoolId)setSchoolId(user.schoolId);else if(d.schools[0])setSchoolId(d.schools[0].id)}if(!ageId&&d.ageGroups[0])setAgeId(d.ageGroups[0].id)}catch(e){setError(e instanceof Error?e.message:'Không tải được dữ liệu thực đơn.')}finally{if(!silent)setLoading(false)}};
  useEffect(()=>{void refresh()},[]);
  useEffect(()=>{
-   const onBusinessUpdate=()=>{void refresh()};
+   const onBusinessUpdate=()=>{void refresh(true)};
    window.addEventListener('cantinso:business-updated',onBusinessUpdate);
    return ()=>window.removeEventListener('cantinso:business-updated',onBusinessUpdate);
  },[schoolId,ageId]);
