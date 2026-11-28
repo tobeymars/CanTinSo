@@ -123,6 +123,7 @@ model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   passwordHash String   @map("password_hash")
+  notifications UserNotification[]
   fullName     String   @map("full_name")
   role         UserRole @default(SCHOOL_STAFF)
   isActive     Boolean  @default(true) @map("is_active")
@@ -1034,4 +1035,22 @@ model InventoryDisposal {
   @@unique([kitchenId,number])
   @@index([lotId,status])
   @@map("inventory_disposals")
+}
+
+/** Persistent inbox rows. Every row belongs to one recipient; never expose globally. */
+model UserNotification {
+  id String @id @default(uuid()) @db.Uuid
+  recipientId String @map("recipient_id") @db.Uuid
+  recipient User @relation(fields:[recipientId],references:[id],onDelete:Cascade)
+  eventKey String @unique @map("event_key")
+  kind String
+  title String
+  body String
+  targetPath String @map("target_path")
+  schoolId String? @map("school_id") @db.Uuid
+  kitchenId String? @map("kitchen_id") @db.Uuid
+  readAt DateTime? @map("read_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([recipientId,readAt,createdAt])
+  @@map("user_notifications")
 }
