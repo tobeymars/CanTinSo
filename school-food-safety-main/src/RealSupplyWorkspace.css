@@ -538,3 +538,72 @@
 @media(max-width:370px){
  .supply-finance-modal .supply-finance-kpis{grid-template-columns:1fr!important}
 }
+
+
+/* Bảng tổng hợp tồn kho: phân biệt tồn vật lý và tồn đủ điều kiện xuất. */
+.supply-workspace .supply-ingredient-summary{
+  gap:17px;
+  padding:21px!important;
+  border:1px solid #dce5ef;
+  border-radius:17px;
+  box-shadow:0 3px 12px #142d4e08;
+  min-width:0;
+}
+.supply-ingredient-summary>.card-header{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;margin:0!important;padding:0!important;
+}
+.supply-ingredient-summary>.card-header>div{min-width:0}
+.supply-ingredient-summary>.card-header h3{font-size:19px;letter-spacing:-.025em;line-height:1.4}
+.supply-ingredient-summary>.card-header p{margin-top:4px;max-width:780px}
+.supply-ingredient-summary__count{
+  white-space:nowrap;padding:8px 12px;border:1px solid #dce8f7;
+  border-radius:999px;background:#f2f7fd;color:#28518b;
+  font-size:12px;font-weight:750;
+}
+.supply-workspace .supply-ingredient-summary__table{
+  min-width:780px!important;width:100%!important;
+  table-layout:auto!important;
+}
+.supply-ingredient-summary__table :is(th,td){
+  padding:14px 17px!important;
+  vertical-align:middle!important;
+  word-break:normal!important;
+}
+.supply-ingredient-summary__table th{
+  font-size:12px;white-space:nowrap!important;
+  background:#f3f7fd;
+}
+.supply-ingredient-summary__table th:first-child{min-width:210px}
+.supply-ingredient-summary__table th:nth-child(2){min-width:105px}
+.supply-ingredient-summary__table :is(th,td):nth-child(n+3){
+  text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap!important;
+}
+.supply-ingredient-summary__table tbody tr:hover{background:#f8fbff}
+.supply-ingredient-summary__table td:first-child{
+  color:#142c4c;min-width:210px;
+}
+.supply-ingredient-summary__table td:first-child small,
+.supply-ingredient-summary__table td:nth-child(3) small{
+  display:block;margin-top:3px;font-size:11px;color:#718199;font-weight:500;
+}
+.supply-ingredient-summary__name{font-size:13.5px;line-height:1.5;font-weight:750}
+.supply-ingredient-summary__unit{
+  display:inline-block;min-width:34px;padding:4px 8px;
+  border-radius:7px;background:#eff4fa;color:#45617d;
+  text-align:center;font-size:12px;font-weight:700;
+}
+.supply-ingredient-summary__number{font-size:13.5px;font-weight:700}
+.supply-ingredient-summary__available{color:#166c52}
+.supply-ingredient-summary__blocked{color:#a3591b}
+.supply-ingredient-summary__zero{color:#9aa6b6}
+.supply-ingredient-summary__note{
+  font-size:12px;line-height:1.65;color:#5b6e84;
+  padding:12px 14px;border-radius:10px;
+  background:#f6f9fd;
+}
+@media(max-width:650px){
+ .supply-workspace .supply-ingredient-summary{padding:15px!important}
+ .supply-ingredient-summary__table :is(th,td){padding:12px 13px!important}
+ .supply-ingredient-summary__count{font-size:11px}
+}
