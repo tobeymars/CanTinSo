@@ -68,6 +68,17 @@ export default function KitchenDishCatalog({ school, role }: { school: School; r
     })
     return () => { active = false }
   }, [school.id, role, isKitchen, storedUser?.kitchenId, storedUser?.role])
+  useEffect(() => {
+    if (!isKitchen || !storedUser?.kitchenId) return;
+    let active=true;
+    const onBusinessUpdate=()=>{
+      void listKitchenDishes(school.id,role as 'central_kitchen'|'school_kitchen')
+        .then(items=>{if(active)setProposals(items)})
+        .catch(reason=>{if(active)setError(reason instanceof Error?reason.message:'Không thể cập nhật danh mục món.')});
+    };
+    window.addEventListener('cantinso:business-updated',onBusinessUpdate);
+    return ()=>{active=false;window.removeEventListener('cantinso:business-updated',onBusinessUpdate)};
+  },[school.id,role,isKitchen,storedUser?.kitchenId]);
   useEffect(() => { setPage(1); setDetail(null); setDeleting(null); setEditor(null); setSuccess(''); setError('') }, [school.id, role])
   const own = useMemo(() => proposals.filter(item => !isKitchen || item.createdBy === role), [proposals, role, isKitchen])
   const rows = useMemo(() => {
