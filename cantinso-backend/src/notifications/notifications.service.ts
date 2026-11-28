@@ -52,7 +52,7 @@ export class NotificationsService {
   }
   async forSchool(eventKey:string,schoolId:string,kind:string,title:string,body:string,targetPath:string,excludeId:string,recipientRole:'SCHOOL_ADMIN'|'CENTRAL_KITCHEN'|'SCHOOL_KITCHEN'='SCHOOL_ADMIN'){
     try {
-    const school=await this.prisma.school.findUnique({where:{id:schoolId},select:{id:true}});
+    const school=await this.prisma.school.findUnique({where:{id:schoolId},select:{id:true,name:true}});
     if(!school)return;
     let ids:string[]=[];
     if(recipientRole==='SCHOOL_ADMIN'){
@@ -72,7 +72,7 @@ export class NotificationsService {
       ids=rows.map(x=>x.id);
     }
     await this.send(ids.map(recipientId=>({recipientId,eventKey:eventKey+':'+recipientId,
-      kind,title,body,targetPath,schoolId})));
+      kind,title,body:body+' · '+school.name,targetPath,schoolId})));
     } catch(error) {
       this.logger.error('Could not determine notification recipients',error);
     }
