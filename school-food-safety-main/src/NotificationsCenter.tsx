@@ -5,6 +5,7 @@ import { Bell, CheckCheck, CircleCheck, RefreshCw } from 'lucide-react';
 import { getAccessToken, getStoredUser } from './lib/authApi';
 import { loadNotifications, readAllNotifications, readNotification, streamNotifications } from './lib/notificationsApi';
 import './NotificationsCenter.css';
+import { useUI } from './lib/store';
 
 const inboxKey=(id:string)=>['account-notifications',id];
 export function NotificationBell({onOpen}:{onOpen:()=>void}){
@@ -29,7 +30,7 @@ export function NotificationBell({onOpen}:{onOpen:()=>void}){
 }
 export function NotificationsPanel({onClose}:{onClose:()=>void}){
  const user=getStoredUser(),id=user?.id??'';
- const qc=useQueryClient(),navigate=useNavigate();
+ const qc=useQueryClient(),navigate=useNavigate(),setSchool=useUI(state=>state.setSchool);
  const [onlyUnread,setOnlyUnread]=useState(false);
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState('');
@@ -42,6 +43,7 @@ export function NotificationsPanel({onClose}:{onClose:()=>void}){
      if(!item.readAt)await readNotification(item.id);
      await invalidate();
      if(item.targetPath.startsWith('/')&&!item.targetPath.startsWith('//')&&!item.targetPath.includes('://')){
+       if(item.schoolId)setSchool(item.schoolId);
        navigate(item.targetPath);onClose();
      }
    }catch{setError('Không thể đánh dấu thông báo đã đọc.')}
