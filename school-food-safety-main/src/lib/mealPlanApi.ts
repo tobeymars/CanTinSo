@@ -29,6 +29,10 @@ export type MealPlanRow = {
     items: Array<{ mealSlot: string; isDefault?: boolean; dishVersion: { versionNo: number; recipeSnapshot?: Record<string, unknown> | null; ingredients?: Array<{ quantity: number | string; unitCode: string; ingredient: { name: string; code?: string } }>; dish: { name: string } } }>;
   }>;
 };
+/** Lightweight, permission-scoped list for the status strip on the menu page. */
+export async function listMealPlansForStatus():Promise<MealPlanRow[]> {
+  return request<MealPlanRow[]>('/meal-plans');
+}
 export async function loadMealPlanWorkspace() {
   const user = getStoredUser();
   const [ageGroups, plans] = await Promise.all([
