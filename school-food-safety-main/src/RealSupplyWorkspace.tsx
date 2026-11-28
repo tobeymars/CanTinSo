@@ -18,7 +18,7 @@ import RealSupplierDocuments from './RealSupplierDocuments'
 import RealWarehouseOverview from './RealWarehouseOverview'
 import { convertReceiptQuantity, formatReceiptQuantity, receiptUnitOptions, preferredReceiptUnit, readableStockQuantity } from './lib/supervisionUnits'
 
-function SupplyDialog({onClose,busy,children,title='Tạo phiếu nhập kho',eyebrow='QUẢN LÝ KHO · NHẬP NGUYÊN LIỆU',description='Kiểm nhận hàng hóa, nguyên liệu và lưu ảnh, chứng từ theo từng phiếu.'}:{onClose:()=>void;busy:boolean;children:ReactNode;title?:string;eyebrow?:string;description?:string}){
+function SupplyDialog({onClose,busy,children,wide=false,title='Tạo phiếu nhập kho',eyebrow='QUẢN LÝ KHO · NHẬP NGUYÊN LIỆU',description='Kiểm nhận hàng hóa, nguyên liệu và lưu ảnh, chứng từ theo từng phiếu.'}:{onClose:()=>void;busy:boolean;children:ReactNode;wide?:boolean;title?:string;eyebrow?:string;description?:string}){
   const dialogRef=useRef<HTMLDialogElement>(null)
   useEffect(()=>{
     const dialog=dialogRef.current
@@ -32,7 +32,7 @@ function SupplyDialog({onClose,busy,children,title='Tạo phiếu nhập kho',ey
     }
     return ()=>{if(dialog.open && typeof dialog.close==='function')dialog.close()}
   },[])
-  return <dialog ref={dialogRef} className="supply-receipt-modal" aria-label={title}
+  return <dialog ref={dialogRef} className={`supply-receipt-modal${wide?" supply-finance-modal":""}`} aria-label={title}
     onCancel={event=>{event.preventDefault();if(!busy)onClose()}}>
     <header className="supply-receipt-modal__heading">
       <div><small>{eyebrow}</small><h2>{title}</h2><p>{description}</p></div>
@@ -363,7 +363,7 @@ export default function RealSupplyWorkspace({mode,role}:{mode:'suppliers'|'wareh
           receipts={(finance.data?.receipts??[]).map(item=>({id:item.id,number:item.number,supplierId:item.supplier.id}))}
           canEdit={canEdit} busy={busy} execute={execute}/>
       </SupplyDialog>}
-      {financeDialogOpen&&finance.data&&<SupplyDialog title="Công nợ & thanh toán" eyebrow="ĐỐI SOÁT NHÀ CUNG CẤP"
+      {financeDialogOpen&&finance.data&&<SupplyDialog wide title="Công nợ & thanh toán" eyebrow="ĐỐI SOÁT NHÀ CUNG CẤP"
         description="Xem phiếu nhập, số dư và các chứng từ thanh toán đã ghi nhận của bếp."
         busy={busy} onClose={()=>setFinanceDialogOpen(false)}>
         <RealSupplierFinance key={activeId} kitchenId={activeId} finance={finance.data} canEdit={canEdit} busy={busy} execute={execute}/>
